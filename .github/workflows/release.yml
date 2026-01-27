@@ -1,0 +1,283 @@
+# 公开仓库构建 Release
+# 此文件需要放到公开仓库的 .github/workflows/ 目录
+#
+# 触发方式：由私有仓库通过 repository_dispatch 触发
+#
+# 安全说明：
+# - 代码通过 PAT 从私有仓库临时拉取，只存在于构建环境
+# - 构建完成后 runner 销毁，代码不会保留在公开仓库
+# - 日志已做静默处理，减少敏感信息泄露
+# - 私有仓库名通过 Secret 传递，不会出现在日志中
+#
+# 前置条件：
+# - 在公开仓库设置 Secrets:
+#   - PRIVATE_REPO: 私有仓库名 (如 owner/repo)
+#   - PRIVATE_REPO_PAT: 有权限读取私有仓库的 PAT (需要 repo 权限)
+#   - APPLE_CERTIFICATE: Apple 开发者证书 (Base64)
+#   - APPLE_CERTIFICATE_PASSWORD: 证书密码
+#   - APPLE_SIGNING_IDENTITY: 签名身份
+#   - APPLE_ID: Apple ID
+#   - APPLE_PASSWORD: App-specific password
+#   - APPLE_TEAM_ID: Team ID
+#   - TAURI_SIGNING_PRIVATE_KEY: Tauri 更新签名私钥
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 签名私钥密码
+
+name: Release
+
+on:
+  repository_dispatch:
+    types: [build-release]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 0.5.0)'
+        required: true
+
+jobs:
+  # 创建 Release
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: 获取版本号
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 版本号: $VERSION"
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: 'MobausStudio v${{ steps.version.outputs.version }}'
+          body: |
+            ## 下载说明
+
+            | 平台 | 文件 |
+            |------|------|
+            | macOS (Apple Silicon) | `.dmg` (aarch64) |
+            | macOS (Intel) | `.dmg` (x86_64) |
+            | Windows | `.msi` 或 `.exe` |
+            | Linux (Debian/Ubuntu) | `.deb` |
+            | Linux (Fedora/RHEL) | `.rpm` |
+            | Linux (通用) | `.AppImage` |
+
+            ## 自动更新
+
+            应用内置自动更新功能，启动时会自动检查新版本。
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 构建桌面应用
+  build-desktop:
+    needs: [create-release]
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+          - platform: 'windows-latest'
+            args: ''
+            target: ''
+          - platform: 'ubuntu-22.04'
+            args: ''
+            target: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      # 静默检出代码，仓库名通过 Secret 传递
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: v${{ needs.create-release.outputs.version }}
+
+      - name: 准备构建环境
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # 静默更新版本号
+          if command -v jq &> /dev/null; then
+            jq ".version = \"$VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+            jq ".version = \"$VERSION\"" src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          else
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json && rm -f package.json.bak
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json && rm -f src-tauri/tauri.conf.json.bak
+          fi
+
+          echo "✅ 环境准备完成"
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: 安装系统依赖 (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update > /dev/null 2>&1
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf > /dev/null 2>&1
+          echo "✅ 系统依赖安装完成"
+
+      # 静默安装依赖，隐藏包名
+      - name: 安装依赖
+        run: |
+          npm ci --silent > /dev/null 2>&1
+          echo "✅ 依赖安装完成"
+
+      - name: 导入签名证书 (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "⚠️ 未配置证书，跳过签名"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $RUNNER_TEMP/certificate.p12
+
+          # 静默执行证书导入
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH 2>/dev/null
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH 2>/dev/null
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security list-keychain -d user -s $KEYCHAIN_PATH 2>/dev/null
+
+          echo "✅ 证书导入完成"
+
+      # 构建应用
+      - name: 构建应用
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: 'MobausStudio v${{ steps.version.outputs.version }}'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # 构建 Web 版本
+  build-web:
+    needs: [create-release]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: v${{ needs.create-release.outputs.version }}
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 静默安装和构建
+      - name: 构建 Web 版本
+        run: |
+          npm ci --silent > /dev/null 2>&1
+          echo "✅ 依赖安装完成"
+          npm run build > /dev/null 2>&1
+          echo "✅ Web 构建完成"
+
+      - name: 打包并上传
+        run: |
+          cd dist && zip -rq ../MobausStudio-web.zip .
+          echo "✅ 打包完成"
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: MobausStudio-web.zip
+          tag_name: v${{ needs.create-release.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 构建 Docker 镜像
+  build-docker:
+    needs: [create-release]
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: v${{ needs.create-release.outputs.version }}
+
+      - name: 设置 Docker 环境
+        run: echo "🐳 配置 Docker 构建环境..."
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.create-release.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
