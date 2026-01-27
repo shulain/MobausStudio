@@ -32,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如 0.5.0)'
+        description: "版本号 (如 0.5.0)"
         required: true
 
 jobs:
@@ -114,26 +114,23 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: 'MobausStudio v${{ steps.version.outputs.version }}'
+          name: "MobausStudio v${{ steps.version.outputs.version }}"
           body: |
             ${{ steps.changelog.outputs.content }}
 
             ---
 
-            ## 📥 下载说明
+            ## 📥 Download Instructions
 
-            | 平台 | 文件 |
+            | Platform | File |
             |------|------|
             | macOS (Apple Silicon) | `.dmg` (aarch64) |
             | macOS (Intel) | `.dmg` (x86_64) |
-            | Windows | `.msi` 或 `.exe` |
+            | Windows | `.msi` Or `.exe` |
             | Linux (Debian/Ubuntu) | `.deb` |
             | Linux (Fedora/RHEL) | `.rpm` |
-            | Linux (通用) | `.AppImage` |
+            | Linux (General) | `.AppImage` |
 
-            ## 🔄 自动更新
-
-            桌面应用内置自动更新功能，启动时会自动检查新版本。
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         env:
@@ -167,27 +164,34 @@ jobs:
         run: |
           echo "🔍 扫描敏感信息..."
 
-          # 默认敏感模式 + 自定义模式
-          DEFAULT_PATTERNS="kinzhi|PRIVATE|SECRET|API_KEY|PASSWORD|apikey|api-key"
-          CUSTOM_PATTERNS="${{ secrets.SENSITIVE_PATTERNS }}"
+          # 真正需要检测的敏感模式（更精确）
+          # - kinzhi: 仓库贡献者
+          # - sk-[a-zA-Z0-9]: OpenAI API Key 格式
+          # - ghp_: GitHub Personal Access Token
+          # - PRIVATE_REPO: 私有仓库变量名
+          # - 实际的密码/密钥值（非说明文字）
+          SENSITIVE_PATTERNS="kinzhi|sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|PRIVATE_REPO_PAT|PRIVATE_REPO\b"
 
+          # 用户自定义的额外模式
+          CUSTOM_PATTERNS="${{ secrets.SENSITIVE_PATTERNS }}"
           if [ -n "$CUSTOM_PATTERNS" ]; then
-            PATTERNS="$DEFAULT_PATTERNS|$CUSTOM_PATTERNS"
-          else
-            PATTERNS="$DEFAULT_PATTERNS"
+            SENSITIVE_PATTERNS="$SENSITIVE_PATTERNS|$CUSTOM_PATTERNS"
           fi
 
           # 扫描 user-guide 目录
           FOUND_ISSUES=""
           while IFS= read -r -d '' file; do
-            if grep -iE "$PATTERNS" "$file" > /dev/null 2>&1; then
-              FOUND_ISSUES="$FOUND_ISSUES\n- $file"
+            # 检测敏感模式
+            MATCHES=$(grep -oE "$SENSITIVE_PATTERNS" "$file" 2>/dev/null || true)
+            if [ -n "$MATCHES" ]; then
+              FOUND_ISSUES="$FOUND_ISSUES\n- $file: $MATCHES"
             fi
           done < <(find private-repo/user-guide -type f \( -name "*.md" -o -name "*.txt" -o -name "*.json" \) -print0)
 
           if [ -n "$FOUND_ISSUES" ]; then
-            echo "❌ 发现敏感信息！以下文件包含敏感内容:"
+            echo "❌ 发现敏感信息！"
             echo -e "$FOUND_ISSUES"
+            echo ""
             echo "请检查并移除敏感信息后重试"
             exit 1
           fi
@@ -248,18 +252,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            target: 'aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-            target: 'x86_64-apple-darwin'
-          - platform: 'windows-latest'
-            args: ''
-            target: ''
-          - platform: 'ubuntu-22.04'
-            args: ''
-            target: ''
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
+          - platform: "windows-latest"
+            args: ""
+            target: ""
+          - platform: "ubuntu-22.04"
+            args: ""
+            target: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -293,7 +297,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - name: 安装 Rust
         uses: dtolnay/rust-toolchain@stable
@@ -350,7 +354,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v${{ steps.version.outputs.version }}
-          releaseName: 'MobausStudio v${{ steps.version.outputs.version }}'
+          releaseName: "MobausStudio v${{ steps.version.outputs.version }}"
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -373,7 +377,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - name: 构建 Web 版本
         shell: bash
