@@ -1,13 +1,14 @@
 # 公开仓库构建 Release
 # 此文件需要放到公开仓库的 .github/workflows/ 目录
 #
-# 触发方式：由私有仓库通过 repository_dispatch 触发
+# 触发方式：由私有仓库通过 repository_dispatch 触发，或手动触发
 #
 # 安全说明：
 # - 代码通过 PAT 从私有仓库临时拉取，只存在于构建环境
 # - 构建完成后 runner 销毁，代码不会保留在公开仓库
 # - 日志已做静默处理，减少敏感信息泄露
 # - 私有仓库名通过 Secret 传递，不会出现在日志中
+# - 用户手册同步前会进行敏感信息扫描
 #
 # 前置条件：
 # - 在公开仓库设置 Secrets:
@@ -21,6 +22,7 @@
 #   - APPLE_TEAM_ID: Team ID
 #   - TAURI_SIGNING_PRIVATE_KEY: Tauri 更新签名私钥
 #   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 签名私钥密码
+#   - SENSITIVE_PATTERNS: 敏感信息正则模式（可选，用|分隔多个模式）
 
 name: Release
 
@@ -34,13 +36,14 @@ on:
         required: true
 
 jobs:
-  # 创建 Release
-  create-release:
+  # 验证并准备发布
+  prepare-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.content }}
     steps:
       - name: 获取版本号
         id: version
@@ -50,8 +53,62 @@ jobs:
           else
             VERSION="${{ github.event.inputs.version }}"
           fi
+
+          # 验证版本号格式
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ 版本号格式错误: $VERSION"
+            echo "正确格式示例: 0.1.0, 1.0.0, 1.0.0-beta.1"
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 版本号: $VERSION"
+
+      - name: 检出私有仓库代码
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: v${{ steps.version.outputs.version }}
+          sparse-checkout: |
+            user-guide
+
+      - name: 提取 Changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHANGELOG_FILE="user-guide/en/changelog.md"
+
+          if [ -f "$CHANGELOG_FILE" ]; then
+            # 提取当前版本的 changelog 内容
+            # 匹配 ## [版本号] 到下一个 ## 或文件结束
+            CONTENT=$(awk -v ver="$VERSION" '
+              /^## \[/ {
+                if (found) exit
+                if (index($0, "["ver"]")) found=1
+              }
+              found && !/^## \[/ { print }
+            ' "$CHANGELOG_FILE")
+
+            if [ -n "$CONTENT" ]; then
+              # 保存到文件（处理多行）
+              echo "$CONTENT" > /tmp/changelog.md
+              echo "✅ 已提取 v$VERSION 的更新日志"
+            else
+              echo "⚠️ 未找到 v$VERSION 的更新日志，使用默认内容"
+              echo "首次发布" > /tmp/changelog.md
+            fi
+          else
+            echo "⚠️ 未找到 changelog 文件，使用默认内容"
+            echo "版本更新" > /tmp/changelog.md
+          fi
+
+          # 使用 EOF 处理多行内容
+          {
+            echo 'content<<EOF'
+            cat /tmp/changelog.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: 创建 Release
         uses: softprops/action-gh-release@v1
@@ -59,7 +116,11 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: 'MobausStudio v${{ steps.version.outputs.version }}'
           body: |
-            ## 下载说明
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+
+            ## 📥 下载说明
 
             | 平台 | 文件 |
             |------|------|
@@ -70,17 +131,117 @@ jobs:
             | Linux (Fedora/RHEL) | `.rpm` |
             | Linux (通用) | `.AppImage` |
 
-            ## 自动更新
+            ## 🔄 自动更新
 
-            应用内置自动更新功能，启动时会自动检查新版本。
+            桌面应用内置自动更新功能，启动时会自动检查新版本。
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # 同步用户手册到公开仓库
+  sync-docs:
+    needs: [prepare-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 检出公开仓库
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 检出私有仓库用户手册
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: v${{ needs.prepare-release.outputs.version }}
+          path: private-repo
+          sparse-checkout: |
+            user-guide
+
+      - name: 敏感信息扫描
+        id: security-scan
+        run: |
+          echo "🔍 扫描敏感信息..."
+
+          # 默认敏感模式 + 自定义模式
+          DEFAULT_PATTERNS="kinzhi|PRIVATE|SECRET|API_KEY|PASSWORD|apikey|api-key"
+          CUSTOM_PATTERNS="${{ secrets.SENSITIVE_PATTERNS }}"
+
+          if [ -n "$CUSTOM_PATTERNS" ]; then
+            PATTERNS="$DEFAULT_PATTERNS|$CUSTOM_PATTERNS"
+          else
+            PATTERNS="$DEFAULT_PATTERNS"
+          fi
+
+          # 扫描 user-guide 目录
+          FOUND_ISSUES=""
+          while IFS= read -r -d '' file; do
+            if grep -iE "$PATTERNS" "$file" > /dev/null 2>&1; then
+              FOUND_ISSUES="$FOUND_ISSUES\n- $file"
+            fi
+          done < <(find private-repo/user-guide -type f \( -name "*.md" -o -name "*.txt" -o -name "*.json" \) -print0)
+
+          if [ -n "$FOUND_ISSUES" ]; then
+            echo "❌ 发现敏感信息！以下文件包含敏感内容:"
+            echo -e "$FOUND_ISSUES"
+            echo "请检查并移除敏感信息后重试"
+            exit 1
+          fi
+
+          echo "✅ 敏感信息扫描通过"
+
+      - name: 同步用户手册
+        run: |
+          # 清理旧的 user-guide（保留 .git）
+          rm -rf user-guide
+
+          # 复制新的 user-guide
+          cp -r private-repo/user-guide .
+
+          # 复制 README 到根目录
+          if [ -f "user-guide/PUBLIC_README.md" ]; then
+            cp user-guide/PUBLIC_README.md README.md
+            echo "✅ 已更新 README.md"
+          fi
+
+          if [ -f "user-guide/PUBLIC_README_ZH.md" ]; then
+            cp user-guide/PUBLIC_README_ZH.md README_ZH.md
+            echo "✅ 已更新 README_ZH.md"
+          fi
+
+          # 复制 LICENSE
+          if [ -f "user-guide/LICENSE" ]; then
+            cp user-guide/LICENSE LICENSE
+            echo "✅ 已更新 LICENSE"
+          fi
+
+          # 清理临时文件
+          rm -rf private-repo
+
+          echo "✅ 用户手册同步完成"
+
+      - name: 提交更改
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --staged --quiet; then
+            echo "📝 没有文档变更需要提交"
+          else
+            git commit -m "docs: 同步用户手册 v${{ needs.prepare-release.outputs.version }}"
+            git push
+            echo "✅ 文档已提交"
+          fi
+
   # 构建桌面应用
   build-desktop:
-    needs: [create-release]
+    needs: [prepare-release]
     permissions:
       contents: write
     strategy:
@@ -103,19 +264,18 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      # 静默检出代码，仓库名通过 Secret 传递
       - name: 检出代码
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.PRIVATE_REPO }}
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: v${{ needs.create-release.outputs.version }}
+          ref: v${{ needs.prepare-release.outputs.version }}
 
       - name: 准备构建环境
         id: version
         shell: bash
         run: |
-          VERSION="${{ needs.create-release.outputs.version }}"
+          VERSION="${{ needs.prepare-release.outputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # 静默更新版本号
@@ -147,8 +307,8 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf > /dev/null 2>&1
           echo "✅ 系统依赖安装完成"
 
-      # 静默安装依赖，隐藏包名
       - name: 安装依赖
+        shell: bash
         run: |
           npm ci --silent > /dev/null 2>&1
           echo "✅ 依赖安装完成"
@@ -169,7 +329,6 @@ jobs:
 
           echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $RUNNER_TEMP/certificate.p12
 
-          # 静默执行证书导入
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH 2>/dev/null
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
@@ -179,7 +338,6 @@ jobs:
 
           echo "✅ 证书导入完成"
 
-      # 构建应用
       - name: 构建应用
         uses: tauri-apps/tauri-action@v0
         env:
@@ -199,7 +357,7 @@ jobs:
 
   # 构建 Web 版本
   build-web:
-    needs: [create-release]
+    needs: [prepare-release]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -209,7 +367,7 @@ jobs:
         with:
           repository: ${{ secrets.PRIVATE_REPO }}
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: v${{ needs.create-release.outputs.version }}
+          ref: v${{ needs.prepare-release.outputs.version }}
 
       - name: 安装 Node.js
         uses: actions/setup-node@v4
@@ -217,8 +375,8 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 静默安装和构建
       - name: 构建 Web 版本
+        shell: bash
         run: |
           npm ci --silent > /dev/null 2>&1
           echo "✅ 依赖安装完成"
@@ -234,13 +392,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: MobausStudio-web.zip
-          tag_name: v${{ needs.create-release.outputs.version }}
+          tag_name: v${{ needs.prepare-release.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # 构建 Docker 镜像
   build-docker:
-    needs: [create-release]
+    needs: [prepare-release]
     permissions:
       contents: read
       packages: write
@@ -251,7 +409,7 @@ jobs:
         with:
           repository: ${{ secrets.PRIVATE_REPO }}
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: v${{ needs.create-release.outputs.version }}
+          ref: v${{ needs.prepare-release.outputs.version }}
 
       - name: 设置 Docker 环境
         run: echo "🐳 配置 Docker 构建环境..."
@@ -269,6 +427,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 设置镜像名称
+        id: image
+        run: |
+          # 强制转换为小写
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+
+          echo "name=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+
       - name: 构建并推送镜像
         uses: docker/build-push-action@v5
         with:
@@ -276,8 +445,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.create-release.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ${{ steps.image.outputs.name }}:${{ needs.prepare-release.outputs.version }}
+            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.major_minor }}
+            ${{ steps.image.outputs.name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
