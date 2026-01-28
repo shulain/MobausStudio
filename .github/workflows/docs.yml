@@ -1,7 +1,6 @@
 # 公开仓库构建文档站
 # 此文件需要放到公开仓库的 .github/workflows/ 目录
 
-
 name: Deploy Docs
 
 on:
@@ -38,6 +37,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
+        with:
+          enablement: true
 
       - name: Install dependencies
         run: cd user-guide && npm install
