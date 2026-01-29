@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#667eea"/>
+      <stop offset="100%" stop-color="#764ba2"/>
+    </linearGradient>
+    <!-- 气泡微光效果 -->
+    <linearGradient id="bubble" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f3f0ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 圆角背景 -->
+  <rect width="32" height="32" rx="8" fill="url(#bg)"/>
+
+  <!-- 装饰光点 - 左上 -->
+  <circle cx="5" cy="5" r="1.5" fill="white" opacity="0.3"/>
+  <circle cx="8" cy="3" r="1" fill="white" opacity="0.2"/>
+
+  <!-- 装饰光点 - 右下 -->
+  <circle cx="28" cy="27" r="1.2" fill="white" opacity="0.25"/>
+  <circle cx="25" cy="29" r="0.8" fill="white" opacity="0.15"/>
+
+  <!-- AI 聊天气泡 - 倾斜设计更有动感 -->
+  <g transform="rotate(-3 16 14)">
+    <path d="M6.5 9C6.5 7.34 7.84 6 9.5 6h13c1.66 0 3 1.34 3 3v8.5c0 1.66-1.34 3-3 3h-3l-3.5 4-3.5-4h-3c-1.66 0-3-1.34-3-3V9z"
+          fill="url(#bubble)"
+          filter="url(#glow)"/>
+  </g>
+
+  <!-- 三个点 - AI 思考中 -->
+  <circle cx="11" cy="13.5" r="2" fill="#667eea"/>
+  <circle cx="16" cy="13.5" r="2" fill="#7c3aed"/>
+  <circle cx="21" cy="13.5" r="2" fill="#764ba2"/>
+
+  <!-- 小星星装饰 - 代表智能闪光 -->
+  <path d="M27 8l0.5 1 1 0.5-1 0.5-0.5 1-0.5-1-1-0.5 1-0.5z" fill="white" opacity="0.8"/>
+  <path d="M6 24l0.4 0.8 0.8 0.4-0.8 0.4-0.4 0.8-0.4-0.8-0.8-0.4 0.8-0.4z" fill="white" opacity="0.5"/>
+</svg>

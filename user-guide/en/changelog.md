@@ -4,7 +4,23 @@ All version update records.
 
 ---
 
-## [0.5.0] - 2026-01-27
+## [0.6.0] - 2025-01-29
+
+### Added
+
+- 🔐 Provider Hub - Unified management for 15+ AI service providers
+- 🔑 OAuth Login - Support GitHub Copilot, OpenAI, Anthropic, Google account authorization
+- 🔄 Auto Model Fetching - Automatically fetch latest models after connecting to providers
+- 🆕 OpenAI New Models - GPT-5, GPT-4.1, o3 and other latest models
+
+### Improved
+
+- 💾 Model Selection Memory - Preserve selected model after switching pages or restarting
+- 🔒 Auto Token Refresh - No need to re-authorize frequently after OAuth login
+
+---
+
+## [0.5.0] - 2025-01-27
 
 ### Added
 
