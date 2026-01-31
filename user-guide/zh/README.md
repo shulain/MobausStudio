@@ -15,7 +15,9 @@
 
 - [界面介绍](./features/ui-overview.md) - 了解界面布局
 - [对话功能](./features/chat.md) - 如何进行 AI 对话
+- [提供商管理](./features/providers.md) - 连接 AI 服务提供商（支持 OAuth 登录）
 - [模型配置](./features/models.md) - 配置和切换 AI 模型
+- [智能体](./features/agents.md) - 创建专属 AI 助手
 - [MCP 服务](./features/mcp.md) - 连接外部工具和服务
 - [技能系统](./features/skills.md) - 使用和管理技能
 

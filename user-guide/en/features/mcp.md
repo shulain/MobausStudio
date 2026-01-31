@@ -17,9 +17,9 @@ This greatly extends AI's capabilities, enabling it to complete more complex tas
 
 ## Configure MCP Server
 
-### 1. Open MCP Settings
+### 1. Open MCP Page
 
-Click the "🔌 MCP" icon in the sidebar, or go to "Settings" → "MCP Configuration".
+Click the "MCP" icon in the sidebar to enter the MCP management page.
 
 ### 2. Add Server
 

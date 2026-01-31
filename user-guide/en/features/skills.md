@@ -36,34 +36,17 @@ Click "Execute" or "Send", the skill will automatically generate the complete pr
 
 ---
 
-## Built-in Skill Examples
+## Built-in Skills
 
-### Code Related
+MobausStudio provides 3 built-in skills, ready to use out of the box:
 
-| Skill | Function |
-|-------|----------|
-| Code Review | Review code quality, security, performance |
-| Code Explanation | Explain code functionality and logic |
-| Code Optimization | Provide optimization suggestions |
-| Bug Fix | Analyze and fix code issues |
-| Unit Test | Generate unit test code |
+| Skill | Function | Description |
+|-------|----------|-------------|
+| Code Review | Review code quality, security, performance | Categorizes issues by P0/P1/P2 priority, provides professional review reports |
+| Translation Expert | Multi-language translation | Supports Chinese/English/Japanese/Korean, follows faithfulness-expressiveness-elegance principles |
+| Writing Assistant | Polish, expand, rewrite articles | Supports business emails, technical docs, marketing copy and more |
 
-### Text Related
-
-| Skill | Function |
-|-------|----------|
-| Text Summary | Generate article summary |
-| Translation | Multi-language translation |
-| Polish | Improve text expression |
-| Proofread | Check grammar and spelling |
-
-### Others
-
-| Skill | Function |
-|-------|----------|
-| Brainstorm | Generate ideas and thoughts |
-| Explain Concept | Explain complex concepts in simple language |
-| Comparison Analysis | Compare pros and cons of multiple options |
+> 💡 Built-in skills cannot be edited or deleted, but you can create custom skills to meet more needs.
 
 ---
 

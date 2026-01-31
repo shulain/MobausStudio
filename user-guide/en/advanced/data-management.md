@@ -61,6 +61,38 @@ cp -r ~/.config/MobausStudio ~/Backup/
 
 ---
 
+## Import/Export Configuration
+
+MobausStudio supports importing and exporting app configuration for easy backup and migration.
+
+### Export Configuration
+
+1. Click the "⚙️ Settings" icon in the sidebar
+2. Select "Data Management"
+3. Click "Export Configuration"
+4. Select content to export:
+   - **Model Configuration**: AI model settings (including API Keys)
+   - **Agents**: Custom AI assistants
+   - **Skills**: Custom skills
+   - **MCP Servers**: MCP configuration
+   - **Chat Records**: All conversation history
+5. Click "Export", choose save location
+
+> ⚠️ **Security Note**: Export files contain sensitive information like API keys. Keep them safe.
+
+### Import Configuration
+
+1. Click the "⚙️ Settings" icon in the sidebar
+2. Select "Data Management"
+3. Click "Import Configuration"
+4. Select previously exported configuration file
+5. Choose import options:
+   - **Merge**: Merge with existing data
+   - **Overwrite**: Replace existing data
+6. Click "Import"
+
+---
+
 ## Export Conversations
 
 ### Single Conversation

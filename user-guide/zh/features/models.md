@@ -2,54 +2,66 @@
 
 MobausStudio 支持多种 AI 模型，本文介绍如何配置和管理模型。
 
+## 前提条件
+
+在添加模型之前，你需要先连接对应的 AI 提供商。请参考 [提供商管理](./providers.md) 了解如何连接提供商。
+
+---
+
 ## 支持的模型
 
 ### OpenAI
 
-- GPT-4o
-- GPT-4 Turbo
-- GPT-4
+- GPT-4o、GPT-4o Mini（推荐）
+- GPT-4.1 Nano、GPT-4.1 Mini（超低成本）
+- GPT-4 Turbo、GPT-4
 - GPT-3.5 Turbo
+- o1、o1 Mini、o3 Mini（推理模型）
 
 ### Anthropic
 
-- Claude 3.5 Sonnet
-- Claude 3 Opus
-- Claude 3 Sonnet
-- Claude 3 Haiku
+- Claude Sonnet 4（最新）
+- Claude 3.5 Sonnet、Claude 3.5 Haiku
+- Claude 3 Opus、Claude 3 Sonnet、Claude 3 Haiku
+
+### Google AI
+
+- Gemini 2.0 Flash
+- Gemini 1.5 Pro、Gemini 1.5 Flash
+- Gemini Pro
+
+### DeepSeek
+
+- DeepSeek Chat
+- DeepSeek Reasoner（深度推理）
 
 ### 其他兼容模型
 
 任何兼容 OpenAI API 格式的模型：
 - Azure OpenAI
 - 本地部署的开源模型（通过 Ollama、LM Studio 等）
-- 其他第三方 API 服务
+- OpenRouter、Groq、Together AI 等第三方服务
 
 ---
 
 ## 配置步骤
 
-### 1. 打开设置
+### 1. 确保已连接提供商
 
-点击侧边栏的「⚙️ 设置」图标，选择「模型配置」。
+点击侧边栏的「🔗 提供商」图标，确认对应提供商显示「已连接」状态。
 
-### 2. 添加 API 密钥
+### 2. 添加模型
 
-#### OpenAI
-
-1. 访问 [OpenAI API Keys](https://platform.openai.com/api-keys)
-2. 创建新的 API Key
-3. 复制密钥，粘贴到 MobausStudio 的 OpenAI API Key 输入框
-
-#### Anthropic
-
-1. 访问 [Anthropic Console](https://console.anthropic.com/)
-2. 创建 API Key
-3. 复制密钥，粘贴到 MobausStudio 的 Anthropic API Key 输入框
+1. 点击侧边栏的「🖥️ 模型」图标
+2. 点击「添加模型」按钮
+3. 选择已连接的提供商
+4. 选择具体模型
+5. 根据需要调整参数
+6. 点击「保存」
 
 ### 3. 选择默认模型
 
-配置完成后，选择一个默认使用的模型。
+配置完成后，可以在对话界面顶部选择默认使用的模型。
 
 ---
 

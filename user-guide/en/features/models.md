@@ -2,21 +2,38 @@
 
 MobausStudio supports multiple AI models. This article introduces how to configure and manage models.
 
+## Prerequisites
+
+Before adding models, you need to connect the corresponding AI provider first. See [Provider Management](./providers.md) to learn how to connect providers.
+
+---
+
 ## Supported Models
 
 ### OpenAI
 
-- GPT-4o
-- GPT-4 Turbo
-- GPT-4
+- GPT-4o, GPT-4o Mini (Recommended)
+- GPT-4.1 Nano, GPT-4.1 Mini (Ultra low cost)
+- GPT-4 Turbo, GPT-4
 - GPT-3.5 Turbo
+- o1, o1 Mini, o3 Mini (Reasoning models)
 
 ### Anthropic
 
-- Claude 3.5 Sonnet
-- Claude 3 Opus
-- Claude 3 Sonnet
-- Claude 3 Haiku
+- Claude Sonnet 4 (Latest)
+- Claude 3.5 Sonnet, Claude 3.5 Haiku
+- Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku
+
+### Google AI
+
+- Gemini 2.0 Flash
+- Gemini 1.5 Pro, Gemini 1.5 Flash
+- Gemini Pro
+
+### DeepSeek
+
+- DeepSeek Chat
+- DeepSeek Reasoner (Deep reasoning)
 
 ### Other Compatible Models
 
@@ -24,33 +41,28 @@ Any model compatible with OpenAI API format:
 
 - Azure OpenAI
 - Locally deployed open-source models (via Ollama, LM Studio, etc.)
-- Other third-party API services
+- OpenRouter, Groq, Together AI and other third-party services
 
 ---
 
 ## Configuration Steps
 
-### 1. Open Settings
+### 1. Ensure Provider is Connected
 
-Click the "⚙️ Settings" icon in the sidebar, select "Model Configuration".
+Click the "🔗 Providers" icon in the sidebar, confirm the corresponding provider shows "Connected" status.
 
-### 2. Add API Key
+### 2. Add Model
 
-#### OpenAI
-
-1. Visit [OpenAI API Keys](https://platform.openai.com/api-keys)
-2. Create a new API Key
-3. Copy the key and paste into MobausStudio's OpenAI API Key input
-
-#### Anthropic
-
-1. Visit [Anthropic Console](https://console.anthropic.com/)
-2. Create an API Key
-3. Copy the key and paste into MobausStudio's Anthropic API Key input
+1. Click the "🖥️ Models" icon in the sidebar
+2. Click "Add Model" button
+3. Select the connected provider
+4. Select specific model
+5. Adjust parameters as needed
+6. Click "Save"
 
 ### 3. Select Default Model
 
-After configuration, select a default model to use.
+After configuration, you can select the default model at the top of the chat interface.
 
 ---
 

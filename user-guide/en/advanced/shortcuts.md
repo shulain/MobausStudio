@@ -1,78 +1,64 @@
 # Keyboard Shortcuts
 
-Mastering keyboard shortcuts can greatly improve your efficiency.
-
-## General Shortcuts
-
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| New chat | `⌘ + N` | `Ctrl + N` |
-| Open settings | `⌘ + ,` | `Ctrl + ,` |
-| Close window | `⌘ + W` | `Ctrl + W` |
-| Quit app | `⌘ + Q` | `Alt + F4` |
-
----
+Mastering keyboard shortcuts can improve your efficiency.
 
 ## Chat Shortcuts
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Send message | `Enter` | `Enter` |
-| New line | `⇧ + Enter` | `Shift + Enter` |
-| Focus input | `⌘ + L` | `Ctrl + L` |
-| Clear input | `⌘ + ⇧ + Backspace` | `Ctrl + Shift + Backspace` |
+| Shortcut | Function |
+|----------|----------|
+| `Enter` | Send message |
+| `Shift + Enter` | New line (without sending) |
 
 ---
 
-## Editing Shortcuts
+## System Shortcuts
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Copy | `⌘ + C` | `Ctrl + C` |
-| Paste | `⌘ + V` | `Ctrl + V` |
-| Cut | `⌘ + X` | `Ctrl + X` |
-| Select all | `⌘ + A` | `Ctrl + A` |
-| Undo | `⌘ + Z` | `Ctrl + Z` |
-| Redo | `⌘ + ⇧ + Z` | `Ctrl + Shift + Z` |
+The following are general shortcuts provided by the operating system and browser, which also work in MobausStudio:
+
+### Editing
+
+| Action | macOS | Windows/Linux | Function |
+|--------|-------|---------------|----------|
+| Copy | `⌘ + C` | `Ctrl + C` | Copy selected content |
+| Paste | `⌘ + V` | `Ctrl + V` | Paste content |
+| Cut | `⌘ + X` | `Ctrl + X` | Cut selected content |
+| Select all | `⌘ + A` | `Ctrl + A` | Select all content |
+| Undo | `⌘ + Z` | `Ctrl + Z` | Undo operation |
+| Redo | `⌘ + ⇧ + Z` | `Ctrl + Shift + Z` | Redo operation |
+
+### Window Operations (Desktop)
+
+| Action | macOS | Windows/Linux | Function |
+|--------|-------|---------------|----------|
+| Close window | `⌘ + W` | `Ctrl + W` | Close current window |
+| Quit app | `⌘ + Q` | `Alt + F4` | Quit application |
+| Minimize | `⌘ + M` | `Win + ↓` | Minimize window |
+| Fullscreen | `⌘ + Ctrl + F` | `F11` | Toggle fullscreen mode |
+| Zoom in | `⌘ + +` | `Ctrl + +` | Zoom in interface |
+| Zoom out | `⌘ + -` | `Ctrl + -` | Zoom out interface |
+| Reset zoom | `⌘ + 0` | `Ctrl + 0` | Reset to default size |
 
 ---
 
-## Navigation Shortcuts
+## Input Tips
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Previous chat | `⌘ + ↑` | `Ctrl + ↑` |
-| Next chat | `⌘ + ↓` | `Ctrl + ↓` |
-| Scroll to top | `⌘ + Home` | `Ctrl + Home` |
-| Scroll to bottom | `⌘ + End` | `Ctrl + End` |
+### Chinese Input Method
 
----
+When using Chinese input method, pressing `Enter` to confirm word selection won't send the message. Only pressing `Enter` when not in input method mode will send.
 
-## Window Shortcuts
+### Paste Images
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Minimize | `⌘ + M` | `Win + ↓` |
-| Fullscreen | `⌘ + Ctrl + F` | `F11` |
-| Zoom in | `⌘ + +` | `Ctrl + +` |
-| Zoom out | `⌘ + -` | `Ctrl + -` |
-| Reset zoom | `⌘ + 0` | `Ctrl + 0` |
+Paste images directly in the input box (`Ctrl/Cmd + V`), and they will be automatically added as attachments.
+
+### Drag and Drop Files
+
+Drag files to the chat window to quickly add attachments.
 
 ---
 
 ## Custom Shortcuts
 
 Custom shortcuts are not currently supported. This feature is under development.
-
----
-
-## Shortcut Conflicts
-
-If shortcuts conflict with system or other apps:
-
-1. Check system shortcut settings
-2. Close conflicting apps
-3. Use alternative operations (mouse click)
 
 ---
 

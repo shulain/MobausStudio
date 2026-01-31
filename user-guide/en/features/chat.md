@@ -56,14 +56,6 @@ All chats are displayed in the left list:
 
 Click the copy icon next to the message, or select text and copy.
 
-### Regenerate
-
-For AI replies, click "Regenerate" to get a new answer.
-
-### Edit Message
-
-For messages you sent, click "Edit" to modify and resend.
-
 ---
 
 ## Markdown Support
@@ -157,5 +149,6 @@ If the answer is not satisfactory:
 
 ## Next Steps
 
+- [Provider Management](./providers.md) - Connect more AI services
 - [Model Configuration](./models.md) - Configure more AI models
 - [MCP Services](./mcp.md) - Let AI use external tools

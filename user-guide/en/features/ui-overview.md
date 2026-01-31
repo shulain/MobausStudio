@@ -35,6 +35,7 @@ The sidebar is on the left side of the interface, providing quick access to main
 | 🤖 | Agents | Agent management, create and configure AI assistants |
 | 🧩 | Skills | Preset prompt templates |
 | 🔌 | MCP | MCP service management |
+| 🔗 | Providers | AI service provider connection management |
 | 🖥️ | Models | AI model configuration and management |
 
 ### Bottom Actions
@@ -82,14 +83,24 @@ You can select different AI models at the top.
 
 ## Feature Pages
 
+### Providers Page (Standalone)
+
+Click "🔗 Providers" in the sidebar to connect AI service providers:
+
+- View all supported providers (15+)
+- One-click OAuth login (OpenAI, Anthropic, Google, GitHub)
+- API Key connection method
+- View connection status and available model count
+- Search and filter providers
+
 ### Models Page (Standalone)
 
 Click "🖥️ Models" in the sidebar to configure AI models:
 
 - Add/edit/delete model configurations
-- Set API keys and endpoints
+- Select models from connected providers
+- Set model parameters (temperature, max tokens, etc.)
 - Test model connection status
-- Supports OpenAI, Anthropic, custom compatible endpoints
 
 ### Agents Page (Standalone)
 
@@ -126,8 +137,6 @@ Click "⚙️ Settings" in the sidebar:
 Hovering over a message shows action buttons:
 
 - 📋 Copy content
-- 🔄 Regenerate (AI replies)
-- ✏️ Edit (user messages)
 
 ### Code Block Operations
 
@@ -151,5 +160,6 @@ Switch themes in "Settings" → "General".
 
 ## Next Steps
 
+- [Provider Management](./providers.md) - Connect AI service providers
 - [Chat](./chat.md) - Learn more about chat features
 - [Model Configuration](./models.md) - Configure AI models

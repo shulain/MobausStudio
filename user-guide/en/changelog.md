@@ -4,6 +4,28 @@ All version update records.
 
 ---
 
+## [0.7.0] - 2025-01-30
+
+### Added
+
+- 📊 Google Model Quota Display - View remaining quota for each model in provider card
+- 🔄 Dynamic Model List - Google provider automatically fetches latest available models
+- ✅ Batch Model Check - One-click check availability status for all models
+
+### Improved
+
+- 🎨 New Dropdown Selector - Beautiful custom dropdown component, goodbye native styles
+- 🏷️ Connected Provider Badge - Green badge clearly indicates connected status
+- 🌫️ Modal Backdrop Blur - Unified frosted glass effect for all modals
+- 🎯 Smart Model Selection - Warning indicator for models with exhausted quota
+
+### Fixed
+
+- 🔧 Fixed models using provider credentials not working after restart
+- 🔧 Fixed model credential persistence loss issue
+
+---
+
 ## [0.6.0] - 2025-01-29
 
 ### Added

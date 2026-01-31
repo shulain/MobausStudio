@@ -40,21 +40,93 @@ sudo dnf install fuse fuse-libs
 
 ---
 
+## Provider & Authentication Issues
+
+### How to connect AI services?
+
+MobausStudio supports two connection methods:
+
+**Method 1: OAuth Login (Recommended)**
+
+1. Click the "Providers" icon in the sidebar
+2. Find providers that support OAuth (OpenAI, Anthropic, Google, GitHub Copilot)
+3. Click "Connect", select "OAuth Login"
+4. Complete authorization in browser
+
+**Method 2: API Key**
+
+1. Click the "Providers" icon in the sidebar
+2. Find the provider you want to connect, click "Connect"
+3. Select "API Key" method
+4. Enter your API Key
+
+### What are the requirements for OAuth login?
+
+| Provider | Required Subscription |
+|----------|----------------------|
+| OpenAI | ChatGPT Plus or Pro subscription |
+| Anthropic | Claude Pro or Max subscription |
+| Google AI | Google account (free) |
+| GitHub Copilot | GitHub Copilot subscription |
+
+### What to do if OAuth authorization fails?
+
+1. **Check browser**: Make sure browser isn't blocking popups
+2. **Check network**: Ensure network connection is stable
+3. **Manual copy link**: If auto-redirect fails, try manually copying the authorization link to browser
+4. **Check subscription status**: Confirm your subscription is still active
+
+### What to do if API Key is invalid?
+
+1. **Check copy**: Confirm Key is copied completely without extra spaces
+2. **Check validity**: Confirm Key hasn't expired or been revoked
+3. **Check balance**: Confirm account has sufficient balance
+4. **Check permissions**: Some Keys may have usage restrictions
+
+### How to get an API Key?
+
+On the provider connection page, click "Get API Key" link to go to the provider's website:
+
+| Provider | Website |
+|----------|---------|
+| OpenAI | platform.openai.com |
+| Anthropic | console.anthropic.com |
+| Google AI | aistudio.google.com |
+| DeepSeek | platform.deepseek.com |
+
+### Why do I need to add models after connecting a provider?
+
+Providers and models are managed separately:
+
+- **Provider**: Manages authentication credentials (API Key or OAuth Token)
+- **Model**: Configures which specific model to use and its parameters
+
+After connecting a provider, you need to add specific model configurations in the "Models" page to use them.
+
+---
+
 ## Usage Issues
-
-### How to configure API keys?
-
-1. Click the "Settings" icon in the sidebar
-2. Select "Model Configuration"
-3. Enter the API key for the provider
 
 ### Which AI models are supported?
 
-MobausStudio supports:
+MobausStudio supports 15+ AI service providers:
 
-- OpenAI (GPT-4, GPT-3.5, etc.)
-- Anthropic (Claude series)
-- Other OpenAI-compatible APIs
+**Popular Providers:**
+
+- OpenAI (GPT-4o, GPT-4, GPT-3.5, o1, etc.)
+- Anthropic (Claude 3.5, Claude 3 series)
+- Google AI (Gemini 2.0, Gemini 1.5 series)
+- DeepSeek (DeepSeek Chat, Reasoner)
+- GitHub Copilot
+- OpenRouter
+
+**Other Providers:**
+
+- Groq, xAI, Mistral, Cohere, Together AI, Fireworks AI, Perplexity, Cerebras
+
+**Local Services:**
+
+- Ollama, LM Studio
 
 ### Where are chat records saved?
 
@@ -66,7 +138,45 @@ MobausStudio supports:
 
 ### How to export chat records?
 
-Currently you can export by copying chat content. Full export feature is under development.
+1. Click the "Settings" icon in the sidebar
+2. Select "Data Management"
+3. Click "Export Configuration"
+4. Check "Chat Records"
+5. Click "Export"
+
+### How to backup all data?
+
+1. Click "Settings" → "Data Management" → "Export Configuration"
+2. Check all options (Model configs, Agents, Skills, MCP servers, Chat records)
+3. Click "Export" to save the file
+
+### How to migrate to a new computer?
+
+1. Export configuration file on the old computer
+2. Install MobausStudio on the new computer
+3. Click "Settings" → "Data Management" → "Import Configuration"
+4. Select the previously exported file
+
+---
+
+## Agent Issues
+
+### What's the difference between an Agent and direct chat?
+
+| Feature | Direct Chat | Agent |
+|---------|-------------|-------|
+| System Prompt | None | Customizable |
+| Skill Binding | None | Supported |
+| MCP Tools | None | Supported |
+| Permission Control | None | Supported |
+
+### Why is the MCP server list empty?
+
+You need to add and connect MCP servers in the MCP page first. Only connected servers will appear in the Agent configuration.
+
+### Are Agent permission settings required?
+
+No, they're not required. Permission settings are optional advanced features used to restrict the agent's operational scope and improve security.
 
 ---
 
@@ -79,13 +189,32 @@ Possible causes and solutions:
 1. **Unstable network**: Check network connection
 2. **API provider rate limiting**: Try again later
 3. **Proxy settings issue**: Check system proxy configuration
+4. **Request too long**: Reduce input content or lower Max Tokens
 
 ### Cannot connect to API
 
-1. Confirm API key is correct
-2. Confirm API endpoint address is correct
+1. Confirm provider is connected (shows green "Connected" status)
+2. Confirm model configuration is correct
 3. Check if proxy configuration is needed
 4. Confirm API account has sufficient balance
+
+---
+
+## MCP Issues
+
+### MCP server won't start
+
+1. Confirm Node.js is installed (run `node -v` to check)
+2. Confirm npx command is available
+3. Check if server configuration is correct
+4. Check error logs
+
+### MCP tool call failed
+
+1. Confirm server is running (shows green status)
+2. Confirm permission configuration is correct
+3. Check if path exists
+4. Check detailed error message
 
 ---
 
@@ -144,7 +273,13 @@ Please include:
 
 ### Is it open source?
 
-MobausStudio uses MIT License.
+Yes, MobausStudio uses MIT License.
+
+### Is my data secure?
+
+- All data is stored locally and never uploaded to any server
+- Only API requests are sent to the corresponding AI service providers
+- API Keys and OAuth Tokens are stored in local configuration files
 
 ---
 

@@ -15,7 +15,9 @@ Welcome to MobausStudio! This guide will help you get started quickly.
 
 - [UI Overview](./features/ui-overview.md) - Understand the interface layout
 - [Chat](./features/chat.md) - How to chat with AI
+- [Provider Management](./features/providers.md) - Connect AI service providers (OAuth login supported)
 - [Model Configuration](./features/models.md) - Configure and switch AI models
+- [Agents](./features/agents.md) - Create personalized AI assistants
 - [MCP Services](./features/mcp.md) - Connect external tools and services
 - [Skills System](./features/skills.md) - Use and manage skills
 
