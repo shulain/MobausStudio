@@ -105,6 +105,17 @@ On the providers page, you can see:
 - **Disconnected**: Shows gray indicator, needs to be connected first
 - **Error**: Shows red indicator, need to check credentials
 
+### Google Model Quota View (New in v0.7.0)
+
+After connecting to Google provider, you can view quota usage for each model in the provider card:
+
+1. Find the connected Google provider card
+2. Click "📊 Model Quota" to expand the quota panel
+3. View remaining quota percentage for each model
+4. Models with exhausted quota will show red warning
+
+> 💡 **Tip**: Click "Refresh" button to get the latest quota information.
+
 ### Disconnect
 
 1. Find the connected provider

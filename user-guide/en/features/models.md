@@ -55,12 +55,23 @@ Click the "🔗 Providers" icon in the sidebar, confirm the corresponding provid
 
 1. Click the "🖥️ Models" icon in the sidebar
 2. Click "Add Model" button
-3. Select the connected provider
+3. Select the connected provider (connected providers show green "Connected" badge)
 4. Select specific model
 5. Adjust parameters as needed
 6. Click "Save"
 
-### 3. Select Default Model
+### 3. Batch Check Model Availability (New in v0.7.0)
+
+After adding models, you can batch check their availability:
+
+1. On the Models page, click "Check All" button
+2. System will test connection for all models in sequence
+3. Available models show green checkmark, unavailable ones show red warning
+4. Click on warning icon to view detailed error message
+
+> 💡 **Tip**: It's recommended to check model availability after connecting a new provider or changing API Key.
+
+### 4. Select Default Model
 
 After configuration, you can select the default model at the top of the chat interface.
 

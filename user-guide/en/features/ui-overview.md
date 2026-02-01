@@ -124,9 +124,11 @@ Click "🔌 MCP" in the sidebar to manage MCP server connections:
 
 Click "⚙️ Settings" in the sidebar:
 
-- General: Theme switch (light/dark), language settings
+- General: Theme switch (light/dark/system), language settings (Chinese/English)
 - Data Management: Import/export configuration
 - About: Version info, check for updates, open source license
+
+> 💡 **Tip**: On first launch, the app automatically selects the interface language based on your system language.
 
 ---
 

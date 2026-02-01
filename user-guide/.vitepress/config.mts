@@ -36,7 +36,9 @@ export default defineConfig({
               items: [
                 { text: '界面介绍', link: '/zh/features/ui-overview' },
                 { text: '对话功能', link: '/zh/features/chat' },
+                { text: '提供商管理', link: '/zh/features/providers' },
                 { text: '模型配置', link: '/zh/features/models' },
+                { text: '智能体', link: '/zh/features/agents' },
                 { text: 'MCP 服务', link: '/zh/features/mcp' },
                 { text: '技能系统', link: '/zh/features/skills' }
               ]
@@ -107,7 +109,9 @@ export default defineConfig({
               items: [
                 { text: 'UI Overview', link: '/en/features/ui-overview' },
                 { text: 'Chat', link: '/en/features/chat' },
+                { text: 'Provider Management', link: '/en/features/providers' },
                 { text: 'Model Configuration', link: '/en/features/models' },
+                { text: 'Agents', link: '/en/features/agents' },
                 { text: 'MCP Services', link: '/en/features/mcp' },
                 { text: 'Skills System', link: '/en/features/skills' }
               ]

@@ -4,6 +4,23 @@ All version update records.
 
 ---
 
+## [0.7.1] - 2025-02-01
+
+### Added
+
+- 🌍 Smart Language Detection - Automatically select interface language based on system language on first launch
+
+### Improved
+
+- 🌐 Enhanced i18n Support - Fixed hardcoded text across multiple pages, full Chinese/English support
+- 🔌 MCP Process Management - Gracefully stop all MCP services on app exit, preventing orphan processes
+
+### Fixed
+
+- 🔧 Fixed app unable to restart after update
+
+---
+
 ## [0.7.0] - 2025-01-30
 
 ### Added
