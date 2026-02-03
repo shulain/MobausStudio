@@ -4,6 +4,26 @@ All version update records.
 
 ---
 
+## [0.7.2] - 2025-02-02
+
+### Added
+
+- 🤖 Kiro Model Support - New Amazon Kiro AI model integration
+- 📊 Analytics Module - New usage data analysis feature
+
+### Improved
+
+- 🎨 UI Layout Optimization - Unified card layout style for Agent, Models, and MCP pages
+- 💭 Thinking Process Display - Improved thinking phase display for Google and Kiro models
+- 🔧 Skills Repository Adaptation - Adapted to skills.sh official repository API updates
+
+### Fixed
+
+- 🔧 Fixed Google model thinking phase display issue
+- 🔧 Fixed field parsing issue during skill installation
+
+---
+
 ## [0.7.1] - 2025-02-01
 
 ### Added

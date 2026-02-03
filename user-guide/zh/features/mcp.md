@@ -18,23 +18,47 @@ MCP 允许 AI 模型：
 
 ### 1. 打开 MCP 页面
 
-点击侧边栏的「MCP」图标进入 MCP 管理页面。
+点击侧边栏的「🔌 MCP」图标进入 MCP 管理页面。
 
 ### 2. 添加服务器
 
-点击「添加服务器」，填写配置信息：
+点击「添加服务器」，填写配置信息。
 
-```json
-{
-  "name": "filesystem",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]
-}
-```
+### 3. 选择传输方式
 
-### 3. 启用服务器
+MobausStudio 支持两种传输方式：
 
-添加后，点击开关启用服务器。
+| 传输方式 | 说明 | 适用场景 |
+|----------|------|----------|
+| **stdio** | 通过命令行启动本地进程 | 本地 MCP 服务器 |
+| **HTTP** | 通过 HTTP/WebSocket 连接 | 远程 MCP 服务器 |
+
+#### stdio 方式配置
+
+适用于本地运行的 MCP 服务器：
+
+- **启动命令**：如 `npx`、`node`、`python`
+- **命令参数**：如 `-y, @modelcontextprotocol/server-filesystem, /path/to/folder`
+- **环境变量**：如 `GITHUB_TOKEN=xxx`（每行一个，KEY=VALUE 格式）
+
+#### HTTP 方式配置
+
+适用于远程 MCP 服务器：
+
+- **端点地址**：服务器的 URL，支持 `http://`、`https://`、`ws://`、`wss://`
+
+### 4. 配置认证（可选）
+
+如果 MCP 服务器需要认证，可以选择：
+
+- **无需认证**：公开服务器
+- **API Key**：使用 API 密钥认证
+- **Token**：使用令牌认证
+
+### 5. 启用与自启动
+
+- **启用开关**：控制服务器是否可用
+- **自启动**：应用启动时自动连接此服务器
 
 ---
 
@@ -44,40 +68,26 @@ MCP 允许 AI 模型：
 
 允许 AI 读写指定目录的文件：
 
-```json
-{
-  "name": "filesystem",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/you/projects"]
-}
-```
+- **传输方式**：stdio
+- **启动命令**：`npx`
+- **命令参数**：`-y, @modelcontextprotocol/server-filesystem, /Users/you/projects`
 
 ### SQLite 数据库
 
 允许 AI 查询 SQLite 数据库：
 
-```json
-{
-  "name": "sqlite",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "/path/to/database.db"]
-}
-```
+- **传输方式**：stdio
+- **启动命令**：`npx`
+- **命令参数**：`-y, @modelcontextprotocol/server-sqlite, --db-path, /path/to/database.db`
 
 ### GitHub
 
 允许 AI 操作 GitHub 仓库：
 
-```json
-{
-  "name": "github",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-github"],
-  "env": {
-    "GITHUB_TOKEN": "your-github-token"
-  }
-}
-```
+- **传输方式**：stdio
+- **启动命令**：`npx`
+- **命令参数**：`-y, @modelcontextprotocol/server-github`
+- **环境变量**：`GITHUB_TOKEN=your-github-token`
 
 ### 更多服务器
 
