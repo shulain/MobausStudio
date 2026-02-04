@@ -4,6 +4,21 @@ All version update records.
 
 ---
 
+## [0.7.3] - 2025-02-03
+
+### Added
+
+- 📦 Agent Template Management - Support scanning and installing Agent templates from GitHub repositories
+- 🔗 Template URL Download - Support downloading template files directly via URL
+
+### Improved
+
+- 🤖 Agent Status Display - Card now clearly shows MCP, Skills, and Model connection status
+- 🎨 MCP Page Layout - Adjusted to two-card-per-row layout with tool detail tooltips
+- 📊 Analytics Service - Improved usage statistics data processing
+
+---
+
 ## [0.7.2] - 2025-02-02
 
 ### Added

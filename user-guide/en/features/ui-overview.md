@@ -107,9 +107,22 @@ Click "🖥️ Models" in the sidebar to configure AI models:
 Click "🤖 Agents" in the sidebar to manage AI assistants:
 
 - Create custom Agents
+- Install Agents from templates with one click
 - Configure system prompts
 - Bind skills and MCP tools
+- View Agent health status (model/skill/MCP connection status)
 - Run Agent to start conversation
+
+### Roundtable Meeting
+
+You can start a Roundtable Meeting from the chat page to have multiple agents collaborate on a discussion:
+
+- Select 2-5 agents to participate
+- Set the discussion topic
+- Watch agents take turns speaking
+- Join the discussion or guide the direction at any time
+
+For detailed instructions, see [Roundtable Meeting](./roundtable.md).
 
 ### MCP Page (Standalone)
 

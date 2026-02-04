@@ -24,6 +24,51 @@ Click the `+` button in the sidebar to start a new chat. New chats don't carry p
 
 ---
 
+## Using Agent Chat
+
+### Start from Agent
+
+1. Go to the "Agents" page
+2. Click the "Run" button on the agent card
+3. A new chat is automatically created with the agent's configuration applied
+
+### Agent Info in Chat
+
+When chatting with an agent, the top bar shows:
+
+- Current agent name
+- Model configured for the agent
+- MCP tool connection status (if enabled)
+
+### MCP Tool Status
+
+If the agent has MCP tools enabled, the chat header shows connection status:
+
+| Status | Description |
+|--------|-------------|
+| 🟢 All Connected | All MCP servers are connected |
+| 🟡 Partially Connected | Some MCP servers are not connected |
+| 🔴 Connection Error | MCP server connection failed |
+
+> 💡 **Tip**: Click the status badge to view detailed status of each MCP server.
+
+---
+
+## Roundtable Meeting
+
+Roundtable Meeting is a special chat mode that allows multiple agents to collaborate on discussing the same topic.
+
+### Start a Roundtable Meeting
+
+1. Click the "Roundtable Meeting" button on the chat page
+2. Select agents to participate in the discussion
+3. Set the discussion topic
+4. Start the meeting
+
+For detailed instructions, see [Roundtable Meeting](./roundtable.md).
+
+---
+
 ## Chat Management
 
 ### Chat List

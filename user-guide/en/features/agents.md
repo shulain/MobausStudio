@@ -178,16 +178,67 @@ Extra instructions appended after the system prompt.
 
 ---
 
+## Install from Templates
+
+Besides creating manually, you can also install pre-configured agents from the template library with one click.
+
+### What are Agent Templates?
+
+Agent templates are pre-configured agent solutions that include:
+
+- Complete system prompts
+- Recommended skill configurations
+- MCP tool configurations
+- Permission settings
+
+### Installation Steps
+
+1. On the Agents page, click the "Install from Template" button
+2. Browse the available template list
+3. Click on the template you want to install
+4. Review the template details and confirm the configuration
+5. Click "Install"
+
+### After Installation
+
+Once installed, the agent will automatically appear in your agent list. You can:
+
+- Use it directly
+- Modify the configuration as needed
+- Adjust permission settings
+
+> 💡 **Tip**: During template installation, the system will automatically check for required skills and MCP servers. If any are missing, you'll be prompted to install them first.
+
+---
+
 ## Managing Agents
 
 ### View Agent List
 
 On the Agents page, you can see all created agent cards showing:
+
 - Name and description
-- Model used
-- Number of bound skills
-- Number of MCP tools
-- Status (enabled/disabled)
+- Model used and its status
+- Number of bound skills and their status
+- Number of MCP tools and connection status
+- Overall health status indicator
+
+### Status Indicators
+
+Agent cards display the status of each component, helping you quickly understand if the agent can work properly:
+
+| Component | Status Icon | Description |
+|-----------|-------------|-------------|
+| Model | 🟢 Green | Model is configured and available |
+| Model | 🟡 Yellow | Model is offline or unavailable |
+| Model | 🔴 Red | Model is not configured or deleted |
+| Skills | 🟢 Green | All skills are working |
+| Skills | 🟡 Yellow | Some skills have been deleted |
+| MCP | 🟢 Green | All MCP servers are connected |
+| MCP | 🟡 Yellow | Some MCP servers are not connected |
+| MCP | 🔴 Red | MCP server connection error |
+
+> 💡 **Tip**: If you see yellow or red status, click edit agent to view details and fix the issues.
 
 ### Search and Filter
 

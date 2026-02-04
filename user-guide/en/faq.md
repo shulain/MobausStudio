@@ -178,6 +178,19 @@ You need to add and connect MCP servers in the MCP page first. Only connected se
 
 No, they're not required. Permission settings are optional advanced features used to restrict the agent's operational scope and improve security.
 
+### What is a Roundtable Meeting?
+
+Roundtable Meeting is a multi-agent collaboration feature that allows multiple AI agents to discuss the same topic together. It's suitable for scenarios requiring multi-perspective analysis, such as solution reviews, brainstorming, etc.
+
+### How to start a Roundtable Meeting?
+
+1. Click the "Roundtable Meeting" button on the chat page
+2. Select 2-5 agents to participate in the discussion
+3. Set the discussion topic
+4. Click "Start Meeting"
+
+For detailed instructions, see [Roundtable Meeting](./features/roundtable.md).
+
 ---
 
 ## Network Issues

@@ -39,6 +39,7 @@ export default defineConfig({
                 { text: '提供商管理', link: '/zh/features/providers' },
                 { text: '模型配置', link: '/zh/features/models' },
                 { text: '智能体', link: '/zh/features/agents' },
+                { text: '圆桌会议', link: '/zh/features/roundtable' },
                 { text: 'MCP 服务', link: '/zh/features/mcp' },
                 { text: '技能系统', link: '/zh/features/skills' }
               ]
@@ -112,6 +113,7 @@ export default defineConfig({
                 { text: 'Provider Management', link: '/en/features/providers' },
                 { text: 'Model Configuration', link: '/en/features/models' },
                 { text: 'Agents', link: '/en/features/agents' },
+                { text: 'Roundtable Meeting', link: '/en/features/roundtable' },
                 { text: 'MCP Services', link: '/en/features/mcp' },
                 { text: 'Skills System', link: '/en/features/skills' }
               ]
