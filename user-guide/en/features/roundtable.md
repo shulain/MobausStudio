@@ -90,6 +90,16 @@ During the discussion, you can:
 - **Guide Direction**: Adjust the discussion focus
 - **Summarize**: Ask agents to summarize discussion conclusions
 
+### MCP Tool Calls
+
+If participating agents have MCP tools configured, they can use these tools during the discussion:
+
+- Agents can read files, query data to support their viewpoints
+- Tool call results will be displayed in the discussion messages
+- You can see which tools the agent used and the returned results
+
+> 💡 **Tip**: Configuring MCP tools for agents can make discussions more evidence-based. For example, a technical expert agent can view actual code or configuration files.
+
 ### End Meeting
 
 Click the "End Meeting" button to conclude the roundtable discussion. You can:

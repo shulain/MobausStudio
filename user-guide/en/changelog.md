@@ -4,6 +4,27 @@ All version update records.
 
 ---
 
+## [0.7.4] - 2025-02-08
+
+### Added
+
+- 🔧 Roundtable MCP Tool Calls - Agents participating in discussions can now use MCP tools for evidence-based discussions
+- 🔐 Agent Permission Control - Support configuring file path permissions, tool call rules, auto-approve settings and more
+
+### Improved
+
+- 📝 Unified Message Rendering - Optimized chat message display for better consistency
+- 🔄 OAuth Token Auto Refresh - Automatically refresh expired login credentials on app startup, no need to re-login
+- 🧹 Data Cleanup Optimization - Improved user experience for data cleanup and export features
+- 🔧 Skill Installation Optimization - Fixed path matching issues when installing from official repository
+
+### Fixed
+
+- 🔧 Fixed timer reset issue when switching conversations in roundtable meetings
+- 🔧 Fixed repeated prompts after OAuth token refresh failure
+
+---
+
 ## [0.7.3] - 2025-02-03
 
 ### Added
