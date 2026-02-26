@@ -18,8 +18,11 @@
 - [提供商管理](./features/providers.md) - 连接 AI 服务提供商（支持 OAuth 登录）
 - [模型配置](./features/models.md) - 配置和切换 AI 模型
 - [智能体](./features/agents.md) - 创建专属 AI 助手
+- [圆桌会议](./features/roundtable.md) - 多 Agent 协作讨论
 - [MCP 服务](./features/mcp.md) - 连接外部工具和服务
 - [技能系统](./features/skills.md) - 使用和管理技能
+- [使用统计](./features/stats.md) - 查看使用数据
+- [设置](./features/settings.md) - 外观、语言和数据管理
 
 ### 进阶使用
 
