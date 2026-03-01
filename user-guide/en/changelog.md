@@ -1,6 +1,44 @@
 # Changelog
 
+<!-- markdownlint-disable MD024 -->
+
 All version update records.
+
+---
+
+## [0.8.0] - 2026-03-01
+
+### Added
+
+- 🧩 Enhanced Custom Provider support - Connect more OpenAI-compatible endpoints, including enterprise gateways, proxies, and private services
+- 🔵 Better roundtable tool visibility - Tool calls and results are now clearer during roundtable discussions for easier evidence tracking
+
+### Improved
+
+- 🔄 Smoother roundtable continuation flow - Discussions continue more naturally after tool execution with better context carry-over
+- 🧭 Better role consistency in roundtable - Multi-agent role identity and message ownership are now more stable and easier to follow
+- 📚 Improved user guide usability - Roundtable and provider docs are now more usage-focused and easier for end users
+
+### Fixed
+
+- 🔧 Fixed duplicate tool call display in roundtable - The same tool call no longer appears repeatedly in multiple message bubbles
+- 🔧 Fixed thinking placeholder during tool execution - "Thinking..." placeholder no longer shows while tool cards are already being displayed
+
+---
+
+## [0.7.5] - 2026-02-26
+
+### Improved
+
+- 🔄 OAuth Connection Stability - More reliable token auto-renewal, automatically restores connection status after retry success on refresh failure
+- 🔑 Login Credential Retention - Preserves credentials on temporary token refresh failure, auto-retries next time without requiring re-login
+- ⌨️ Input Experience Optimization - Fixed issue where pressing Enter during Chinese IME composition would accidentally send the message
+- 🎯 Input Focus Management - Auto-focuses input box after switching conversations or when AI reply completes
+
+### Fixed
+
+- 🔧 Fixed provider status display issue - Provider page still showing "Not Connected" after successful token renewal
+- 🔧 Fixed issue where pressing Enter to commit IME input would directly send the message
 
 ---
 

@@ -1,183 +1,100 @@
 # Roundtable Meeting
 
-Roundtable Meeting is a multi-agent collaboration feature that allows multiple AI agents to discuss the same topic together, providing multi-perspective analysis and suggestions.
-
-## What is a Roundtable Meeting?
-
-Imagine you have a team of experts, each with different professional backgrounds and perspectives. When facing a complex problem, you can bring them together for a discussion, with each expert contributing their insights from their own perspective.
-
-Roundtable Meeting is exactly this concept - it lets multiple AI agents collaborate to discuss a topic, with each agent contributing based on their expertise.
+Roundtable Meeting is MobausStudio's multi-agent collaboration mode. You can assign different roles to multiple agents, discuss one topic from multiple perspectives, and reach clearer decisions faster.
 
 ---
 
-## Use Cases
+## Best Use Cases
 
-### Scenario 1: Solution Review
-
-When you have a technical solution that needs evaluation:
-
-- **Architecture Expert**: Evaluates system design rationality
-- **Security Expert**: Identifies potential security risks
-- **Performance Expert**: Analyzes performance bottlenecks
-
-### Scenario 2: Content Creation
-
-When you need to create high-quality content:
-
-- **Content Planner**: Designs article structure
-- **Copywriter**: Polishes language expression
-- **SEO Expert**: Optimizes search keywords
-
-### Scenario 3: Brainstorming
-
-When you need creative inspiration:
-
-- **Product Manager**: Analyzes user needs
-- **Designer**: Proposes interaction solutions
-- **Developer**: Evaluates technical feasibility
+- **Solution review**: Evaluate one plan with architecture, engineering, and QA perspectives
+- **Product decisions**: Balance business value, technical cost, and user experience
+- **Complex problem solving**: Break down a hard problem before execution
 
 ---
 
-## How to Start a Roundtable Meeting
+## Quick Start (3 Minutes)
 
-### Step 1: Enter Chat Page
+1. Open **Chat** and click **Orchestration**
+2. Choose **Roundtable Meeting**
+3. Enter a topic and add participants (recommended: 2-5)
+4. Click **Start Discussion**
 
-Click the "💬 Chat" icon in the sidebar to enter the chat page.
-
-### Step 2: Click Roundtable Meeting
-
-Click the "Roundtable Meeting" button in the top right corner of the chat page.
-
-### Step 3: Select Participants
-
-1. Browse the available agent list
-2. Select 2-5 agents to participate in the discussion
-3. Selected agents will be highlighted
-
-> 💡 **Tip**: Choose agents with different expertise for more diverse perspectives.
-
-### Step 4: Set Discussion Topic
-
-Enter the topic or question you want to discuss in the topic input box, for example:
-
-- "Please evaluate this microservices architecture design"
-- "How to improve user retention for this product"
-- "Discuss the pros and cons of this marketing plan"
-
-### Step 5: Start Meeting
-
-Click the "Start Meeting" button to begin the roundtable discussion.
+> Tip: Choose participants with clearly different roles for better output quality.
 
 ---
 
-## Discussion Process
+## How to Configure a Better Discussion
 
-### Agent Speaking Order
+### 1) Write a Clear Topic
 
-After the meeting starts, agents will speak in turn:
+Instead of "Please review this", include:
 
-1. First agent analyzes the topic and gives initial opinion
-2. Second agent supplements or raises different views based on the previous speaker
-3. Subsequent agents continue to add perspectives
-4. Cycle continues until discussion is complete
+- What problem you want to solve
+- What outcome you expect
+- What dimensions matter most (cost, speed, UX, risk, etc.)
 
-### User Participation
+### 2) Add Background (Optional)
 
-During the discussion, you can:
+Provide business context, key metrics, and what you've already tried.
 
-- **Watch Discussion**: Observe agents' exchange of views
-- **Ask Questions**: Pose questions to specific agents
-- **Guide Direction**: Adjust the discussion focus
-- **Summarize**: Ask agents to summarize discussion conclusions
+### 3) Add Constraints (Optional)
 
-### MCP Tool Calls
-
-If participating agents have MCP tools configured, they can use these tools during the discussion:
-
-- Agents can read files, query data to support their viewpoints
-- Tool call results will be displayed in the discussion messages
-- You can see which tools the agent used and the returned results
-
-> 💡 **Tip**: Configuring MCP tools for agents can make discussions more evidence-based. For example, a technical expert agent can view actual code or configuration files.
-
-### End Meeting
-
-Click the "End Meeting" button to conclude the roundtable discussion. You can:
-
-- Review the complete discussion record
-- Export discussion content
-- Start a new meeting based on the discussion
+Add limits like budget, timeline, and team capacity so suggestions stay practical.
 
 ---
 
-## Tips
+## What You Can Do During Discussion
 
-### 1. Choose the Right Agents
+- **Ask follow-up questions** on any point
+- **@mention a role** to direct the next response (for example: `@Architect evaluate scalability`)
+- **Adjust direction anytime** by adding new context
 
-Select agents with relevant expertise based on the discussion topic:
+### Tool Call Visibility
 
-| Topic Type | Recommended Agents |
-|------------|-------------------|
-| Technical Solutions | Architect, Security Expert, Performance Expert |
-| Product Design | Product Manager, Designer, User Researcher |
-| Content Creation | Copywriter, Editor, SEO Expert |
-| Business Decisions | Analyst, Strategist, Risk Assessor |
+When an agent uses tools during discussion, tool calls and results are shown in dedicated cards so you can quickly understand the evidence behind conclusions.
 
-### 2. Clear Topic Description
+---
 
-Provide sufficient context information so agents can better understand the discussion background:
+## After Discussion
 
-**Less effective**:
-> Discuss this solution
+Click **Generate Summary** to get:
 
-**More effective**:
-> Please evaluate this e-commerce platform microservices architecture design, focusing on scalability, maintainability, and cost-effectiveness
+- Key viewpoints
+- Agreements and disagreements
+- Actionable recommendations
 
-### 3. Timely Guidance
+If needed, continue the discussion first, then generate summary later.
 
-If the discussion deviates from the topic, intervene promptly:
+---
 
-- "Please focus on discussing XXX aspect"
-- "Can you elaborate on the point just mentioned?"
-- "Please summarize the main conclusions so far"
+## Practical Tips
 
-### 4. Make Good Use of Summaries
-
-At the end of the discussion, ask agents to summarize:
-
-- "Please summarize the main points of this discussion"
-- "What are the key action items?"
-- "What issues need further discussion?"
+1. **Go broad first, then deep**: collect viewpoints before focusing on disagreements
+2. **Use specific role names**: clearer roles improve consistency
+3. **Add context step by step**: incremental guidance works better than dumping everything at once
+4. **Ask for action items**: request next steps and priorities explicitly
 
 ---
 
 ## FAQ
 
-### How many agents can participate in a roundtable meeting?
+### Is more participants always better?
 
-It's recommended to have 2-5 agents participate. Too few may lack diverse perspectives, while too many may make the discussion unfocused.
+Not necessarily. 2-5 participants usually gives the best balance.
 
-### Can I add or remove agents during the meeting?
+### Roundtable vs regular chat?
 
-Currently, you cannot change participants during the meeting. If you need to adjust, please end the current meeting and start a new one.
+- Use **regular chat** for quick one-agent tasks
+- Use **roundtable** for comparison, analysis, and decision-making
 
-### Will the meeting record be saved?
+### Is the discussion saved?
 
-Yes, the roundtable meeting record will be saved as a conversation record, which you can view and export at any time.
-
-### What's the difference between roundtable meeting and regular chat?
-
-| Feature | Regular Chat | Roundtable Meeting |
-|---------|-------------|-------------------|
-| Participants | Single agent | Multiple agents |
-| Interaction | One-on-one Q&A | Multi-party discussion |
-| Perspective | Single viewpoint | Multiple viewpoints |
-| Suitable for | Specific tasks | Complex analysis |
+Yes. Roundtable sessions are saved as conversation history and can be continued later.
 
 ---
 
 ## Next Steps
 
-- [Agents](./agents.md) - Create more specialized agents
-- [Chat Features](./chat.md) - Learn more about chat features
-- [Skills System](./skills.md) - Enhance agent capabilities with skills
+- [Agents](./agents.md) - Build specialized participants
+- [Skills](./skills.md) - Add domain-specific capabilities
+- [Chat](./chat.md) - Learn more interaction features

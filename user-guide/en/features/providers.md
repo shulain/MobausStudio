@@ -1,5 +1,7 @@
 # Provider Management
 
+<!-- markdownlint-disable MD060 -->
+
 Providers are the core feature of MobausStudio for connecting to AI services. Through provider management, you can easily connect to various AI services without manually configuring complex API settings.
 
 ## What is a Provider?
@@ -24,16 +26,14 @@ A provider is a source of AI services, such as OpenAI, Anthropic, Google, etc. E
 
 ### Other Providers
 
-| Provider | Description |
-|----------|-------------|
-| ⚡ Groq | Ultra-fast inference |
-| 🚀 xAI | Grok series models |
-| 🌪️ Mistral AI | Mistral series models |
-| 🔷 Cohere | Command series models |
-| 🤝 Together AI | Open source model hosting |
-| 🎆 Fireworks AI | High-performance inference |
-| 🔮 Perplexity | Search-enhanced AI |
-| 🧩 Cerebras | Ultra-fast inference |
+- ⚡ **Groq**: Ultra-fast inference
+- 🚀 **xAI**: Grok series models
+- 🌪️ **Mistral AI**: Mistral series models
+- 🔷 **Cohere**: Command series models
+- 🤝 **Together AI**: Open source model hosting
+- 🎆 **Fireworks AI**: High-performance inference
+- 🔮 **Perplexity**: Search-enhanced AI
+- 🧩 **Cerebras**: Ultra-fast inference
 
 ### Enterprise/Cloud Services
 
@@ -66,6 +66,7 @@ Some providers support OAuth login, which is the easiest way to connect:
 6. After authorization, you'll be returned to the app automatically
 
 **Providers supporting OAuth:**
+
 - OpenAI (using ChatGPT Plus/Pro subscription)
 - Anthropic (using Claude Pro/Max subscription)
 - Google AI (using Google account)
@@ -82,6 +83,7 @@ Some providers support OAuth login, which is the easiest way to connect:
 5. Click "Connect"
 
 **Getting API Key:**
+
 - Click "Get API Key" link to open the provider's website
 - Create an API Key on the website and copy-paste it
 
@@ -89,9 +91,20 @@ Some providers support OAuth login, which is the easiest way to connect:
 
 Some enterprise providers support configuration via environment variables:
 
-1. Set the corresponding environment variables in your system
+1. Set the required environment variables in your system
 2. Restart MobausStudio
 3. The app will automatically detect and connect
+
+### Method 4: Custom Provider (OpenAI-Compatible)
+
+If you use an internal gateway, proxy service, or private endpoint, use **Custom**:
+
+1. Select **Custom** in the provider list
+2. Enter API Endpoint (for example `https://your-endpoint/v1`)
+3. Fill API Key only if your service requires it
+4. Click **Test Connection** before saving
+
+> 💡 **Tip**: Testing connection first helps you find configuration issues quickly.
 
 ---
 
