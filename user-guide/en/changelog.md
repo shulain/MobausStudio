@@ -6,6 +6,23 @@ All version update records.
 
 ---
 
+## [0.8.1] - 2026-03-04
+
+### Improved
+
+- 🔧 Custom Provider Management - Removed built-in Custom provider, unified to use "Add Custom Provider" feature, supports adding multiple custom services
+- 🔌 Protocol Configuration Enhancement - More flexible model-level protocol configuration, supports selecting different communication protocols for different models
+- 📝 API Logging Optimization - Added request logging and response format detection for all streaming protocols, easier to troubleshoot issues
+- 🔄 Google OAuth Stability - Fixed issue where Token expiration was not automatically refreshed or prompted
+
+### Fixed
+
+- 🔧 Fixed Google API tool call compatibility issues
+- 🔧 Fixed missing error prompts when API calls fail
+- 🔧 Fixed fundamental issues with roundtable tool calls
+
+---
+
 ## [0.8.0] - 2026-03-01
 
 ### Added

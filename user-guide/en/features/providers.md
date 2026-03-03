@@ -22,7 +22,6 @@ A provider is a source of AI services, such as OpenAI, Anthropic, Google, etc. E
 | 🔍 DeepSeek | DeepSeek Chat, Reasoner | API Key |
 | 🐙 GitHub Copilot | Access multiple models with Copilot subscription | OAuth Login |
 | 🌐 OpenRouter | Unified API for multiple models | API Key |
-| ⚙️ Custom | Custom OpenAI-compatible endpoint | API Key / No Auth |
 
 ### Other Providers
 
@@ -95,16 +94,47 @@ Some enterprise providers support configuration via environment variables:
 2. Restart MobausStudio
 3. The app will automatically detect and connect
 
-### Method 4: Custom Provider (OpenAI-Compatible)
+---
 
-If you use an internal gateway, proxy service, or private endpoint, use **Custom**:
+## Add Custom Provider
 
-1. Select **Custom** in the provider list
-2. Enter API Endpoint (for example `https://your-endpoint/v1`)
-3. Fill API Key only if your service requires it
-4. Click **Test Connection** before saving
+If you use an enterprise gateway, proxy service, or private deployment, you can add custom providers:
 
-> 💡 **Tip**: Testing connection first helps you find configuration issues quickly.
+### When Do You Need a Custom Provider?
+
+- Using an internal enterprise AI gateway
+- Using a third-party proxy service
+- Using a privately deployed OpenAI-compatible endpoint
+- Using other OpenAI-compatible services not built-in
+
+### How to Add a Custom Provider
+
+1. Click the "🔌 Providers" icon in the sidebar
+2. Click the "➕ Add Custom Provider" button in the top right
+3. Fill in provider information:
+   - **Name**: Custom name (e.g., "Company Internal AI")
+   - **Icon**: Choose an emoji icon
+   - **Description**: Brief description (supports both Chinese and English)
+   - **API Endpoint**: Service address (e.g., `https://your-endpoint/v1`)
+   - **API Key**: Fill in if required by your service (optional)
+4. Add at least one model:
+   - **Model ID**: Model identifier (e.g., `gpt-4o`)
+   - **Display Name**: Name shown in the interface
+   - **Max Output Tokens**: Maximum output length of the model
+   - **Context Window**: Context length supported by the model
+   - **Capabilities**: Check features supported by the model (vision, function calling, streaming)
+5. Click "Test Connection" to verify the configuration
+6. Click "Save" to complete
+
+> 💡 **Tip**: You can add multiple custom providers, each with independent configuration and management.
+
+### Managing Custom Providers
+
+- **Edit**: Click the "Edit" button on the custom provider card to modify configuration
+- **Delete**: Click the "Delete" button to remove the custom provider
+- **Connect/Disconnect**: Manage connection status like built-in providers
+
+> ⚠️ **Warning**: After deleting a custom provider, conversations using models from that provider will not be able to continue.
 
 ---
 
