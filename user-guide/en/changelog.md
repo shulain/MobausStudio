@@ -6,6 +6,21 @@ All version update records.
 
 ---
 
+## [0.8.2] - 2026-03-07
+
+### Fixed
+
+- 🔧 Fixed skill installation issues - Fixed issue where installing skills from skills.sh repositories using master branch couldn't download complete directories (like scripts folder)
+- 🔧 Fixed root skill installation - Fixed issue where subdirectories like scripts in root-level skills couldn't be downloaded correctly
+- 🔧 Fixed GitHub API rate limit handling - Improved error handling for GitHub API rate limits to avoid partial installations
+
+### Improved
+
+- ✅ Test quality improvements - Fixed test quality issues, added 151 unit tests to ensure code quality
+- 📝 Enhanced skill installation documentation - Updated skill module documentation with detailed problem analysis and solutions
+
+---
+
 ## [0.8.1] - 2026-03-04
 
 ### Improved
