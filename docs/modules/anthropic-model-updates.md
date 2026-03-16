@@ -1,10 +1,233 @@
-# Anthropic 模型更新记录
+# Anthropic Model Updates / Anthropic 模型更新记录
 
-## 📅 2026-02-28 更新
+> [English](#english) | [中文](#中文)
 
-### 新增模型
+---
 
-#### Claude 4.6 系列（最新）
+<a id="english"></a>
+
+## English
+
+### 2026-02-28 Update
+
+#### New Models
+
+##### Claude 4.6 Series (Latest)
+
+| Model ID | Name | Release Date | Context Window | Max Output | Features |
+|----------|------|-------------|---------------|------------|----------|
+| `claude-opus-4-20260205` | Claude Opus 4.6 | 2026-02-05 | 1M tokens | 128K | Strongest reasoning, supports adaptive thinking |
+| `claude-sonnet-4-20260217` | Claude Sonnet 4.6 | 2026-02-17 | 1M tokens | 16K | Balance of speed and intelligence, supports extended thinking |
+
+**Highlights:**
+- **1M token context window** (beta)
+- **Adaptive thinking** (Opus 4.6)
+- **Extended thinking** (Sonnet 4.6)
+- **Code execution tool** free (with web search/fetch)
+- **Dynamic filtering** (web search)
+- **Fast Mode** (Opus 4.6, research preview)
+
+##### Claude 4.5 Series
+
+| Model ID | Name | Release Date | Context Window | Max Output |
+|----------|------|-------------|---------------|------------|
+| `claude-opus-4-5-20251124` | Claude Opus 4.5 | 2025-11-24 | 200K | 16K |
+| `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5 | 2025-09-29 | 1M (beta) | 16K |
+| `claude-haiku-4-5-20251015` | Claude Haiku 4.5 | 2025-10-15 | 200K | 8K |
+
+##### Claude 4.1 Series
+
+| Model ID | Name | Release Date | Context Window | Max Output |
+|----------|------|-------------|---------------|------------|
+| `claude-opus-4-1-20250805` | Claude Opus 4.1 | 2025-08-05 | 200K | 16K |
+
+##### Claude 4 Series
+
+| Model ID | Name | Release Date | Context Window | Max Output |
+|----------|------|-------------|---------------|------------|
+| `claude-opus-4-20250522` | Claude Opus 4 | 2025-05-22 | 200K | 16K |
+| `claude-sonnet-4-20250522` | Claude Sonnet 4 | 2025-05-22 | 1M (beta) | 16K |
+
+#### Deprecated Models
+
+##### Deprecated 2026-02-19
+
+- `claude-3-7-sonnet-20250219` - Claude 3.7 Sonnet
+- `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
+
+**Replacement:** Claude 3.7 Sonnet -> Claude Sonnet 4.6; Claude 3.5 Haiku -> Claude Haiku 4.5
+
+##### Deprecated 2026-01-05
+
+- `claude-3-opus-20240229` - Claude 3 Opus
+
+**Replacement:** Claude Opus 4.5 (improved performance, 2/3 cost reduction)
+
+##### Deprecated 2025-10-28
+
+- `claude-3-5-sonnet-20241022` - Claude 3.5 Sonnet (2024-10-22)
+- `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet (2024-06-20)
+
+**Replacement:** Claude Sonnet 4.5
+
+##### Deprecated 2025-07-21
+
+- `claude-3-sonnet-20240229` - Claude 3 Sonnet
+- `claude-2.1` - Claude 2.1
+- `claude-2.0` - Claude 2.0
+
+##### Upcoming Deprecation (2026-04-19)
+
+- `claude-3-haiku-20240307` - Claude 3 Haiku
+
+**Replacement:** Claude Haiku 4.5
+
+---
+
+### Model Comparison
+
+#### Recommended Models (2026-02)
+
+| Use Case | Recommended Model | Reason |
+|----------|-------------------|--------|
+| Complex reasoning | Claude Opus 4.6 | Strongest reasoning, 1M context |
+| Daily conversation | Claude Sonnet 4.6 | Balance of speed and intelligence, cost-effective |
+| High-frequency calls | Claude Haiku 4.5 | Fastest speed, lowest cost |
+| Code generation | Claude Sonnet 4.5/4.6 | Excellent programming ability |
+| Long document processing | Claude Opus 4.6 / Sonnet 4.6 | 1M token context window |
+
+#### Pricing Comparison (per million tokens)
+
+| Model | Input Price | Output Price |
+|-------|------------|-------------|
+| Claude Opus 4.6 | $5 | $25 |
+| Claude Sonnet 4.6 | $3 | $15 |
+| Claude Opus 4.5 | $5 | $25 |
+| Claude Sonnet 4.5 | $3 | $15 |
+| Claude Haiku 4.5 | $1 | $5 |
+
+---
+
+### New Features
+
+#### Auto-Caching (2026-02-19)
+
+- Just add a `cache_control` field
+- System automatically caches the last cacheable block
+- Cache point moves automatically as conversation grows
+- No manual breakpoint management needed
+
+#### 1M Token Context Window (Beta)
+
+**Supported Models:**
+- Claude Opus 4.6
+- Claude Sonnet 4.6
+- Claude Sonnet 4.5
+- Claude Sonnet 4
+
+**Pricing:**
+- First 200K tokens: Standard pricing
+- Beyond 200K tokens: Long context pricing
+
+#### Fast Mode (Research Preview)
+
+**Claude Opus 4.6 only:**
+- 2.5x faster output speed
+- Need to join [waitlist](https://claude.com/fast-mode)
+- Premium pricing
+
+#### Code Execution Tool
+
+- **Free** when used with web search/fetch
+- Supports Bash command execution
+- Direct file operations
+- Multi-language support
+
+---
+
+### Migration Guide
+
+#### From Claude 3.5 to 4.6
+
+```typescript
+// Old configuration
+const model = 'claude-3-5-sonnet-20241022';
+
+// New configuration
+const model = 'claude-sonnet-4-20260217';
+```
+
+**Notes:**
+- API interface fully compatible
+- Significant performance improvement
+- Supports more features (extended thinking, 1M context)
+- Pricing may differ
+
+#### From Claude 3 Opus to Opus 4.5
+
+```typescript
+// Old configuration
+const model = 'claude-3-opus-20240229';
+
+// New configuration
+const model = 'claude-opus-4-5-20251124';
+```
+
+**Advantages:**
+- Performance improvement
+- 2/3 cost reduction
+- Better visual capabilities
+- Stronger programming capabilities
+
+---
+
+### Update Log
+
+#### 2026-02-28
+- Updated to latest model list
+- Added Claude 4.6 series
+- Marked deprecated models
+- Updated context window information
+- Updated maximum output token counts
+
+#### Historical Versions
+- 2025-05-22: Added Claude 4 series
+- 2025-09-29: Added Claude Sonnet 4.5
+- 2025-10-15: Added Claude Haiku 4.5
+- 2025-11-24: Added Claude Opus 4.5
+- 2026-02-05: Added Claude Opus 4.6
+- 2026-02-17: Added Claude Sonnet 4.6
+
+---
+
+### Reference Resources
+
+- [Anthropic Official Documentation](https://platform.claude.com/docs)
+- [Model Pricing](https://claude.com/platform/api)
+- [API Release Notes](https://platform.claude.com/docs/en/release-notes/api)
+- [Model Deprecation Schedule](https://platform.claude.com/docs/en/about-claude/model-deprecations)
+
+---
+
+### Sources
+
+- [Claude Developer Platform](https://platform.claude.com/docs/en/release-notes/api)
+- [Claude Sonnet 4.6 API Guide](https://www.apidog.com/blog/claude-sonnet-4-6-api/)
+- [Claude Opus 4.6 API Guide](https://apidog.com/blog/claude-opus-4-6-api/)
+- [Claude API Pricing 2026](https://www.metacto.com/blogs/anthropic-api-pricing-a-full-breakdown-of-costs-and-integration)
+- [Claude Opus 4.6 Pricing Guide](https://blog.laozhang.ai/en/posts/claude-opus-4-6-pricing-subscription-guide)
+
+---
+
+<a id="中文"></a>
+
+## 中文
+
+### 2026-02-28 更新
+
+#### 新增模型
+
+##### Claude 4.6 系列（最新）
 
 | 模型 ID | 名称 | 发布日期 | 上下文窗口 | 最大输出 | 特性 |
 |---------|------|----------|-----------|---------|------|
@@ -12,14 +235,14 @@
 | `claude-sonnet-4-20260217` | Claude Sonnet 4.6 | 2026-02-17 | 1M tokens | 16K | 速度与智能平衡，支持扩展思考 |
 
 **亮点：**
-- ✅ **1M token 上下文窗口**（beta）
-- ✅ **自适应思考**（Opus 4.6）
-- ✅ **扩展思考**（Sonnet 4.6）
-- ✅ **代码执行工具**免费（与 web search/fetch 配合使用）
-- ✅ **动态过滤**（web search）
-- ✅ **Fast Mode**（Opus 4.6，研究预览）
+- **1M token 上下文窗口**（beta）
+- **自适应思考**（Opus 4.6）
+- **扩展思考**（Sonnet 4.6）
+- **代码执行工具**免费（与 web search/fetch 配合使用）
+- **动态过滤**（web search）
+- **Fast Mode**（Opus 4.6，研究预览）
 
-#### Claude 4.5 系列
+##### Claude 4.5 系列
 
 | 模型 ID | 名称 | 发布日期 | 上下文窗口 | 最大输出 |
 |---------|------|----------|-----------|---------|
@@ -27,60 +250,58 @@
 | `claude-sonnet-4-5-20250929` | Claude Sonnet 4.5 | 2025-09-29 | 1M (beta) | 16K |
 | `claude-haiku-4-5-20251015` | Claude Haiku 4.5 | 2025-10-15 | 200K | 8K |
 
-#### Claude 4.1 系列
+##### Claude 4.1 系列
 
 | 模型 ID | 名称 | 发布日期 | 上下文窗口 | 最大输出 |
 |---------|------|----------|-----------|---------|
 | `claude-opus-4-1-20250805` | Claude Opus 4.1 | 2025-08-05 | 200K | 16K |
 
-#### Claude 4 系列
+##### Claude 4 系列
 
 | 模型 ID | 名称 | 发布日期 | 上下文窗口 | 最大输出 |
 |---------|------|----------|-----------|---------|
 | `claude-opus-4-20250522` | Claude Opus 4 | 2025-05-22 | 200K | 16K |
 | `claude-sonnet-4-20250522` | Claude Sonnet 4 | 2025-05-22 | 1M (beta) | 16K |
 
-### 已废弃模型
+#### 已废弃模型
 
-#### 2026-02-19 废弃
+##### 2026-02-19 废弃
 
-- ❌ `claude-3-7-sonnet-20250219` - Claude 3.7 Sonnet
-- ❌ `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
+- `claude-3-7-sonnet-20250219` - Claude 3.7 Sonnet
+- `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
 
-**替代方案：**
-- Claude 3.7 Sonnet → Claude Sonnet 4.6
-- Claude 3.5 Haiku → Claude Haiku 4.5
+**替代方案：** Claude 3.7 Sonnet -> Claude Sonnet 4.6; Claude 3.5 Haiku -> Claude Haiku 4.5
 
-#### 2026-01-05 废弃
+##### 2026-01-05 废弃
 
-- ❌ `claude-3-opus-20240229` - Claude 3 Opus
+- `claude-3-opus-20240229` - Claude 3 Opus
 
 **替代方案：** Claude Opus 4.5（性能提升，成本降低 2/3）
 
-#### 2025-10-28 废弃
+##### 2025-10-28 废弃
 
-- ❌ `claude-3-5-sonnet-20241022` - Claude 3.5 Sonnet (2024-10-22)
-- ❌ `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet (2024-06-20)
+- `claude-3-5-sonnet-20241022` - Claude 3.5 Sonnet (2024-10-22)
+- `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet (2024-06-20)
 
 **替代方案：** Claude Sonnet 4.5
 
-#### 2025-07-21 废弃
+##### 2025-07-21 废弃
 
-- ❌ `claude-3-sonnet-20240229` - Claude 3 Sonnet
-- ❌ `claude-2.1` - Claude 2.1
-- ❌ `claude-2.0` - Claude 2.0
+- `claude-3-sonnet-20240229` - Claude 3 Sonnet
+- `claude-2.1` - Claude 2.1
+- `claude-2.0` - Claude 2.0
 
-#### 即将废弃（2026-04-19）
+##### 即将废弃（2026-04-19）
 
-- ⚠️ `claude-3-haiku-20240307` - Claude 3 Haiku
+- `claude-3-haiku-20240307` - Claude 3 Haiku
 
 **替代方案：** Claude Haiku 4.5
 
 ---
 
-## 📊 模型对比
+### 模型对比
 
-### 推荐模型（2026-02）
+#### 推荐模型（2026-02）
 
 | 用途 | 推荐模型 | 理由 |
 |------|---------|------|
@@ -90,7 +311,7 @@
 | 代码生成 | Claude Sonnet 4.5/4.6 | 优秀的编程能力 |
 | 长文档处理 | Claude Opus 4.6 / Sonnet 4.6 | 1M token 上下文窗口 |
 
-### 定价对比（每百万 token）
+#### 定价对比（每百万 token）
 
 | 模型 | 输入价格 | 输出价格 |
 |------|---------|---------|
@@ -102,16 +323,16 @@
 
 ---
 
-## 🆕 新功能
+### 新功能
 
-### 自动缓存（2026-02-19）
+#### 自动缓存（2026-02-19）
 
 - 只需添加一个 `cache_control` 字段
 - 系统自动缓存最后一个可缓存块
 - 随着对话增长自动移动缓存点
 - 无需手动管理断点
 
-### 1M Token 上下文窗口（Beta）
+#### 1M Token 上下文窗口（Beta）
 
 **支持模型：**
 - Claude Opus 4.6
@@ -123,14 +344,14 @@
 - 前 200K tokens：标准价格
 - 超过 200K tokens：长上下文定价
 
-### Fast Mode（研究预览）
+#### Fast Mode（研究预览）
 
 **仅限 Claude Opus 4.6：**
 - 输出速度提升 2.5 倍
 - 需要加入 [waitlist](https://claude.com/fast-mode)
 - 高级定价
 
-### 代码执行工具
+#### 代码执行工具
 
 - 与 web search/fetch 配合使用时**免费**
 - 支持 Bash 命令执行
@@ -139,9 +360,9 @@
 
 ---
 
-## 🔄 迁移指南
+### 迁移指南
 
-### 从 Claude 3.5 迁移到 4.6
+#### 从 Claude 3.5 迁移到 4.6
 
 ```typescript
 // 旧配置
@@ -152,12 +373,12 @@ const model = 'claude-sonnet-4-20260217';
 ```
 
 **注意事项：**
-- ✅ API 接口完全兼容
-- ✅ 性能显著提升
-- ✅ 支持更多功能（扩展思考、1M 上下文）
-- ⚠️ 定价可能不同
+- API 接口完全兼容
+- 性能显著提升
+- 支持更多功能（扩展思考、1M 上下文）
+- 定价可能不同
 
-### 从 Claude 3 Opus 迁移到 Opus 4.5
+#### 从 Claude 3 Opus 迁移到 Opus 4.5
 
 ```typescript
 // 旧配置
@@ -168,23 +389,23 @@ const model = 'claude-opus-4-5-20251124';
 ```
 
 **优势：**
-- ✅ 性能提升
-- ✅ 成本降低 2/3
-- ✅ 更好的视觉能力
-- ✅ 更强的编程能力
+- 性能提升
+- 成本降低 2/3
+- 更好的视觉能力
+- 更强的编程能力
 
 ---
 
-## 📝 更新日志
+### 更新日志
 
-### 2026-02-28
-- ✅ 更新到最新模型列表
-- ✅ 添加 Claude 4.6 系列
-- ✅ 标记已废弃模型
-- ✅ 更新上下文窗口信息
-- ✅ 更新最大输出 token 数
+#### 2026-02-28
+- 更新到最新模型列表
+- 添加 Claude 4.6 系列
+- 标记已废弃模型
+- 更新上下文窗口信息
+- 更新最大输出 token 数
 
-### 历史版本
+#### 历史版本
 - 2025-05-22: 添加 Claude 4 系列
 - 2025-09-29: 添加 Claude Sonnet 4.5
 - 2025-10-15: 添加 Claude Haiku 4.5
@@ -194,7 +415,7 @@ const model = 'claude-opus-4-5-20251124';
 
 ---
 
-## 🔗 参考资源
+### 参考资源
 
 - [Anthropic 官方文档](https://platform.claude.com/docs)
 - [模型定价](https://claude.com/platform/api)
@@ -203,7 +424,7 @@ const model = 'claude-opus-4-5-20251124';
 
 ---
 
-## Sources
+### Sources
 
 - [Claude Developer Platform](https://platform.claude.com/docs/en/release-notes/api)
 - [Claude Sonnet 4.6 API Guide](https://www.apidog.com/blog/claude-sonnet-4-6-api/)

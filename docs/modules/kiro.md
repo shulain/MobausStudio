@@ -1,4 +1,450 @@
-# Kiro 模块 (kiro)
+# Kiro Module / Kiro 模块 (kiro)
+
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Responsibilities
+
+Manage Kiro (AWS AI programming assistant) authentication and model services, including:
+- Multiple OAuth authentication methods (AWS Builder ID, IDC, Google, GitHub)
+- Available model list retrieval
+- Quota information management
+- Token refresh mechanism
+
+## Version History
+
+| Version | Date | Description |
+|---------|------|-------------|
+| v0.9.2 | 2026-03 | Auto-detect unrecoverable errors during token refresh and clean up invalid credentials |
+| v0.9.1 | 2024-01 | Support persisting client registration info, fixing token refresh failure after restart |
+| v0.9.0 | 2024-01 | Add authMethod parameter, support IDC authentication |
+| v0.8.0 | 2024-01 | Initial version, support AWS Builder ID authentication |
+
+## Interface Definitions
+
+### kiroOAuth Service
+
+Kiro OAuth authentication service, supporting multiple authentication methods.
+
+#### requestDeviceCode(authMethod, idcOptions?): Promise<KiroDeviceCodeResponse>
+
+Request Device Code (AWS Builder ID or IDC)
+
+**Parameters:**
+- authMethod (KiroAuthMethod): Authentication method, default 'aws'
+- idcOptions (KiroIdcOptions): IDC authentication options (only required when authMethod is 'idc')
+
+**Returns:**
+```typescript
+{
+    device_code: string;      // Device code
+    user_code: string;        // User code (needs user input)
+    verification_uri: string; // Verification URL
+    expires_in: number;       // Expiration time (seconds)
+    interval: number;         // Polling interval (seconds)
+}
+```
+
+#### pollForToken(deviceCode, interval, expiresIn, onStatus?, abortSignal?): Promise<KiroOAuthResult>
+
+Poll for Access Token
+
+**Parameters:**
+- deviceCode (string): Device code
+- interval (number): Polling interval (seconds)
+- expiresIn (number): Expiration time (seconds)
+- onStatus (KiroPollStatusCallback): Status callback
+- abortSignal (AbortSignal): Cancel signal
+
+**Returns:**
+```typescript
+{
+    success: boolean;
+    accessToken?: string;      // Access token
+    refreshToken?: string;     // Refresh token
+    profileArn?: string;       // Profile ARN (for fetching model list and quota)
+    expiresAt?: number;        // Token expiration timestamp (milliseconds)
+    authMethod?: string;       // Authentication method ("idc" | "aws")
+    kiroClientId?: string;     // v0.9.1: Client ID (needs persistence)
+    kiroClientSecret?: string; // v0.9.1: Client secret (needs persistence)
+    kiroSsoRegion?: string;    // v0.9.1: SSO region (needs persistence)
+    kiroStartUrl?: string;     // v0.9.1: IDC Start URL (needs persistence)
+    error?: string;
+}
+```
+
+#### authorize(onDeviceCode, onStatus?, abortSignal?, authMethod?, idcOptions?): Promise<KiroOAuthResult>
+
+Complete OAuth flow
+
+**Parameters:**
+- onDeviceCode (function): Callback when Device Code is obtained
+- onStatus (KiroPollStatusCallback): Status callback
+- abortSignal (AbortSignal): Cancel signal
+- authMethod (KiroAuthMethod): Authentication method, default 'aws'
+- idcOptions (KiroIdcOptions): IDC authentication options
+
+#### refreshToken(refreshToken, clientId?, clientSecret?, ssoRegion?): Promise<KiroOAuthResult>
+
+Refresh Access Token
+
+**Parameters:**
+- refreshToken (string): Refresh token
+- clientId (string): v0.9.1: Client ID (from persisted credentials)
+- clientSecret (string): v0.9.1: Client secret (from persisted credentials)
+- ssoRegion (string): v0.9.1: SSO region (from persisted credentials)
+
+**Returns:**
+- Success: `{ success: true, accessToken, refreshToken, expiresAt }`
+- Failure (retryable): `{ success: false, error: "error message" }`
+- Failure (requires re-authentication): `{ success: false, error: "error message", needsReauth: true }` (v0.9.2)
+
+**v0.9.2 Improvements:**
+
+When the refresh_token itself is invalid (e.g., "Invalid token provided", "invalid_grant" and other unrecoverable errors), the system will:
+
+1. Return `needsReauth: true` flag
+2. Frontend automatically deletes invalid credentials
+3. Notify user to re-login
+4. Avoid repeated attempts to refresh a known-invalid token
+
+### kiro-models Service
+
+Kiro model list and quota service.
+
+#### fetchKiroAvailableModels(accessToken, profileArn?): Promise<AvailableKiroModel[]>
+
+Fetch Kiro available model list
+
+**Parameters:**
+- accessToken (string): OAuth Access Token
+- profileArn (string): User profile ARN (optional, AWS Builder ID users don't have one)
+
+**Returns:**
+```typescript
+[{
+    id: string;              // Model ID
+    displayName?: string;    // Display name
+    description?: string;    // Model description
+    isExhausted: boolean;    // Whether quota is exhausted
+    maxInputTokens?: number; // Maximum input token count
+    rateMultiplier?: number; // Rate multiplier
+}]
+```
+
+#### fetchKiroQuota(accessToken, profileArn?, authMethod?): Promise<KiroQuotaInfo | null>
+
+Fetch Kiro quota information
+
+**Parameters:**
+- accessToken (string): OAuth Access Token
+- profileArn (string): User profile ARN (optional)
+- authMethod (string): v0.9.0: Authentication method ("idc" | "aws")
+
+**Returns:**
+```typescript
+{
+    total_limit: number;        // Total quota
+    current_usage: number;      // Current usage
+    remaining_quota: number;    // Remaining quota
+    is_exhausted: boolean;      // Whether exhausted
+    resource_type?: string;     // Resource type
+    next_reset?: number;        // Next reset time (millisecond timestamp)
+    subscription_title?: string; // Subscription type
+}
+```
+
+#### formatKiroQuotaInfo(quota): string
+
+Format quota information into a readable string
+
+**Parameters:**
+- quota (KiroQuotaInfo | null): Quota information
+
+**Returns:**
+- Normal: `"Remaining 80% (400/500)"`
+- Exhausted: `"Quota exhausted"`
+- No data: `""`
+
+#### isKiroQuotaAvailable(quota): boolean
+
+Check if quota is available
+
+**Parameters:**
+- quota (KiroQuotaInfo | null): Quota information
+
+**Returns:**
+- true: Quota available
+- false: Quota exhausted
+
+### useKiroModels Hook
+
+Kiro model list management Hook.
+
+#### Parameters
+
+```typescript
+{
+    accessToken?: string;  // OAuth Access Token
+    profileArn?: string;   // User profile ARN
+    authMethod?: string;   // v0.9.0: Authentication method ("idc" | "aws")
+    autoFetch?: boolean;   // Whether to auto-fetch (default true)
+}
+```
+
+#### Return Value
+
+```typescript
+{
+    models: ProviderModelInfo[];      // Available model list (converted format)
+    rawModels: AvailableKiroModel[];  // Raw model data
+    quota: KiroQuotaInfo | null;      // Quota information
+    loading: boolean;                  // Whether loading
+    error: string | null;              // Error message
+    refresh: () => Promise<void>;      // Manual refresh
+    formatQuota: () => string;         // Format quota info
+    isQuotaAvailable: () => boolean;   // Check if quota is available
+    lastUpdated: Date | null;          // Last update time
+}
+```
+
+## Type Definitions
+
+### KiroAuthMethod
+
+```typescript
+type KiroAuthMethod = 'google' | 'github' | 'aws' | 'idc';
+```
+
+| Value | Description |
+|-------|-------------|
+| google | Google OAuth (Social Auth) |
+| github | GitHub OAuth (Social Auth) |
+| aws | AWS Builder ID (Device Flow) |
+| idc | AWS Identity Center (Device Flow with custom Start URL) |
+
+### KiroIdcOptions
+
+```typescript
+interface KiroIdcOptions {
+    startUrl: string;  // Organization's SSO portal URL
+    region: string;    // AWS region (default us-east-1)
+}
+```
+
+### KiroOAuthResult
+
+```typescript
+interface KiroOAuthResult {
+    success: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+    profileArn?: string;
+    expiresAt?: number;        // v0.9.0
+    authMethod?: string;       // v0.9.0
+    kiroClientId?: string;     // v0.9.1
+    kiroClientSecret?: string; // v0.9.1
+    kiroSsoRegion?: string;    // v0.9.1
+    kiroStartUrl?: string;     // v0.9.1
+    error?: string;
+    needsReauth?: boolean;     // v0.9.2: Whether re-authentication is needed
+}
+```
+
+### KiroQuotaInfo
+
+```typescript
+interface KiroQuotaInfo {
+    total_limit: number;
+    current_usage: number;
+    remaining_quota: number;
+    is_exhausted: boolean;
+    resource_type?: string;
+    next_reset?: number;
+    subscription_title?: string;
+}
+```
+
+## Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-KIRO-001 | Normal model list and quota fetch | Valid accessToken and profileArn | Returns model list and quota info |
+| TC-KIRO-002 | Format quota info | Quota 400/500 | Returns "Remaining 80% (400/500)" |
+| TC-KIRO-003 | Quota exhausted state | is_exhausted=true | isQuotaAvailable returns false |
+| TC-KIRO-004 | Include reset time | next_reset has value | quota.next_reset has value |
+| TC-KIRO-005 | Loading state | Request in progress | loading=true |
+| TC-KIRO-006 | Loading failure | API returns error | error has value |
+| TC-KIRO-007 | No token, no request | accessToken is empty | No API request initiated |
+| TC-KIRO-008 | Manual refresh | Call refresh() | Force re-fetch, clear cache |
+| TC-KIRO-009 | Cache mechanism | Same token multiple renders | Only one API request |
+| TC-KIRO-010 | Builder ID user | Only accessToken, no profileArn | Still able to fetch model list |
+| TC-KIRO-011 | v0.9.2: Token refresh failure - unrecoverable error auto-deletes credentials | refreshToken invalid, backend returns needsReauth=true | Auto-delete credentials, return needsReauth=true, notify callback |
+| TC-KIRO-012 | v0.9.2: Token refresh failure - unrecoverable error skips graceful degradation | refreshToken invalid and old token not expired | Don't use graceful degradation, directly delete credentials and return failure |
+| TC-KIRO-013 | v0.9.2: Token refresh failure - retryable error preserves credentials | Network error or other temporary errors | Preserve credentials, follow normal retry and graceful degradation flow |
+| TC-KIRO-014 | v0.9.2: Token refresh failure - UI notification distinction | needsReauth=true | Toast shows "Re-login required", duration 15 seconds |
+| TC-KIRO-015 | v0.9.2: Backend identifies unrecoverable error | "Invalid token provided" error | Returns needs_reauth=true |
+| TC-KIRO-016 | v0.9.2: Backend identifies unrecoverable error | "invalid_grant" error | Returns needs_reauth=true |
+| TC-KIRO-017 | v0.9.2: Backend identifies unrecoverable error | HTTP 401 status code | Returns needs_reauth=true |
+| TC-KIRO-018 | v0.9.2: Backend identifies retryable error | Network timeout or other temporary errors | Returns needs_reauth=false |
+
+## Usage Examples
+
+### Basic Usage
+
+```tsx
+import { useKiroModels } from '../hooks/useKiroModels';
+
+function KiroModelSelector({ credential }) {
+    const {
+        models,
+        quota,
+        loading,
+        error,
+        refresh,
+        formatQuota,
+        isQuotaAvailable,
+    } = useKiroModels({
+        accessToken: credential.accessToken,
+        profileArn: credential.profileArn,
+        authMethod: credential.authMethod,
+    });
+
+    if (loading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error}</div>;
+
+    return (
+        <div>
+            <select disabled={!isQuotaAvailable()}>
+                {models.map(model => (
+                    <option key={model.id} value={model.id}>
+                        {model.name}
+                    </option>
+                ))}
+            </select>
+            <span>{formatQuota()}</span>
+            <button onClick={refresh}>Refresh</button>
+        </div>
+    );
+}
+```
+
+### OAuth Authentication Flow
+
+```tsx
+import { kiroOAuth } from '../services/kiro-oauth';
+
+// AWS Builder ID authentication
+async function loginWithBuilderID() {
+    const result = await kiroOAuth.authorize(
+        (deviceData) => {
+            // Display user code and verification URL
+            console.log(`Please visit ${deviceData.verification_uri}`);
+            console.log(`Enter code: ${deviceData.user_code}`);
+        },
+        (status) => {
+            // Status update
+            console.log('Status:', status);
+        }
+    );
+
+    if (result.success) {
+        // Save credentials (including v0.9.1 new client registration info)
+        saveCredential({
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            profileArn: result.profileArn,
+            expiresAt: result.expiresAt,
+            authMethod: result.authMethod,
+            kiroClientId: result.kiroClientId,
+            kiroClientSecret: result.kiroClientSecret,
+            kiroSsoRegion: result.kiroSsoRegion,
+        });
+    }
+}
+
+// IDC authentication
+async function loginWithIDC(startUrl: string, region: string) {
+    const result = await kiroOAuth.authorize(
+        (deviceData) => { /* ... */ },
+        (status) => { /* ... */ },
+        undefined,
+        'idc',
+        { startUrl, region }
+    );
+    // ...
+}
+```
+
+### Token Refresh
+
+```tsx
+import { kiroOAuth } from '../services/kiro-oauth';
+
+async function refreshKiroToken(credential) {
+    // v0.9.1: Pass persisted client registration info
+    const result = await kiroOAuth.refreshToken(
+        credential.refreshToken,
+        credential.kiroClientId,
+        credential.kiroClientSecret,
+        credential.kiroSsoRegion
+    );
+
+    if (result.success) {
+        // Update credentials
+        updateCredential({
+            ...credential,
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            expiresAt: result.expiresAt,
+        });
+    }
+}
+```
+
+## Error Codes
+
+| Error Code/Message | Description | Recoverable | Handling Suggestion |
+|--------------------|-------------|-------------|---------------------|
+| expired | Device Code has expired | No | Restart authentication flow |
+| cancelled | User cancelled authentication | - | Prompt user to retry |
+| slow_down | Polling too fast | Yes | Automatically increase polling interval |
+| Token refresh failed | Refresh Token invalid or expired | No | Re-login |
+| Invalid token provided | v0.9.2: refresh_token has expired | No | Auto-delete credentials, prompt re-login |
+| invalid_grant | v0.9.2: OAuth authorization has expired | No | Auto-delete credentials, prompt re-login |
+| invalid_client | v0.9.2: Client authentication failed | No | Auto-delete credentials, prompt re-login |
+| unauthorized_client | v0.9.2: Client unauthorized | No | Auto-delete credentials, prompt re-login |
+| HTTP 401 | v0.9.2: Authentication failed | No | Auto-delete credentials, prompt re-login |
+| Network timeout/connection failure | Temporary network issue | Yes | Auto-retry (max 3 times, exponential backoff) |
+| Failed to fetch model list | Access Token invalid | Yes | Try refreshing token or re-login |
+
+## Notes
+
+1. **v0.9.2 Auto credential cleanup**: When token refresh encounters an unrecoverable error (e.g., refresh_token expired), the system will automatically delete invalid credentials and notify the user to re-login, avoiding repeated invalid refresh attempts.
+
+2. **v0.9.1 Persistence requirement**: After successful authentication, `kiroClientId`, `kiroClientSecret`, and `kiroSsoRegion` fields must be persisted, otherwise token refresh will fail after app restart.
+
+3. **Builder ID vs IDC**:
+   - AWS Builder ID users don't have `profileArn`, but can still fetch the model list
+   - IDC users need to provide the organization's `startUrl` and `region`
+
+4. **Quota is global**: Kiro's quota is account-level, all models share the same quota.
+
+5. **Cache mechanism**: The Hook has a built-in 5-minute cache, same token won't trigger repeated requests. Call `refresh()` to force refresh.
+
+## Change Log
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2026-03-15 | v0.9.2 | Auto-detect unrecoverable errors during token refresh and clean up invalid credentials | - |
+| 2024-01-XX | v0.9.1 | Support persisting client registration info | - |
+| 2024-01-XX | v0.9.0 | Add authMethod parameter, support IDC authentication | - |
+| 2024-01-XX | v0.8.0 | Initial version | - |
+
+---
+
+<a id="中文"></a>
 
 ## 模块职责
 

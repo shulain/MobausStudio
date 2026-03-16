@@ -1,6 +1,336 @@
-# Models 模型管理模块
+# Models Module / Models 模型管理模块
 
-## 📋 模块概述
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Overview
+
+The Models module is responsible for managing AI model configuration, API keys, and provider settings, supporting multi-model switching and connection testing.
+
+| Property | Value |
+|----------|-------|
+| Module Path | `src/components/features/Models` |
+| Storage Service | `src/services/storage.ts` |
+| Rust Commands | `src-tauri/src/lib.rs` |
+| Created Date | 2026-01-18 |
+| Last Updated | 2026-01-23 |
+
+---
+
+## Feature List
+
+### Core Features
+
+- [x] Model list display and status monitoring
+- [x] Add/edit model configuration
+- [x] Delete model (with confirmation dialog)
+- [x] API Key secure management
+- [x] Model connection testing
+- [x] Multi-provider support (OpenAI, Anthropic, Google, Custom)
+- [x] Local persistent storage (Tauri file system)
+- [x] Auto-test after configuration (v2.5.3)
+- [x] Toast notification for test results (v2.5.3)
+- [x] Batch check model availability (v3.6.0)
+
+### Extended Features
+
+- [x] Google Cloud Code model quota display (v3.6.1)
+- [ ] Model usage statistics
+- [ ] Auto-discover models
+- [ ] Rate configuration
+
+### Google Model Quota Display (v3.6.1)
+
+When a user connects the Google provider, the system automatically fetches Google Cloud Code available model list and quota information:
+
+- **Dynamic model list**: Fetches actually available models from the API, not static configuration
+- **Quota status display**: Shows remaining quota percentage in the model selector
+- **Quota exhausted warning**: Models with exhausted quota show a warning indicator and cannot be selected
+- **Quota reset time**: Shows estimated time for quota reset
+
+### Available Model Filtering (v3.6.0)
+
+Chat and Agent module model selectors only display models with status `online`, ensuring users can only select verified available models for conversations.
+
+---
+
+## Component Structure
+
+```
+Models/
+├── index.tsx              # Module entry (ModelPage)
+├── ModelCard.tsx          # Model card component
+├── ModelModal.tsx         # Model configuration modal
+└── types.ts               # Type definitions (references global types)
+```
+
+---
+
+## Data Structures
+
+### AIModelConfig Model Configuration
+
+```typescript
+interface AIModelConfig {
+  id: string;
+  name: string;            // Display name
+  modelId?: string;        // Model ID/endpoint ID (for custom providers)
+  provider: string;        // Provider ID
+  status: 'online' | 'offline' | 'error';
+  apiKeySet: boolean;      // Whether API Key is set
+  apiKey?: string;         // API Key (frontend transport only, not persisted in plaintext)
+  endpoint?: string;       // Custom API address
+  baseUrl?: string;        // Same as endpoint, compatibility field
+  maxTokens: number;
+  temperature?: number;
+  pricing?: {
+    input: number;
+    output: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### ModelProvider Provider
+
+```typescript
+interface ModelProvider {
+  id: string;
+  name: string;
+  icon: string;
+  defaultEndpoint: string;
+  models: Array<{
+    id: string;
+    name: string;
+    maxTokens: number;
+    /** v3.6.1: Quota info (Google provider only) */
+    quota?: {
+      remainingFraction: number;  // Remaining quota ratio (0.0 - 1.0)
+      resetTime?: string;         // Quota reset time (ISO 8601)
+      isExhausted: boolean;       // Whether quota is exhausted
+    };
+  }>;
+  /** v3.2.0: Whether connected */
+  connected?: boolean;
+  /** v3.6.1: Whether dynamic model list is supported (e.g., Google) */
+  supportsDynamicModels?: boolean;
+  /** v3.6.1: Dynamic model loading state */
+  modelsLoading?: boolean;
+  /** v3.6.1: Dynamic model loading error */
+  modelsError?: string;
+}
+```
+
+---
+
+## API Interface
+
+### Data Persistence
+
+Uses `src/services/storage.ts` for unified management, supporting dual environments:
+- **Tauri environment**: Calls Tauri commands to store to local file system
+- **Browser environment**: Falls back to LocalStorage
+
+### Tauri Commands
+
+#### `save_models`
+Save model configuration to local file
+
+```rust
+#[tauri::command]
+async fn save_models(models: Vec<AIModelConfig>) -> Result<(), String>
+```
+
+#### `load_models`
+Load model configuration from local file
+
+```rust
+#[tauri::command]
+async fn load_models() -> Result<Vec<AIModelConfig>, String>
+```
+
+#### `test_model`
+Test model connection (bypasses CORS restrictions)
+
+```rust
+#[tauri::command]
+async fn test_model(request: TestModelRequest) -> Result<TestModelResponse, String>
+
+struct TestModelRequest {
+    provider: String,
+    api_key: String,
+    endpoint: Option<String>,
+    model_name: Option<String>,
+}
+```
+
+#### `google_fetch_available_models` (v3.6.1)
+Fetch Google Cloud Code available model list and quota info
+
+```rust
+#[tauri::command]
+async fn google_fetch_available_models(
+    access_token: String,
+    project_id: Option<String>,
+) -> Result<FetchAvailableModelsResponse, String>
+
+struct FetchAvailableModelsResponse {
+    success: bool,
+    models: Vec<AvailableModelInfo>,
+    error: Option<String>,
+}
+
+struct AvailableModelInfo {
+    id: String,
+    display_name: Option<String>,
+    remaining_fraction: Option<f64>,
+    reset_time: Option<String>,
+    is_exhausted: bool,
+}
+```
+
+### Frontend Interface
+
+#### `onBatchTestModels` (v3.6.0)
+Batch test all models' availability
+
+**Function signature:**
+```typescript
+onBatchTestModels: () => Promise<void>
+```
+
+**Description:**
+- Iterates through all configured models, calling `test_model` command for each
+- Concurrency control: Tests at most 3 models simultaneously to avoid request overload
+- Shows progress notifications during testing
+- Updates each model's `status` field after testing
+- Displays batch test result summary via Toast notification
+
+**Return value:**
+- No return value, results are communicated through state updates and Toast notifications
+
+#### `getAvailableModels` (v3.6.0)
+Get available models list (models with online status)
+
+**Function signature:**
+```typescript
+getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
+```
+
+**Description:**
+- Filters models with `status === 'online'`
+- Used for Chat and Agent module model selectors
+
+---
+
+## Test Cases
+
+| Case ID | Test Scenario | Input | Expected Output | Status |
+|---------|--------------|-------|-----------------|--------|
+| TC-MODEL-001 | Render model list | Mock data | Correctly display model cards | [x] |
+| TC-MODEL-002 | Add model | Click add button, fill form | New model in list, save successful | [x] |
+| TC-MODEL-003 | Edit model | Click edit button | Modal shows pre-filled data, updates after save | [x] |
+| TC-MODEL-004 | Delete model | Click delete button | Show confirmation dialog | [x] |
+| TC-MODEL-005 | Confirm delete | Click delete in confirmation dialog | Model removed from list | [x] |
+| TC-MODEL-006 | Cancel delete | Click cancel in confirmation dialog | Dialog closes, model retained | [x] |
+| TC-MODEL-007 | Test model | Click test button | Show testing status, then show result | [x] |
+| TC-MODEL-008 | Filter models | Enter search keyword | List shows only matching items | [x] |
+| TC-MODEL-009 | Standard model auto-select | Open add modal | Auto-select first model ID | [x] |
+| TC-MODEL-010 | Switch provider | Switch selection | Auto-update model selection | [x] |
+| TC-MODEL-011 | Delete persistence | Delete model and restart | Model config deleted | [x] |
+| TC-MODEL-012 | Auto-test after add | Add model | Auto-execute test and show Toast | [x] |
+| TC-MODEL-013 | Auto-test after update | Edit model | Auto-execute test and show Toast | [x] |
+| TC-MODEL-014 | Toast shows success | Test successful | Green Toast in top-right corner | [x] |
+| TC-MODEL-015 | Toast shows failure | Test failed | Red Toast in top-right, expandable details | [x] |
+| TC-MODEL-016 | Model status update | Test complete | Status updated to online/error | [x] |
+
+### Google Model Race Condition Tests (v3.6.2)
+
+| Case ID | Test Scenario | Input | Expected Output | Status |
+|---------|--------------|-------|-----------------|--------|
+| TC-GMODEL-001 | Quick account switch cancels old request | Switch accessToken twice | Old request cancelled, only latest result kept | [ ] |
+| TC-GMODEL-002 | Project switch cancels old request | Switch projectId | Old request cancelled, new request completes normally | [ ] |
+| TC-GMODEL-003 | Normal single request | Single accessToken set | Normal model list return | [ ] |
+| TC-GMODEL-004 | Old request not written back on disconnect | Request in progress, accessToken becomes empty | Old request return doesn't update state, model list stays empty | [ ] |
+| TC-MODEL-017 | Batch check button display | Model list page | Show "Batch Check" button | [ ] |
+| TC-MODEL-018 | Batch check execution | Click batch check button | Test all models one by one, show progress | [ ] |
+| TC-MODEL-019 | Batch check results | Batch check complete | Toast shows success/failure count summary | [ ] |
+| TC-MODEL-020 | Batch check status update | Batch check complete | Each model status correctly updated | [ ] |
+| TC-MODEL-021 | Batch check concurrency control | Multiple models tested simultaneously | Max 3 concurrent requests | [ ] |
+| TC-MODEL-022 | Chat model filtering | Chat page model selector | Only show status=online models | [ ] |
+| TC-MODEL-023 | Agent model filtering | Agent edit modal | Only show status=online models | [ ] |
+| TC-MODEL-024 | No available models prompt | All models offline/error | Show "Please configure available models first" prompt | [ ] |
+| TC-MODEL-025 | Google model quota fetch | Google provider connected | Call API to get available model list | [ ] |
+| TC-MODEL-026 | Google model quota display | Model selector | Show remaining quota percentage | [ ] |
+| TC-MODEL-027 | Google quota exhausted prompt | Model with 0 quota | Show warning indicator, not selectable | [ ] |
+| TC-MODEL-028 | Google quota reset time | Model with resetTime | Show quota reset time | [ ] |
+| TC-MODEL-029 | Google model loading state | Fetching model list | Show loading indicator | [ ] |
+| TC-MODEL-030 | Google model loading failure | API returns error | Show error prompt, fallback to static list | [ ] |
+
+### Credential Matching Case-insensitive Tests (v3.6.4)
+
+| Case ID | Test Scenario | Input | Expected Output | Status |
+|---------|--------------|-------|-----------------|--------|
+| TC-CRED-CI-001 | storage.get case-insensitive | providerId='Google', stored as 'google' | Return matching credential | [ ] |
+| TC-CRED-CI-002 | storage.getSync case-insensitive | providerId='OPENAI', stored as 'openai' | Return matching credential | [ ] |
+| TC-CRED-CI-003 | ModelModal submit credential matching | provider='Google', credential providerId='google' | Correctly get credential | [ ] |
+
+### Service Layer Pure Function Tests (modelState)
+
+> Test file: `src/test/services/models/modelState.test.ts`
+
+| Case ID | Test Scenario | Input | Expected Output | Status |
+|---------|--------------|-------|-----------------|--------|
+| TC-MODEL-STATE-001 | addModel - create model | ModelCreateInput | New AIModelConfig in list, default status='offline' | [x] |
+| TC-MODEL-STATE-002 | updateModel - update model | id + ModelCreateInput | Specified model fields updated, others unchanged | [x] |
+| TC-MODEL-STATE-003 | updateModel - API Key preserved | No new apiKey | Preserve old apiKey | [x] |
+| TC-MODEL-STATE-004 | deleteModel - delete model | id | Specified model removed from list | [x] |
+| TC-MODEL-STATE-005 | updateModelStatus - update status | id + 'online' | Specified model status updated | [x] |
+| TC-MODEL-STATE-006 | findModel - find existing | id | Return corresponding model | [x] |
+| TC-MODEL-STATE-007 | findModel - find non-existing | Non-existent id | Return undefined | [x] |
+| TC-MODEL-STATE-008 | updateModel - id doesn't exist | Non-existent id | List unchanged | [x] |
+
+### Test Files
+
+- `src/test/components/Models/ModelPage.test.tsx`
+- `src/test/components/Models/ModelCard.test.tsx`
+- `src/test/components/Models/ModelModal.test.tsx`
+- `src/test/services/storage.test.ts`
+- `src/test/services/models/modelState.test.ts`
+
+---
+
+## Change History
+
+| Date | Version | Author | Changes |
+|------|---------|--------|---------|
+| 2026-01-18 | 1.0.0 | - | Initial version, basic CRUD and UI |
+| 2026-01-18 | 1.1.0 | - | Add standard model auto-select logic |
+| 2026-01-18 | 1.2.0 | - | Add Tauri persistence storage interface definition |
+| 2026-01-23 | 2.5.3 | - | Fix delete persistence issue, add delete confirmation dialog |
+| 2026-01-23 | 2.5.3 | - | Add auto-test after configuration feature |
+| 2026-01-23 | 2.5.3 | - | Switch to Toast notification for test results (top-right temporary popup) |
+| 2026-01-23 | 2.5.3 | - | Add error status support |
+| 2026-01-27 | 3.6.0 | - | Add batch check model availability feature |
+| 2026-01-27 | 3.6.0 | - | Add getAvailableModels interface for Chat/Agent |
+| 2026-01-27 | 3.6.0 | - | Fix useProviderCredential field lost in Tauri persistence |
+| 2026-01-28 | 3.6.1 | - | Add Google Cloud Code model quota display feature |
+| 2026-01-28 | 3.6.1 | - | Add google_fetch_available_models Tauri command |
+| 2026-01-28 | 3.6.1 | - | Add src/services/google-models.ts frontend service |
+| 2026-01-28 | 3.6.1 | - | Extend ModelProvider type to support dynamic models and quota info |
+| 2026-03-05 | 4.2.0 | - | Extract modelState pure functions: addModel, updateModel, deleteModel, updateModelStatus, findModel |
+| 2026-03-13 | 3.6.2 | - | Fix useGoogleModels race condition: use AbortController to cancel stale requests, prevent old data overwriting new data on quick account/project switch |
+| 2026-03-13 | 3.6.3 | - | Fix ModelModal Google credential dirty value: clear googleAccessToken/googleProjectId when credential cannot be loaded |
+| 2026-03-13 | 3.6.4 | - | Fix credential matching case-sensitivity: storage.get/getSync and ModelModal submit use toLowerCase for providerId matching |
+| 2026-03-13 | 3.6.5 | - | Fix useGoogleModels disconnect race condition: increment requestIdRef when accessToken becomes empty so in-flight old requests auto-expire |
+
+---
+
+<a id="中文"></a>
+
+## 模块概述
 
 Models模块负责管理AI模型配置、API密钥和提供商设置，支持多模型切换和连接测试。
 
@@ -14,7 +344,7 @@ Models模块负责管理AI模型配置、API密钥和提供商设置，支持多
 
 ---
 
-## 🎯 功能列表
+## 功能列表
 
 ### 核心功能
 
@@ -51,7 +381,7 @@ Chat 和 Agent 模块的模型选择器仅显示状态为 `online` 的可用模�
 
 ---
 
-## 🏗️ 组件结构
+## 组件结构
 
 ```
 Models/
@@ -63,7 +393,7 @@ Models/
 
 ---
 
-## 📐 数据结构
+## 数据结构
 
 ### AIModelConfig 模型配置
 
@@ -121,7 +451,7 @@ interface ModelProvider {
 
 ---
 
-## 📐 API 接口
+## API 接口
 
 ### 数据持久化
 
@@ -221,7 +551,7 @@ getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
 
 ---
 
-## 🧪 测试用例
+## 测试用例
 
 | 用例ID | 测试场景 | 输入 | 期望输出 | 状态 |
 |--------|---------|------|---------|------|
@@ -298,7 +628,7 @@ getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
 
 ---
 
-## 📝 修改历史
+## 修改历史
 
 | 日期 | 版本 | 修改人 | 修改内容 |
 |------|------|--------|---------|

@@ -1,6 +1,474 @@
-# Analytics 运营统计模块
+# Analytics Module / Analytics 运营统计模块
 
-## 📋 模块概述
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Overview
+
+The Analytics module provides operational data analytics functionality, using Mixpanel as the third-party analytics service to collect user counts, user behavior, and other operational data.
+
+| Property | Value |
+|----------|-------|
+| Module Path | `src/services/analytics.ts` |
+| Third-party Service | [Mixpanel](https://mixpanel.com) |
+| API Endpoint | `https://api.mixpanel.com` |
+| Proxy Solution | Cloudflare Worker |
+| Created Date | 2025-01-XX |
+| Last Updated | 2025-01-XX |
+
+---
+
+## Feature List
+
+### Core Features
+
+- [x] User identification (Device ID)
+- [x] App launch tracking
+- [x] User behavior tracking
+- [x] Model usage statistics
+- [x] Feature usage statistics
+
+### Extended Features
+
+- [x] User property setting
+- [x] Cloudflare Worker proxy (solving domestic network access issues)
+- [ ] Offline event caching
+- [ ] Batch reporting
+
+---
+
+## Architecture Design
+
+### Direct Mode (Overseas Users)
+
+```
++-------------------+
+|   MobausStudio    |
+|    (Tauri App)    |
++--------+----------+
+         |
+         | HTTP POST
+         v
++-------------------+
+|     Mixpanel      |
+|   api.mixpanel    |
+|      .com         |
++-------------------+
+```
+
+### Proxy Mode (Domestic Users)
+
+```
++-------------------+
+|   MobausStudio    |
+|    (Tauri App)    |
++--------+----------+
+         |
+         | HTTP POST
+         v
++-------------------+
+|    Cloudflare     |
+|      Worker       |
+|   (your-proxy)    |
++--------+----------+
+         |
+         | Forward request
+         v
++-------------------+
+|     Mixpanel      |
+|   api.mixpanel    |
+|      .com         |
++-------------------+
+```
+
+### File Structure
+
+```
+src/
+├── services/
+│   └── analytics.ts           # Analytics service (core)
+├── test/
+│   └── services/
+│       └── analytics.test.ts  # Unit tests
+scripts/
+└── cloudflare-worker-mixpanel.js  # Cloudflare Worker proxy code
+```
+
+---
+
+## Data Structures
+
+### AnalyticsConfig Configuration
+
+```typescript
+interface AnalyticsConfig {
+    /** Mixpanel Project Token */
+    projectToken: string;
+    /** API endpoint (optional, for proxy configuration) */
+    endpoint?: string;
+    /** Whether enabled (enabled in production, optional in development) */
+    enabled?: boolean;
+    /** Debug mode */
+    debug?: boolean;
+}
+```
+
+### UserProperties
+
+```typescript
+interface UserProperties {
+    /** App version */
+    appVersion?: string;
+    /** Operating system */
+    os?: string;
+    /** OS version */
+    osVersion?: string;
+    /** Language setting */
+    language?: string;
+    /** Theme setting */
+    theme?: string;
+    /** First launch time */
+    firstLaunchAt?: string;
+}
+```
+
+---
+
+## API Interface
+
+### analytics.init(config)
+
+Initialize the analytics service
+
+**Parameters:**
+- config: AnalyticsConfig - Configuration object
+
+**Returns:**
+- void
+
+**Examples:**
+```typescript
+import { analytics } from '@/services/analytics';
+
+// Direct mode (overseas users)
+analytics.init({
+    projectToken: 'YOUR_MIXPANEL_PROJECT_TOKEN',
+    enabled: true,
+    debug: false,
+});
+
+// Proxy mode (domestic users)
+analytics.init({
+    projectToken: 'YOUR_MIXPANEL_PROJECT_TOKEN',
+    endpoint: 'https://your-proxy.workers.dev',
+    enabled: true,
+    debug: false,
+});
+```
+
+### analytics.identify(userProperties?)
+
+Identify user and set user properties
+
+**Parameters:**
+- userProperties: UserProperties (optional) - User properties
+
+**Returns:**
+- void
+
+### analytics.track(eventName, properties?)
+
+Track an event
+
+**Parameters:**
+- eventName: string - Event name
+- properties: Record<string, unknown> (optional) - Event properties
+
+**Returns:**
+- void
+
+**Examples:**
+```typescript
+// Track message sent
+analytics.track('message_sent', {
+    modelId: 'gpt-4',
+    messageLength: 100,
+    hasAttachment: false,
+});
+```
+
+### analytics.setUserProperties(properties)
+
+Update user properties
+
+**Parameters:**
+- properties: Partial<UserProperties> - Properties to update
+
+**Returns:**
+- void
+
+---
+
+## Cloudflare Worker Proxy Configuration
+
+### Why is a proxy needed?
+
+The Mixpanel API (`api.mixpanel.com`) may not be directly accessible in China. This issue can be resolved through a Cloudflare Worker proxy.
+
+### Deployment Steps
+
+1. **Log in to Cloudflare Dashboard**
+   - Visit https://dash.cloudflare.com
+   - Register/log in (free)
+
+2. **Create a Worker**
+   - Go to Workers & Pages
+   - Click "Create Worker"
+   - Copy the code from `scripts/cloudflare-worker-mixpanel.js`
+   - Deploy
+
+3. **Configure Environment Variables**
+   ```bash
+   # .env
+   VITE_MIXPANEL_TOKEN=your_project_token
+   VITE_MIXPANEL_PROXY=https://your-worker.workers.dev
+   ```
+
+4. **(Optional) Bind Custom Domain**
+   - Add a custom domain in Worker settings
+   - e.g., `analytics.yourdomain.com`
+
+### Free Tier
+
+| Item | Free Quota |
+|------|------------|
+| Requests | 100,000/day |
+| CPU Time | 10ms/request |
+| Workers Count | Unlimited |
+
+For analytics services, the free tier is more than sufficient.
+
+---
+
+## Event Tracking Design
+
+### User Lifecycle Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `app_launched` | App launch | `{ version, os, language }` |
+| `app_closed` | App close | `{ sessionDuration }` |
+| `app_updated` | App update | `{ fromVersion, toVersion }` |
+
+### Chat-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `chat_created` | Create new chat | `{ modelId }` |
+| `chat_deleted` | Delete chat | `{ messageCount }` |
+| `message_sent` | Send message | `{ modelId, messageLength, hasAttachment }` |
+| `message_received` | Receive reply | `{ modelId, tokens, responseTime }` |
+
+### Model-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `model_added` | Add model | `{ providerId, modelName }` |
+| `model_deleted` | Delete model | `{ providerId, modelName }` |
+| `model_switched` | Switch model | `{ fromModel, toModel }` |
+
+### Agent-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `agent_created` | Create Agent | `{ agentName }` |
+| `agent_deleted` | Delete Agent | `{ agentName }` |
+| `agent_used` | Use Agent | `{ agentId, agentName }` |
+
+### Skill-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `skill_created` | Create skill | `{ skillName, isBuiltIn }` |
+| `skill_deleted` | Delete skill | `{ skillName }` |
+| `skill_used` | Use skill | `{ skillId, skillName }` |
+| `skill_installed` | Install skill | `{ skillName, source }` |
+
+### MCP-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `mcp_server_added` | Add MCP server | `{ serverName, transportType }` |
+| `mcp_server_deleted` | Delete MCP server | `{ serverName }` |
+| `mcp_server_connected` | Connect MCP server | `{ serverName, toolCount }` |
+| `mcp_tool_used` | Use MCP tool | `{ serverName, toolName }` |
+
+### Provider-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `provider_connected` | Connect provider | `{ providerId, authType }` |
+| `provider_disconnected` | Disconnect provider | `{ providerId }` |
+
+### Settings-related Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `settings_changed` | Change settings | `{ settingKey, newValue }` |
+| `theme_changed` | Switch theme | `{ theme }` |
+| `language_changed` | Switch language | `{ language }` |
+
+### Roundtable Events
+
+| Event Name | Trigger | Event Properties |
+|------------|---------|------------------|
+| `roundtable_created` | Create roundtable | `{ participantCount, topic }` |
+| `roundtable_completed` | Complete roundtable | `{ roundCount, messageCount, duration }` |
+
+---
+
+## Test Cases
+
+| Case ID | Scenario | Input | Expected Result | Status |
+|---------|----------|-------|-----------------|--------|
+| TC-ANALYTICS-001 | Initialize service | Valid config | Service initialized successfully | [x] |
+| TC-ANALYTICS-002 | Initialize service (disabled) | enabled=false | No requests sent | [x] |
+| TC-ANALYTICS-003 | Track event | Valid event name | Event sent successfully | [x] |
+| TC-ANALYTICS-004 | Track event (with properties) | Event name + properties | Properties sent correctly | [x] |
+| TC-ANALYTICS-005 | User identification | Device ID | User ID set successfully | [x] |
+| TC-ANALYTICS-006 | Set user properties | Properties object | Properties updated successfully | [x] |
+| TC-ANALYTICS-007 | Network error handling | Network unavailable | Silent failure, no app impact | [x] |
+| TC-ANALYTICS-008 | Debug mode | debug=true | Console log output | [x] |
+
+### Test Files
+
+- `src/test/services/analytics.test.ts`
+
+---
+
+## Implementation Details
+
+### Device ID Generation
+
+Uses UUID v4 to generate a unique device ID, stored locally:
+
+```typescript
+function getDeviceId(): string {
+    const DEVICE_ID_KEY = 'mobaus_device_id';
+    let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+
+    if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    }
+
+    return deviceId;
+}
+```
+
+### Mixpanel Track API Request Format
+
+```typescript
+// POST https://api.mixpanel.com/track
+[
+    {
+        "event": "message_sent",
+        "properties": {
+            "token": "YOUR_PROJECT_TOKEN",
+            "distinct_id": "device_id_xxx",
+            "time": 1234567890,
+            "$insert_id": "unique-id",
+            "$os": "macOS",
+            "$app_version": "1.0.0",
+            "modelId": "gpt-4",
+            "messageLength": 100
+        }
+    }
+]
+```
+
+### Mixpanel Engage API Request Format (User Properties)
+
+```typescript
+// POST https://api.mixpanel.com/engage
+[
+    {
+        "$token": "YOUR_PROJECT_TOKEN",
+        "$distinct_id": "device_id_xxx",
+        "$set": {
+            "appVersion": "1.0.0",
+            "os": "macOS",
+            "language": "zh"
+        }
+    }
+]
+```
+
+### Error Handling
+
+Analytics service errors **should not affect main app functionality**:
+
+```typescript
+async function track(eventName: string, properties?: Record<string, unknown>): Promise<void> {
+    try {
+        // Send event...
+    } catch (error) {
+        // Silent failure, only log in debug mode
+        if (config.debug) {
+            logger.warn(LogTags.ANALYTICS, 'Event sending failed:', error);
+        }
+    }
+}
+```
+
+---
+
+## Environment Variable Configuration
+
+```bash
+# .env.local or .env.production
+
+# Mixpanel Project Token (required)
+VITE_MIXPANEL_TOKEN=your_project_token
+
+# Mixpanel proxy endpoint (optional, needed for domestic users)
+VITE_MIXPANEL_PROXY=https://your-proxy.workers.dev
+```
+
+---
+
+## Notes
+
+1. **Privacy Compliance**: No personally identifiable information (PII) is collected, only anonymous device IDs are used
+2. **Performance Impact**: Analytics requests are sent asynchronously, not blocking the main thread
+3. **Error Isolation**: Analytics failures do not affect normal app functionality
+4. **Data Real-time**: Mixpanel data is visible almost in real-time
+5. **Domestic Access**: Domestic users need to configure a Cloudflare Worker proxy
+
+---
+
+## Change History
+
+| Date | Version | Author | Changes |
+|------|---------|--------|---------|
+| 2025-01-XX | 1.0.0 | - | Initial version (Amplitude) |
+| 2025-01-XX | 2.0.0 | - | Migrated to Mixpanel, added Cloudflare Worker proxy support |
+
+---
+
+## Related Links
+
+- [Mixpanel Official Documentation](https://docs.mixpanel.com/)
+- [Mixpanel HTTP API](https://docs.mixpanel.com/docs/tracking-methods/http)
+- [Mixpanel Pricing](https://mixpanel.com/pricing/) (Free tier supports 20 million events/month)
+- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
+
+---
+
+<a id="中文"></a>
+
+## 模块概述
 
 Analytics 模块提供运营数据统计功能，使用 Mixpanel 作为第三方统计服务，收集用户数量、用户行为等运营数据。
 
@@ -15,7 +483,7 @@ Analytics 模块提供运营数据统计功能，使用 Mixpanel 作为第三方
 
 ---
 
-## 🎯 功能列表
+## 功能列表
 
 ### 核心功能
 
@@ -34,7 +502,7 @@ Analytics 模块提供运营数据统计功能，使用 Mixpanel 作为第三方
 
 ---
 
-## 🏗️ 架构设计
+## 架构设计
 
 ### 直连模式（海外用户）
 
@@ -93,7 +561,7 @@ scripts/
 
 ---
 
-## 📐 数据结构
+## 数据结构
 
 ### AnalyticsConfig 配置
 
@@ -131,7 +599,7 @@ interface UserProperties {
 
 ---
 
-## 📐 API 接口
+## API 接口
 
 ### analytics.init(config)
 
@@ -206,7 +674,7 @@ analytics.track('message_sent', {
 
 ---
 
-## 🌐 Cloudflare Worker 代理配置
+## Cloudflare Worker 代理配置
 
 ### 为什么需要代理？
 
@@ -247,7 +715,7 @@ Mixpanel API (`api.mixpanel.com`) 在国内可能无法直接访问。通过 Clo
 
 ---
 
-## 📊 埋点事件设计
+## 埋点事件设计
 
 ### 用户生命周期事件
 
@@ -324,7 +792,7 @@ Mixpanel API (`api.mixpanel.com`) 在国内可能无法直接访问。通过 Clo
 
 ---
 
-## 🧪 测试用例
+## 测试用例
 
 | 用例ID | 场景 | 输入 | 预期结果 | 状态 |
 |--------|------|------|----------|------|
@@ -343,7 +811,7 @@ Mixpanel API (`api.mixpanel.com`) 在国内可能无法直接访问。通过 Clo
 
 ---
 
-## 🔧 实现细节
+## 实现细节
 
 ### 设备 ID 生成
 
@@ -420,7 +888,7 @@ async function track(eventName: string, properties?: Record<string, unknown>): P
 
 ---
 
-## ⚙️ 环境变量配置
+## 环境变量配置
 
 ```bash
 # .env.local 或 .env.production
@@ -434,7 +902,7 @@ VITE_MIXPANEL_PROXY=https://your-proxy.workers.dev
 
 ---
 
-## ⚠️ 注意事项
+## 注意事项
 
 1. **隐私合规**：不收集任何个人身份信息（PII），仅使用匿名设备 ID
 2. **性能影响**：统计请求异步发送，不阻塞主线程
@@ -444,7 +912,7 @@ VITE_MIXPANEL_PROXY=https://your-proxy.workers.dev
 
 ---
 
-## 📝 修改历史
+## 修改历史
 
 | 日期 | 版本 | 修改人 | 修改内容 |
 |------|------|--------|---------|
@@ -453,7 +921,7 @@ VITE_MIXPANEL_PROXY=https://your-proxy.workers.dev
 
 ---
 
-## 🔗 相关链接
+## 相关链接
 
 - [Mixpanel 官方文档](https://docs.mixpanel.com/)
 - [Mixpanel HTTP API](https://docs.mixpanel.com/docs/tracking-methods/http)

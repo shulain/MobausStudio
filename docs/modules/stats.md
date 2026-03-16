@@ -1,6 +1,234 @@
-# Stats 统计模块
+# Stats Module / Stats 统计模块
 
-## 📋 模块概述
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Overview
+
+The Stats module provides application usage analytics, including message counts, token usage, cost estimation, model usage distribution, and recent activity records.
+
+| Property | Value |
+|----------|-------|
+| Module Path | `src/components/features/Stats` |
+| Utility Functions | `src/utils/statsUtils.ts` |
+| Created Date | 2025-01-18 |
+| Last Updated | 2025-01-28 |
+
+---
+
+## Feature List
+
+### Core Features
+
+- [x] Time range selection (Today/This Week/This Month)
+- [x] Message count statistics
+- [x] Token usage statistics
+- [x] Cost statistics
+- [x] Model usage distribution
+- [x] Recent activity list
+- [x] **Real data computation** (v3.1.0)
+
+### Extended Features
+
+- [ ] Export CSV report
+- [ ] Export PDF report
+- [ ] Skill usage statistics
+
+---
+
+## Component Structure
+
+```
+Stats/
+└── index.tsx              # StatsModal component
+
+utils/
+└── statsUtils.ts          # Statistics computation utility functions (v3.1.0)
+```
+
+---
+
+## Data Structures
+
+### UsageStats Usage Statistics
+
+```typescript
+interface UsageStats {
+    messages: number;   // Message count
+    tokens: number;     // Token usage
+    cost: number;       // Cost (USD)
+}
+```
+
+### ModelUsage Model Usage Distribution
+
+```typescript
+interface ModelUsage {
+    model: string;      // Model name
+    usage: number;      // Usage percentage (0-100)
+    color: string;      // Display color (Tailwind class)
+}
+```
+
+### ActivityItem Activity Record
+
+```typescript
+interface ActivityItem {
+    id: string;
+    action: string;     // Action description
+    details: string;    // Details
+    time: Date;         // Time
+    type: 'chat' | 'agent' | 'skill' | 'mcp';
+}
+```
+
+### TimeRange Time Range
+
+```typescript
+type TimeRange = 'today' | 'week' | 'month';
+```
+
+---
+
+## API Interface
+
+### Utility Functions (statsUtils.ts) - v3.1.0
+
+#### `getTimeRangeStart(range: TimeRange): Date`
+Get the start time point for a time range
+
+**Parameters:**
+- range: Time range type
+
+**Returns:**
+- Date object representing the start time of that range
+
+#### `calculateAllStats(chats, models): Record<TimeRange, UsageStats>`
+Calculate usage statistics for all time ranges
+
+**Parameters:**
+- chats: Chat[] - Chat list
+- models: AIModelConfig[] - Model configuration list
+
+**Returns:**
+- Object containing statistics for today/week/month three time ranges
+
+#### `calculateModelUsage(chats, models, range): ModelUsage[]`
+Calculate model usage distribution
+
+**Parameters:**
+- chats: Chat[] - Chat list
+- models: AIModelConfig[] - Model configuration list
+- range: TimeRange - Time range
+
+**Returns:**
+- Model usage distribution array, sorted by usage in descending order
+
+#### `generateRecentActivity(chats, agents, limit?): ActivityItem[]`
+Generate recent activity records
+
+**Parameters:**
+- chats: Chat[] - Chat list
+- agents: Agent[] - Agent list
+- limit: number - Return count limit (default 10)
+
+**Returns:**
+- Recent activity records array, sorted by time in descending order
+
+---
+
+## Test Cases
+
+| Case ID | Scenario | Input | Expected Result | Status |
+|---------|----------|-------|-----------------|--------|
+| TC-STATS-001 | Empty data statistics | No chats | Display all 0s | [x] |
+| TC-STATS-002 | Today statistics | Today has messages | Correctly count today's data | [x] |
+| TC-STATS-003 | This week statistics | This week has messages | Correctly count this week's data | [x] |
+| TC-STATS-004 | This month statistics | This month has messages | Correctly count this month's data | [x] |
+| TC-STATS-005 | Model distribution | Multi-model usage | Correctly calculate percentages | [x] |
+| TC-STATS-006 | Recent activity | Has chats and Agents | Display sorted by time | [x] |
+| TC-STATS-007 | Token statistics | Messages have tokens field | Correctly accumulate | [x] |
+| TC-STATS-008 | Cost calculation | Has pricing configuration | Correctly calculate cost | [x] |
+
+### Test Files
+
+- `src/test/components/Stats/Stats.test.tsx`
+
+---
+
+## Change History
+
+| Date | Version | Author | Changes |
+|------|---------|--------|---------|
+| 2025-01-18 | 1.0.0 | - | Initial version (Mock data) |
+| 2025-01-28 | 3.1.0 | - | Switch to real data computation, add statsUtils.ts |
+| 2025-01-28 | 3.1.1 | - | Fix streaming response token statistics issue |
+
+---
+
+## Implementation Details (v3.1.0)
+
+### Time Range Calculation
+
+```typescript
+const getTimeRangeStart = (range: TimeRange): Date => {
+    const now = new Date();
+    switch (range) {
+        case 'today':
+            // Today 00:00:00
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        case 'week':
+            // 7 days ago
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - 7);
+            return weekStart;
+        case 'month':
+            // 30 days ago
+            const monthStart = new Date(now);
+            monthStart.setDate(now.getDate() - 30);
+            return monthStart;
+    }
+};
+```
+
+### Cost Calculation Formula
+
+```typescript
+// Cost = (input tokens * input price + output tokens * output price) / 1000
+// Simplified: assume user messages are input, assistant messages are output
+const inputCost = inputTokens * (pricing.input / 1000);
+const outputCost = outputTokens * (pricing.output / 1000);
+const totalCost = inputCost + outputCost;
+```
+
+### Model Color Assignment
+
+```typescript
+const MODEL_COLORS = [
+    'bg-green-500',   // First model
+    'bg-purple-500',  // Second model
+    'bg-blue-500',    // Third model
+    'bg-orange-500',  // Fourth model
+    'bg-pink-500',    // Fifth model
+    'bg-cyan-500',    // More...
+];
+```
+
+---
+
+## Notes
+
+1. **Token field is optional**: `Message.tokens` is an optional field, calculated as 0 when not set
+2. **Pricing defaults to 0**: Model's `pricing` defaults to `{ input: 0, output: 0 }`, cost may display as 0
+3. **Performance optimization**: Uses `useMemo` to cache computation results, avoiding recalculation on every render
+4. **Date handling**: Dates loaded from storage may be strings and need conversion to Date objects
+
+---
+
+<a id="中文"></a>
+
+## 模块概述
 
 Stats 模块提供应用使用情况的统计分析功能，包括消息数量、Token 使用量、费用估算、模型使用分布和最近活动记录。
 
@@ -13,7 +241,7 @@ Stats 模块提供应用使用情况的统计分析功能，包括消息数量�
 
 ---
 
-## 🎯 功能列表
+## 功能列表
 
 ### 核心功能
 
@@ -33,7 +261,7 @@ Stats 模块提供应用使用情况的统计分析功能，包括消息数量�
 
 ---
 
-## 🏗️ 组件结构
+## 组件结构
 
 ```
 Stats/
@@ -45,7 +273,7 @@ utils/
 
 ---
 
-## 📐 数据结构
+## 数据结构
 
 ### UsageStats 使用统计
 
@@ -87,7 +315,7 @@ type TimeRange = 'today' | 'week' | 'month';
 
 ---
 
-## 📐 API 接口
+## API 接口
 
 ### 工具函数 (statsUtils.ts) - v3.1.0
 
@@ -134,7 +362,7 @@ type TimeRange = 'today' | 'week' | 'month';
 
 ---
 
-## 🧪 测试用例
+## 测试用例
 
 | 用例ID | 场景 | 输入 | 预期结果 | 状态 |
 |--------|------|------|----------|------|
@@ -153,7 +381,7 @@ type TimeRange = 'today' | 'week' | 'month';
 
 ---
 
-## 📝 修改历史
+## 修改历史
 
 | 日期 | 版本 | 修改人 | 修改内容 |
 |------|------|--------|---------|
@@ -163,7 +391,7 @@ type TimeRange = 'today' | 'week' | 'month';
 
 ---
 
-## 🔧 实现细节 (v3.1.0)
+## 实现细节 (v3.1.0)
 
 ### 时间范围计算
 
@@ -213,7 +441,7 @@ const MODEL_COLORS = [
 
 ---
 
-## ⚠️ 注意事项
+## 注意事项
 
 1. **Token 字段可选**: `Message.tokens` 是可选字段，未设置时按 0 计算
 2. **Pricing 默认为 0**: 模型的 `pricing` 默认为 `{ input: 0, output: 0 }`，费用可能显示为 0

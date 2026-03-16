@@ -1,6 +1,384 @@
-# 自定义提供商模块 (custom-providers)
+# Custom Providers Module / 自定义提供商模块
 
-## 模块职责
+> [English](#english) | [中文](#中文)
+
+---
+
+<a id="english"></a>
+
+## English
+
+### Module Responsibility
+
+v4.2.7: Simplified custom provider configuration; model configuration is unified on the Models page.
+
+Manage custom AI providers, including:
+- Add/edit/delete custom providers
+- Configure endpoints, authentication methods, default protocols
+- Persistent storage of custom provider configurations
+- **Model configuration is managed uniformly on the Models page** (v4.2.7 change)
+
+### Design Background
+
+#### Problem (before v4.2.7)
+
+1. Users needed to configure models in two places:
+   - Custom provider page for model list configuration
+   - Models page for model instance configuration again
+   - This caused duplicate configuration and poor user experience
+
+2. Unclear responsibilities:
+   - Providers should only define "service endpoints"
+   - Model configuration should be managed uniformly on the Models page
+
+#### Solution (v4.2.7)
+
+**Separation of Concerns**:
+- **Custom Provider Page**: Only configures service endpoint information
+  - Provider name and icon
+  - API endpoint
+  - Authentication method (API Key)
+  - Default protocol (optional)
+
+- **Models Page**: Unified management of all model configurations
+  - Select provider
+  - Configure model ID
+  - Configure model parameters (temperature, maxTokens, etc.)
+  - Select communication protocol
+
+### Interface Definitions
+
+#### CustomProvider
+
+```typescript
+interface CustomProvider {
+    /** Unique ID (auto-generated, format: custom-{timestamp}) */
+    id: string;
+    /** Display name */
+    name: string;
+    /** Icon (emoji or URL) */
+    icon: string;
+    /** Description */
+    description?: { zh: string; en: string };
+    /** API endpoint */
+    endpoint: string;
+    /** Authentication method (currently only API Key supported) */
+    authMethods: [{ type: 'api'; label: string; description: string }];
+    /** Default communication protocol (optional, used for config export) */
+    protocol?: ProtocolType;
+    /** Connection status */
+    status: ProviderStatus;
+    /** Creation time */
+    createdAt: Date;
+    /** Update time */
+    updatedAt: Date;
+}
+```
+
+**Important Changes (v4.2.7):**
+- Removed `models` field - Model configuration is unified on the Models page
+- Retained `protocol` field - As default protocol, used for config export
+- Simplified configuration flow - Avoid duplicate configuration
+
+#### CustomProviderStorage
+
+Custom provider storage service.
+
+##### save(providers: CustomProvider[]): Promise<void>
+
+Save all custom providers.
+
+**Parameters:**
+- providers (CustomProvider[]): Custom provider list
+
+**Returns:**
+- Promise<void>
+
+##### load(): Promise<CustomProvider[]>
+
+Load all custom providers.
+
+**Returns:**
+- Promise<CustomProvider[]>: Custom provider list
+
+##### add(provider: CustomProvider): Promise<void>
+
+Add a single custom provider.
+
+**Parameters:**
+- provider (CustomProvider): Custom provider object
+
+**Returns:**
+- Promise<void>
+
+##### update(id: string, updates: Partial<CustomProvider>): Promise<void>
+
+Update a custom provider.
+
+**Parameters:**
+- id (string): Provider ID
+- updates (Partial<CustomProvider>): Fields to update
+
+**Returns:**
+- Promise<void>
+
+##### remove(id: string): Promise<void>
+
+Delete a custom provider.
+
+**Parameters:**
+- id (string): Provider ID
+
+**Returns:**
+- Promise<void>
+
+##### get(id: string): Promise<CustomProvider | null>
+
+Get a specific custom provider.
+
+**Parameters:**
+- id (string): Provider ID
+
+**Returns:**
+- Promise<CustomProvider | null>: Custom provider object or null
+
+### UI Components
+
+#### CustomProviderModal
+
+Dialog for adding/editing custom providers.
+
+**Props:**
+```typescript
+interface CustomProviderModalProps {
+    /** Whether to show */
+    open: boolean;
+    /** Edit mode (pass existing provider) */
+    provider?: CustomProvider;
+    /** Close callback */
+    onClose: () => void;
+    /** Save callback */
+    onSave: (provider: CustomProvider) => Promise<void>;
+}
+```
+
+**Form Fields (v4.2.7 simplified):**
+1. **Basic Information**
+   - Name (required)
+   - Icon (emoji picker or URL)
+   - Description (optional, bilingual)
+
+2. **Endpoint Configuration**
+   - API endpoint (required)
+   - Default protocol (optional: OpenAI / Anthropic / Google / AWS)
+   - Hint: For specific model configuration, please go to the Models page
+
+#### ProviderCard Extension
+
+Display special identification for custom providers on provider cards.
+
+**New Features:**
+- Display "Custom" badge
+- Add edit/delete buttons (custom providers only)
+
+### Test Cases
+
+#### Storage Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-CUSTOM-001 | Add custom provider | Valid CustomProvider | Save successful, ID auto-generated |
+| TC-CUSTOM-002 | Load custom providers | Saved providers | Return correct provider list |
+| TC-CUSTOM-003 | Update custom provider | Modify name and endpoint | Update successful, updatedAt updated |
+| TC-CUSTOM-004 | Delete custom provider | Existing ID | Delete successful, list length -1 |
+| TC-CUSTOM-005 | Get non-existent provider | Non-existent ID | Return null |
+| TC-CUSTOM-006 | ID uniqueness | Add multiple providers | Each ID is unique |
+
+#### UI Component Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-CUSTOM-UI-001 | Open add dialog | Click "Add Custom Provider" | Show empty form |
+| TC-CUSTOM-UI-002 | Open edit dialog | Click edit button | Form filled with existing data |
+| TC-CUSTOM-UI-003 | Form validation | Submit empty name | Show error message |
+| TC-CUSTOM-UI-004 | Save successfully | Fill complete info and save | Close dialog, list updated |
+| TC-CUSTOM-UI-005 | Delete confirmation | Click delete provider | Show confirmation dialog |
+| TC-CUSTOM-UI-006 | Protocol selection | Select default protocol | Protocol saved correctly |
+
+#### Integration Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-CUSTOM-INT-001 | Connect custom provider | Valid API Key | status='connected' |
+| TC-CUSTOM-INT-002 | Chat with custom model | Select custom provider's model | Normal send and receive messages |
+| TC-CUSTOM-INT-003 | Multiple custom providers | Add 3 different providers | All work normally |
+| TC-CUSTOM-INT-004 | Restore after restart | App restart | Custom provider config preserved |
+
+**Note:** Protocol-related tests have been moved to [protocol-configuration.md](./protocol-configuration.md).
+
+### Storage Structure
+
+#### Tauri File Storage
+
+**File Path:** `{APP_DATA_DIR}/custom_providers.json`
+
+**Data Format (v4.2.7):**
+```json
+[
+    {
+        "id": "custom-1706000000000",
+        "name": "My Claude API",
+        "icon": "🤖",
+        "description": {
+            "zh": "自建 Claude 兼容服务",
+            "en": "Self-hosted Claude compatible service"
+        },
+        "endpoint": "https://api.example.com/v1",
+        "authMethods": [
+            {
+                "type": "api",
+                "label": "API Key",
+                "description": "Obtain from service provider"
+            }
+        ],
+        "protocol": "anthropic",
+        "status": "connected",
+        "createdAt": "2024-01-23T10:00:00.000Z",
+        "updatedAt": "2024-01-23T10:00:00.000Z"
+    }
+]
+```
+
+**Important Changes (v4.2.7):**
+- Removed `models` field
+- Retained `protocol` field as default protocol
+- Model configuration should be done on the Models page
+
+#### localStorage Backup
+
+**Key:** `mobaus_custom_providers`
+
+**Format:** Same as file storage
+
+### Implementation Steps
+
+#### 1. Backend Implementation (Rust)
+
+**File:** `src-tauri/src/lib.rs`
+
+Add Tauri commands:
+```rust
+#[tauri::command]
+async fn save_custom_providers(providers: Vec<CustomProvider>) -> Result<(), String>
+
+#[tauri::command]
+async fn load_custom_providers() -> Result<Vec<CustomProvider>, String>
+```
+
+#### 2. Frontend Storage Service
+
+**File:** `src/services/customProviderStorage.ts`
+
+Implement `CustomProviderStorage` interface
+
+#### 3. UI Components
+
+**File:** `src/components/features/Providers/CustomProviderModal.tsx`
+
+Implement add/edit dialog
+
+#### 4. Integration into ProviderPage
+
+**Modify:** `src/components/features/Providers/ProviderPage.tsx`
+
+- Add "Add Custom Provider" button
+- Merge built-in and custom provider lists
+- Add edit/delete buttons for custom provider cards
+
+### Usage Examples
+
+#### Adding a Custom Provider (v4.2.7 simplified)
+
+```typescript
+// 1. Add custom provider (only configure endpoint info)
+const customProvider: CustomProvider = {
+    id: 'custom-1706000000000',  // Auto-generated
+    name: 'My Claude API',
+    icon: '🤖',
+    description: {
+        zh: '自建 Claude 兼容服务',
+        en: 'Self-hosted Claude compatible service',
+    },
+    endpoint: 'https://api.example.com/v1',
+    authMethods: [
+        {
+            type: 'api',
+            label: 'API Key',
+            description: 'Obtain from service provider',
+        },
+    ],
+    protocol: 'anthropic',  // Default protocol
+    status: 'disconnected',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+};
+
+await customProviderStorage.add(customProvider);
+
+// 2. Add model configuration on the Models page
+// User goes to the Models page, selects "My Claude API" provider
+// Configures specific models: claude-3-opus, claude-3-sonnet, etc.
+```
+
+#### Adding a Custom OpenAI-Compatible Service
+
+```typescript
+// 1. Add Ollama provider
+const ollamaProvider: CustomProvider = {
+    id: 'custom-1706000000001',
+    name: 'Local Ollama',
+    icon: '🦙',
+    endpoint: 'http://localhost:11434/v1',
+    authMethods: [
+        {
+            type: 'api',
+            label: 'API Key',
+            description: 'Local service does not require API Key',
+        },
+    ],
+    protocol: 'openai',  // OpenAI compatible protocol
+    status: 'disconnected',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+};
+
+await customProviderStorage.add(ollamaProvider);
+
+// 2. Add models on the Models page
+// Select "Local Ollama" provider
+// Configure models: llama3.1:70b, qwen2.5:32b, etc.
+```
+
+### Change Log
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2024-02-28 | v0.9.3 | Initial version, supports multiple custom providers and protocol selection | - |
+| 2024-02-28 | v0.9.3.1 | Optimized API Key editing experience: show config status, leave empty to keep unchanged when editing | - |
+| 2024-02-28 | v0.9.3.2 | Fixed disconnect-reconnect issue: disconnecting doesn't delete credentials, auto-fill saved API Key on reconnect | - |
+| 2024-02-28 | v0.9.3.3 | Smart connection: directly connect when API Key exists, no popup needed | - |
+| 2024-02-28 | v0.9.3.4 | Fixed delete logic: also delete credentials; unified layout: custom providers displayed mixed with other providers | - |
+| 2024-02-28 | v0.9.3.6 | UI optimization: unified style delete confirmation dialog, badge line wrapping, fixed duplicate display issue | - |
+| 2024-03-03 | v4.1.46 | Removed provider-level protocol config, protocol selection moved to model creation | - |
+| 2026-03-11 | v4.2.7 | **Simplified config flow**: removed models field, model config unified on Models page, avoiding duplicate config | - |
+
+---
+
+<a id="中文"></a>
+
+## 中文
+
+### 模块职责
 
 v4.2.7: 简化自定义提供商配置，模型配置统一在 Models 页面进行
 
@@ -10,9 +388,9 @@ v4.2.7: 简化自定义提供商配置，模型配置统一在 Models 页面进�
 - 持久化存储自定义提供商配置
 - **模型配置在 Models 页面统一管理**（v4.2.7 变更）
 
-## 设计背景
+### 设计背景
 
-### 问题（v4.2.7 之前）
+#### 问题（v4.2.7 之前）
 
 1. 用户需要在两个地方配置模型：
    - 自定义提供商页面配置模型列表
@@ -23,7 +401,7 @@ v4.2.7: 简化自定义提供商配置，模型配置统一在 Models 页面进�
    - 提供商应该只定义"服务端点"
    - 模型配置应该在 Models 页面统一管理
 
-### 解决方案（v4.2.7）
+#### 解决方案（v4.2.7）
 
 **职责分离**：
 - **自定义提供商页面**：只配置服务端点信息
@@ -38,9 +416,9 @@ v4.2.7: 简化自定义提供商配置，模型配置统一在 Models 页面进�
   - 配置模型参数（temperature、maxTokens 等）
   - 选择通信协议
 
-## 接口定义
+### 接口定义
 
-### CustomProvider
+#### CustomProvider
 
 ```typescript
 interface CustomProvider {
@@ -68,15 +446,15 @@ interface CustomProvider {
 ```
 
 **重要变更（v4.2.7）：**
-- ✅ 移除了 `models` 字段 - 模型配置统一在 Models 页面管理
-- ✅ 保留 `protocol` 字段 - 作为默认协议，用于配置导出
-- ✅ 简化配置流程 - 避免重复配置
+- 移除了 `models` 字段 - 模型配置统一在 Models 页面管理
+- 保留 `protocol` 字段 - 作为默认协议，用于配置导出
+- 简化配置流程 - 避免重复配置
 
-### CustomProviderStorage
+#### CustomProviderStorage
 
 自定义提供商存储服务
 
-#### save(providers: CustomProvider[]): Promise<void>
+##### save(providers: CustomProvider[]): Promise<void>
 
 保存所有自定义提供商
 
@@ -86,14 +464,14 @@ interface CustomProvider {
 **返回：**
 - Promise<void>
 
-#### load(): Promise<CustomProvider[]>
+##### load(): Promise<CustomProvider[]>
 
 加载所有自定义提供商
 
 **返回：**
 - Promise<CustomProvider[]>: 自定义提供商列表
 
-#### add(provider: CustomProvider): Promise<void>
+##### add(provider: CustomProvider): Promise<void>
 
 添加单个自定义提供商
 
@@ -103,7 +481,7 @@ interface CustomProvider {
 **返回：**
 - Promise<void>
 
-#### update(id: string, updates: Partial<CustomProvider>): Promise<void>
+##### update(id: string, updates: Partial<CustomProvider>): Promise<void>
 
 更新自定义提供商
 
@@ -114,7 +492,7 @@ interface CustomProvider {
 **返回：**
 - Promise<void>
 
-#### remove(id: string): Promise<void>
+##### remove(id: string): Promise<void>
 
 删除自定义提供商
 
@@ -124,7 +502,7 @@ interface CustomProvider {
 **返回：**
 - Promise<void>
 
-#### get(id: string): Promise<CustomProvider | null>
+##### get(id: string): Promise<CustomProvider | null>
 
 获取指定自定义提供商
 
@@ -134,9 +512,9 @@ interface CustomProvider {
 **返回：**
 - Promise<CustomProvider | null>: 自定义提供商对象或 null
 
-## UI 组件
+### UI 组件
 
-### CustomProviderModal
+#### CustomProviderModal
 
 添加/编辑自定义提供商的对话框
 
@@ -165,7 +543,7 @@ interface CustomProviderModalProps {
    - 默认协议（可选：OpenAI / Anthropic / Google / AWS）
    - 提示：具体模型配置请前往 Models 页面
 
-### ProviderCard 扩展
+#### ProviderCard 扩展
 
 在提供商卡片上显示自定义提供商的特殊标识
 
@@ -173,9 +551,9 @@ interface CustomProviderModalProps {
 - 显示"自定义"标签
 - 添加编辑/删除按钮（仅自定义提供商）
 
-## 测试用例
+### 测试用例
 
-### 存储测试
+#### 存储测试
 
 | 用例ID | 场景 | 输入 | 预期结果 |
 |--------|------|------|----------|
@@ -186,7 +564,7 @@ interface CustomProviderModalProps {
 | TC-CUSTOM-005 | 获取不存在的提供商 | 不存在的 ID | 返回 null |
 | TC-CUSTOM-006 | ID 唯一性 | 添加多个提供商 | 每个 ID 唯一 |
 
-### UI 组件测试
+#### UI 组件测试
 
 | 用例ID | 场景 | 输入 | 预期结果 |
 |--------|------|------|----------|
@@ -197,7 +575,7 @@ interface CustomProviderModalProps {
 | TC-CUSTOM-UI-005 | 删除确认 | 点击删除提供商 | 显示确认对话框 |
 | TC-CUSTOM-UI-006 | 协议选择 | 选择默认协议 | 协议正确保存 |
 
-### 集成测试
+#### 集成测试
 
 | 用例ID | 场景 | 输入 | 预期结果 |
 |--------|------|------|----------|
@@ -208,9 +586,9 @@ interface CustomProviderModalProps {
 
 **注意：** 协议相关测试已移至 [protocol-configuration.md](./protocol-configuration.md)。
 
-## 存储结构
+### 存储结构
 
-### Tauri 文件存储
+#### Tauri 文件存储
 
 **文件路径：** `{APP_DATA_DIR}/custom_providers.json`
 
@@ -242,19 +620,19 @@ interface CustomProviderModalProps {
 ```
 
 **重要变更（v4.2.7）：**
-- ❌ 移除了 `models` 字段
-- ✅ 保留 `protocol` 字段作为默认协议
-- 💡 模型配置请在 Models 页面进行
+- 移除了 `models` 字段
+- 保留 `protocol` 字段作为默认协议
+- 模型配置请在 Models 页面进行
 
-### localStorage 备份
+#### localStorage 备份
 
 **Key：** `mobaus_custom_providers`
 
 **格式：** 与文件存储相同
 
-## 实现步骤
+### 实现步骤
 
-### 1. 后端实现（Rust）
+#### 1. 后端实现（Rust）
 
 **文件：** `src-tauri/src/lib.rs`
 
@@ -267,19 +645,19 @@ async fn save_custom_providers(providers: Vec<CustomProvider>) -> Result<(), Str
 async fn load_custom_providers() -> Result<Vec<CustomProvider>, String>
 ```
 
-### 2. 前端存储服务
+#### 2. 前端存储服务
 
 **文件：** `src/services/customProviderStorage.ts`
 
 实现 `CustomProviderStorage` 接口
 
-### 3. UI 组件
+#### 3. UI 组件
 
 **文件：** `src/components/features/Providers/CustomProviderModal.tsx`
 
 实现添加/编辑对话框
 
-### 4. 集成到 ProviderPage
+#### 4. 集成到 ProviderPage
 
 **修改：** `src/components/features/Providers/ProviderPage.tsx`
 
@@ -287,9 +665,9 @@ async fn load_custom_providers() -> Result<Vec<CustomProvider>, String>
 - 合并内置提供商和自定义提供商列表
 - 为自定义提供商卡片添加编辑/删除按钮
 
-## 使用示例
+### 使用示例
 
-### 添加自定义提供商（v4.2.7 简化）
+#### 添加自定义提供商（v4.2.7 简化）
 
 ```typescript
 // 1. 添加自定义提供商（只配置端点信息）
@@ -322,7 +700,7 @@ await customProviderStorage.add(customProvider);
 // 配置具体的模型：claude-3-opus、claude-3-sonnet 等
 ```
 
-### 添加自定义 OpenAI 兼容服务
+#### 添加自定义 OpenAI 兼容服务
 
 ```typescript
 // 1. 添加 Ollama 提供商
@@ -351,7 +729,7 @@ await customProviderStorage.add(ollamaProvider);
 // 配置模型：llama3.1:70b、qwen2.5:32b 等
 ```
 
-## 变更记录
+### 变更记录
 
 | 日期 | 版本 | 修改内容 | 修改人 |
 |------|------|----------|--------|
@@ -363,4 +741,3 @@ await customProviderStorage.add(ollamaProvider);
 | 2024-02-28 | v0.9.3.6 | UI 优化：统一风格的删除确认对话框，徽章换行显示，修复重复显示问题 | - |
 | 2024-03-03 | v4.1.46 | 移除提供商级别协议配置，协议选择移至模型创建时 | - |
 | 2026-03-11 | v4.2.7 | **简化配置流程**：移除 models 字段，模型配置统一在 Models 页面管理，避免重复配置 | - |
-
