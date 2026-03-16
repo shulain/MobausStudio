@@ -115,4 +115,4 @@ fn should_try_next_endpoint(status: StatusCode) -> bool {
 
 | 日期 | 修改内容 | 修改人 |
 |------|----------|--------|
-| 2026-02-27 | 初始版本 | Claude |
+| 2026-02-27 | 初始版本 | - |

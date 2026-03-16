@@ -1,4 +1,10 @@
-# 服务层文档 (Services)
+# Service Layer / 服务层文档
+
+> **English**: The service layer handles business logic, API calls, OAuth authentication, and data storage. Located at `src/services/`.
+>
+> Key services: Storage (local persistence via Tauri FS), Analytics, Template Service, Model Fetcher, Token Refresher, OAuth (OpenAI / Anthropic / Google / Kiro), Credential Access Helper, and Auto Updater.
+>
+> Detailed API docs and test cases are in Chinese below.
 
 ## 模块职责
 
@@ -305,4 +311,4 @@ try {
 
 | 日期 | 修改内容 | 修改人 |
 |------|----------|--------|
-| 2025-02-04 | 初始版本 - 服务层文档 | Claude |
+| 2025-02-04 | 初始版本 - 服务层文档 | - |

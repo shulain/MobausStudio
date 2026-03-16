@@ -516,14 +516,14 @@ signature_cache::SignatureCache::global().clear();
 
 | 日期 | 版本 | 修改内容 | 修改人 |
 |------|------|----------|--------|
-| 2026-02-28 | v0.9.2 | 实现 Thought Signature 缓存机制 | Claude |
-| 2026-02-28 | v0.9.2.1 | 修复默认占位符导致的 Base64 解码错误 | Claude |
-| 2026-02-28 | v0.9.2.2 | 修复空 thought_signature 导致缓存未命中的问题 | Claude |
-| 2026-02-28 | v0.9.2.3 | 清理历史消息中的无效 thought_signature 占位符 | Claude |
-| 2026-02-28 | v0.9.2.4 | 添加全局降级签名机制，解决缓存未命中时的 400 错误 | Claude |
-| 2026-02-28 | v0.9.2.5 | 过滤前端传来的无效 thought_signature 占位符，彻底解决 400 错误 | Claude |
-| 2026-02-28 | v0.9.2.6 | 修复 functionCall/functionResponse 顺序问题，防止用户消息打断 | Claude |
-| 2026-02-28 | v0.9.2.7 | 优化 Claude API 错误响应处理，解决乱码显示问题 | Claude |
-| 2026-02-28 | v0.9.2.8 | 添加 gzip 解压缩支持，完整解析 Claude API 压缩错误响应 | Claude |
-| 2026-02-28 | v0.9.2.9 | 优化 cache_control 使用策略，限制最多 4 个块避免 API 错误 | Claude |
-| 2026-02-28 | v0.9.2.10 | 修复流式响应 gzip 压缩问题，移除手动 Accept-Encoding header | Claude |
+| 2026-02-28 | v0.9.2 | 实现 Thought Signature 缓存机制 | - |
+| 2026-02-28 | v0.9.2.1 | 修复默认占位符导致的 Base64 解码错误 | - |
+| 2026-02-28 | v0.9.2.2 | 修复空 thought_signature 导致缓存未命中的问题 | - |
+| 2026-02-28 | v0.9.2.3 | 清理历史消息中的无效 thought_signature 占位符 | - |
+| 2026-02-28 | v0.9.2.4 | 添加全局降级签名机制，解决缓存未命中时的 400 错误 | - |
+| 2026-02-28 | v0.9.2.5 | 过滤前端传来的无效 thought_signature 占位符，彻底解决 400 错误 | - |
+| 2026-02-28 | v0.9.2.6 | 修复 functionCall/functionResponse 顺序问题，防止用户消息打断 | - |
+| 2026-02-28 | v0.9.2.7 | 优化 Claude API 错误响应处理，解决乱码显示问题 | - |
+| 2026-02-28 | v0.9.2.8 | 添加 gzip 解压缩支持，完整解析 Claude API 压缩错误响应 | - |
+| 2026-02-28 | v0.9.2.9 | 优化 cache_control 使用策略，限制最多 4 个块避免 API 错误 | - |
+| 2026-02-28 | v0.9.2.10 | 修复流式响应 gzip 压缩问题，移除手动 Accept-Encoding header | - |

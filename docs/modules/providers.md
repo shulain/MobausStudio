@@ -442,20 +442,20 @@ v3.4.6: 缓存支持双环境存储
 
 | 日期 | 修改内容 | 修改人 |
 |------|----------|--------|
-| 2025-02-01 | v0.8.0: 统一动态模型处理架构，在 App.tsx 层面增强 providers | Claude |
-| 2025-02-01 | v0.7.3: Kiro OAuth 支持多种认证方式（Google/GitHub/AWS Builder ID），参考 CLIProxyAPIPlus 实现 | Claude |
-| 2025-01-31 | v0.7.2: 添加 Kiro OAuth 支持（AWS Builder ID Device Flow），添加通义千问提供商 | Claude |
-| 2025-01-30 | v3.4.11: 修复 OAuth Token 自动续期问题，完善 expiresAt/refreshToken 持久化 | Claude |
-| 2025-01-29 | v3.4.10: 添加 website 字段用于获取 API Key 链接，修复重启后模型数量丢失问题 | Claude |
-| 2025-01-30 | v3.4.6: 添加 OAuth Token 自动续期服务，优化模型缓存持久化（支持 Tauri 文件系统） | Claude |
-| 2025-01-30 | v3.4.5: 修复 projectId 字段序列化问题，添加 PKCE 公共工具模块 | Claude |
-| 2025-01-29 | v3.3.4: 添加 OpenAI Responses API 支持，支持 GPT-5、GPT-4.1-nano 等新模型 | Claude |
-| 2025-01-29 | v3.3.3: 添加 models.dev 数据源支持，与 opencode 相同实现 | Claude |
-| 2025-01-29 | v3.3.2: 改进 OpenAI 模型列表，标记免费可用模型，添加 o3 支持 | Claude |
-| 2025-01-29 | v3.3.1: 添加 Antigravity onboard 流程，自动获取/创建 GCP 项目 | Claude |
-| 2025-01-28 | v3.3.0: 添加 Google OAuth 支持（Authorization Code Flow） | Claude |
-| 2025-01-28 | v3.3.0: 添加模型动态获取功能 | Claude |
-| 2025-01-28 | 初始版本，支持 15+ 提供商 | Claude |
+| 2025-02-01 | v0.8.0: 统一动态模型处理架构，在 App.tsx 层面增强 providers | - |
+| 2025-02-01 | v0.7.3: Kiro OAuth 支持多种认证方式（Google/GitHub/AWS Builder ID），参考 CLIProxyAPIPlus 实现 | - |
+| 2025-01-31 | v0.7.2: 添加 Kiro OAuth 支持（AWS Builder ID Device Flow），添加通义千问提供商 | - |
+| 2025-01-30 | v3.4.11: 修复 OAuth Token 自动续期问题，完善 expiresAt/refreshToken 持久化 | - |
+| 2025-01-29 | v3.4.10: 添加 website 字段用于获取 API Key 链接，修复重启后模型数量丢失问题 | - |
+| 2025-01-30 | v3.4.6: 添加 OAuth Token 自动续期服务，优化模型缓存持久化（支持 Tauri 文件系统） | - |
+| 2025-01-30 | v3.4.5: 修复 projectId 字段序列化问题，添加 PKCE 公共工具模块 | - |
+| 2025-01-29 | v3.3.4: 添加 OpenAI Responses API 支持，支持 GPT-5、GPT-4.1-nano 等新模型 | - |
+| 2025-01-29 | v3.3.3: 添加 models.dev 数据源支持，与 opencode 相同实现 | - |
+| 2025-01-29 | v3.3.2: 改进 OpenAI 模型列表，标记免费可用模型，添加 o3 支持 | - |
+| 2025-01-29 | v3.3.1: 添加 Antigravity onboard 流程，自动获取/创建 GCP 项目 | - |
+| 2025-01-28 | v3.3.0: 添加 Google OAuth 支持（Authorization Code Flow） | - |
+| 2025-01-28 | v3.3.0: 添加模型动态获取功能 | - |
+| 2025-01-28 | 初始版本，支持 15+ 提供商 | - |
 
 ## OAuth Token 自动续期 (v3.4.11)
 

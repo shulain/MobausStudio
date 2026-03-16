@@ -1,4 +1,8 @@
-# Layout 布局组件
+# Layout Components / 布局组件
+
+> **English**: Application layout components at `src/components/layout/`.
+> Includes Header (top bar with brand logo, window drag support, overlay title bar) and Sidebar (navigation).
+> Detailed design specs and implementation notes are in Chinese below.
 
 ## 📋 概述
 

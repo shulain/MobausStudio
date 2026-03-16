@@ -1,4 +1,8 @@
-# Common 通用组件
+# Common Components / 通用组件
+
+> **English**: Reusable UI components shared across modules. Located at `src/components/common/`.
+> Components: ContextMenu, Modal, Button, Select, Toast, ExpandableSearch, CompactStats, PageHeader, and Markdown rendering suite (CodeBlock, ImageRenderer, LinkRenderer, ThinkingBlock).
+> Detailed API docs and test cases are in Chinese below.
 
 ## 📋 概述
 

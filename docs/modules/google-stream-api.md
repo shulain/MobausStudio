@@ -801,4 +801,4 @@ fn truncate_messages_by_tokens(messages: Vec<Value>, max_tokens: usize) -> Vec<V
 
 | 日期 | 版本 | 修改内容 | 修改人 |
 |------|------|----------|--------|
-| 2026-03-03 | 1.0.0 | 初始版本，完整文档化 chat_stream_google 函数 | Claude |
+| 2026-03-03 | 1.0.0 | 初始版本，完整文档化 chat_stream_google 函数 | - |
