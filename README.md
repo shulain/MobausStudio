@@ -1,42 +1,92 @@
+<div align="center">
+
+<img src="Mobaus.svg" width="80" height="80" alt="MobausStudio Logo">
+
 # MobausStudio
 
-一个基于 Tauri + React + TypeScript 构建的跨平台桌面应用。
+**An open-source, cross-platform AI client with multi-model support, MCP extensions, and agent orchestration.**
 
-## 下载安装
+[![Release](https://img.shields.io/github/v/release/shulain/MobausStudio?style=flat-square)](https://github.com/shulain/MobausStudio/releases)
+[![Downloads](https://img.shields.io/github/downloads/shulain/MobausStudio/total?style=flat-square)](https://github.com/shulain/MobausStudio/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/shulain/MobausStudio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/shulain/MobausStudio/actions)
+[![License](https://img.shields.io/github/license/shulain/MobausStudio?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20Web%20%7C%20Docker-blue?style=flat-square)](#-download--install)
 
-### 桌面应用
+**[中文](./README_ZH.md)** | **[Documentation](https://docs.mobaus.com)** | **[Changelog](./user-guide/en/changelog.md)**
 
-从 [Releases](https://github.com/shulain/MobausStudio/releases) 页面下载对应平台的安装包：
+</div>
 
-| 平台 | 文件 |
-|------|------|
-| macOS (Apple Silicon) | `MobausStudio_x.x.x_aarch64.dmg` |
-| macOS (Intel) | `MobausStudio_x.x.x_x64.dmg` |
-| Windows | `MobausStudio_x.x.x_x64-setup.exe` 或 `.msi` |
-| Linux (Debian/Ubuntu) | `MobausStudio_x.x.x_amd64.deb` |
-| Linux (Fedora/RHEL) | `MobausStudio_x.x.x_amd64.rpm` |
-| Linux (通用) | `MobausStudio_x.x.x_amd64.AppImage` |
+---
 
-### Web 版本
+## Why MobausStudio?
 
-下载 `MobausStudio-web.zip`，解压后使用任意 HTTP 服务器托管：
+Most AI clients lock you into a single provider. MobausStudio gives you **one interface for 20+ AI providers**, with OAuth magic login for your existing subscriptions (ChatGPT Plus, Claude Pro, GitHub Copilot, etc.) -- **no API keys needed**. Plus full MCP tool integration, multi-agent roundtable discussions, and 30,000+ built-in skills.
 
-```bash
-unzip MobausStudio-web.zip -d mobaus-web
-cd mobaus-web
-npx serve .
-```
+---
+
+## Features
+
+### Core
+
+- **20+ AI Providers** -- OpenAI, Anthropic, Google Gemini, DeepSeek, Qwen, Kiro, Ollama, and more
+- **4 Protocols** -- OpenAI Chat Completions, Anthropic Messages, Google Gemini, AWS Bedrock
+- **OAuth Magic Login** -- Use your ChatGPT Plus / Claude Pro / GitHub Copilot subscriptions directly; no API key needed
+- **Custom Providers** -- Add any OpenAI-compatible API endpoint
+
+### Advanced
+
+- **MCP Extensions** -- Connect AI to file systems, databases, APIs via [Model Context Protocol](https://modelcontextprotocol.io)
+- **Agent System** -- Create custom AI assistants with system prompts, skills, and tool permissions
+- **Roundtable Meeting** -- Multi-agent collaboration: assign roles (architect, QA, PM) to discuss a topic from different perspectives
+- **Skills System** -- 30,000+ prompt templates for translation, writing, coding, analysis, and more
+
+### Platform
+
+- **Cross-Platform Desktop** -- macOS, Windows, Linux native apps via Tauri 2
+- **Web Version** -- Self-hostable static web build
+- **Docker Deployment** -- One-command containerized deployment
+- **Auto Update** -- Built-in updater with signed releases
+- **i18n** -- English and Chinese UI
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Desktop | [Tauri 2](https://tauri.app) (Rust) |
+| Frontend | React 19 + TypeScript 5.8 |
+| Styling | Tailwind CSS 4 |
+| Build | Vite 7 |
+| Testing | Vitest + Testing Library (Frontend), cargo test (Rust) |
+| Docs | [VitePress](https://vitepress.dev) |
+
+---
+
+## Download & Install
+
+### Desktop Application
+
+Download from the [Releases](https://github.com/shulain/MobausStudio/releases/latest) page:
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `.dmg` (aarch64) |
+| macOS (Intel) | `.dmg` (x64) |
+| Windows | `.exe` or `.msi` |
+| Linux (Debian/Ubuntu) | `.deb` |
+| Linux (Fedora/RHEL) | `.rpm` |
+| Linux (Universal) | `.AppImage` |
 
 ### Docker
 
 ```bash
-# 拉取并运行
-docker run -d -p 8080:80 ghcr.io/shulain/mobausstudio:latest
-
-# 访问 http://localhost:8080
+docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:latest
+# Visit http://localhost:8080
 ```
 
-或使用 docker-compose：
+<details>
+<summary>docker-compose</summary>
 
 ```yaml
 services:
@@ -47,83 +97,137 @@ services:
     restart: unless-stopped
 ```
 
-## 本地开发
+</details>
 
-### 环境要求
+### Web Version (Self-Hosted)
 
-- Node.js 20+
-- Rust (stable)
-- 系统依赖（参考 [Tauri 官方文档](https://tauri.app/v1/guides/getting-started/prerequisites)）
-
-### 安装依赖
+Download `MobausStudio-web.zip` from Releases, extract and serve:
 
 ```bash
-npm install
+unzip MobausStudio-web.zip -d mobaus-web
+cd mobaus-web && npx serve .
 ```
 
-### 启动开发服务器
+---
+
+## Development
+
+### Prerequisites
+
+- Node.js 20+
+- Rust stable
+- Platform dependencies: see [Tauri prerequisites](https://tauri.app/start/prerequisites/)
+
+### Quick Start
 
 ```bash
-# 仅前端
+# Install dependencies
+npm install
+
+# Start frontend dev server
 npm run dev
 
-# 完整 Tauri 应用
+# Start full Tauri app (frontend + Rust backend)
 npm run tauri dev
 ```
 
-### 构建
+### Build
 
 ```bash
-# 构建 Web 版本
+# Web build
 npm run build
 
-# 构建桌面应用
+# Desktop build
 npm run tauri build
 ```
 
-### 测试
+### Test
 
 ```bash
-# 运行前端测试
+# Frontend tests
 npm test
 
-# 运行 Rust 测试
-npm run test:rust
+# Rust tests
+cd src-tauri && cargo test
 
-# 测试覆盖率
+# Coverage
 npm run test:coverage
 ```
 
-## 发布新版本
+### Release
 
-> **注意**：`package.json` 和 `tauri.conf.json` 中的 `version` 字段为占位符 `0.0.0-dev`，**请勿手动修改**。版本号由 CI 根据 git tag 自动设置。
-
-### 方式一：打 tag（推荐）
+> **Note**: Version numbers in `package.json` and `tauri.conf.json` are placeholders (`0.0.0-dev`). CI sets the version automatically from git tags.
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+# Tag and push to trigger a release build
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-### 方式二：手动触发 GitHub Actions
+---
 
-1. 进入 [Actions](https://github.com/shulain/MobausStudio/actions) 页面
-2. 选择 "Release" workflow
-3. 点击 "Run workflow"
-4. **必须填写版本号**（如 `0.3.0`）
+## Project Structure
 
-CI 会自动构建并发布：
+```
+MobausStudio/
+├── src/                    # React frontend
+│   ├── components/         # UI components (common, features, layout)
+│   ├── services/           # Business logic (auth, providers, MCP, models)
+│   ├── hooks/              # React hooks
+│   ├── i18n/               # Internationalization (en, zh)
+│   └── test/               # Frontend tests
+├── src-tauri/              # Rust backend
+│   └── src/
+│       ├── lib.rs          # Tauri commands & core logic
+│       ├── protocol/       # AI protocol implementations
+│       ├── mcp/            # MCP client (stdio + HTTP transport)
+│       └── services/       # Backend services (config exporter, etc.)
+├── docs/                   # Internal dev documentation
+├── user-guide/             # User documentation (VitePress, EN + ZH)
+└── .github/workflows/      # CI/CD (ci, release, docs)
+```
 
-- 桌面应用（macOS、Windows、Linux）
-- Web 静态包
-- Docker 镜像
+---
 
-## 推荐 IDE 配置
+## System Requirements
 
-- [VS Code](https://code.visualstudio.com/)
-- [Tauri 插件](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
-- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+| Platform | Minimum |
+|----------|---------|
+| macOS | 10.15 (Catalina) or later |
+| Windows | Windows 10 (1803) or later |
+| Linux | glibc 2.31+ (Ubuntu 20.04+) |
 
-## 许可证
+---
 
-MIT
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes
+4. Push to the branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## Feedback
+
+Found a bug or have a suggestion? [Open an issue](https://github.com/shulain/MobausStudio/issues/new).
+
+Please include: OS & version, MobausStudio version, steps to reproduce, and any relevant screenshots or logs.
+
+---
+
+## License
+
+[MIT License](./LICENSE)
+
+---
+
+## Links
+
+- [Documentation](https://docs.mobaus.com)
+- [Releases](https://github.com/shulain/MobausStudio/releases)
+- [Changelog](./user-guide/en/changelog.md)
+- [Issue Tracker](https://github.com/shulain/MobausStudio/issues)
