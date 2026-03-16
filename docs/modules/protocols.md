@@ -1,4 +1,573 @@
-# 协议模块 (protocols)
+# Protocols Module / 协议模块
+
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Overview
+
+v0.9.0: Unified management of AI service provider communication protocols, including:
+- Protocol abstraction layer definition
+- Built-in protocol implementations (OpenAI, Anthropic, Google, AWS)
+- Automatic and manual protocol selection
+- Message format conversion
+- Streaming response parsing
+
+## Design Background
+
+### Problem
+
+The current implementation wraps each provider in a separate function:
+- `chat_stream_anthropic` - Anthropic protocol
+- `chat_stream_google` - Google Cloud Code protocol
+- `chat_stream_kiro` - Kiro/Amazon Q protocol
+- `chat_stream_codex_api` - ChatGPT Codex protocol
+- `chat_stream_responses_api` - OpenAI Responses API
+- `chat_stream_message` - OpenAI Chat Completions (default)
+
+**Issues**:
+1. Code duplication, each function has similar streaming processing logic
+2. Custom providers can only use the OpenAI protocol
+3. Users cannot select other protocols for custom models (e.g., Anthropic-compatible services)
+
+### Solution
+
+Encapsulate protocols as reusable modules:
+- Built-in providers automatically match their corresponding protocol
+- Custom providers/models can choose which protocol to use
+- Unified streaming response processing logic
+
+## Protocol Types
+
+### ProtocolType
+
+```typescript
+type ProtocolType = 'openai' | 'anthropic' | 'google' | 'aws';
+```
+
+| Protocol | Description | Use Cases |
+|----------|-------------|-----------|
+| openai | OpenAI Chat Completions API | OpenAI, DeepSeek, Groq, Together, Ollama and other compatible services |
+| anthropic | Anthropic Messages API | Claude API compatible services |
+| google | Google Gemini API | Gemini API compatible services |
+| aws | AWS Bedrock / Amazon Q | AWS Bedrock, Kiro and other services |
+
+### Protocol Differences
+
+| Protocol | Endpoint Format | Authentication | Message Format | Streaming Format |
+|----------|----------------|----------------|----------------|------------------|
+| OpenAI | `/chat/completions` | Bearer Token | `messages: [{role, content}]` | SSE `data: {...}` |
+| Anthropic | `/messages` (auto-completes /v1) | x-api-key / Bearer | `messages: [{role, content: [{type, text}]}]` | SSE `event: xxx\ndata: {...}` |
+| Google | `/generateContent` | API Key / OAuth | `contents: [{role, parts}]` | SSE `data: {...}` |
+| AWS | Custom endpoint | Bearer Token | `conversationState` | AWS Event Stream binary |
+
+### Base URL Standards (v4.1.46)
+
+| Protocol | User Input | After Auto-completion | Description |
+|----------|------------|----------------------|-------------|
+| Anthropic | `https://api.anthropic.com` | `https://api.anthropic.com/v1/messages` | Auto-completes /v1 path |
+| OpenAI | `https://api.openai.com/v1` | `https://api.openai.com/v1/chat/completions` | User must include /v1 |
+| Google | `https://generativelanguage.googleapis.com/v1beta` | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | User must include /v1beta |
+| AWS | Full endpoint | Not modified | Uses the full endpoint provided by user |
+
+## Interface Definitions
+
+### Rust Trait: ChatProtocol
+
+```rust
+/// Chat protocol trait
+///
+/// Defines the communication protocol interface for different AI service providers
+pub trait ChatProtocol: Send + Sync {
+    /// Get protocol name
+    fn name(&self) -> &'static str;
+
+    /// Build request URL
+    fn build_url(&self, request: &ChatStreamRequest) -> String;
+
+    /// Build request headers
+    fn build_headers(&self, request: &ChatStreamRequest) -> HeaderMap;
+
+    /// Build request body
+    fn build_body(&self, request: &ChatStreamRequest) -> serde_json::Value;
+
+    /// Parse streaming response chunk
+    ///
+    /// Returns a list of parsed events
+    fn parse_chunk(
+        &self,
+        chunk: &[u8],
+        buffer: &mut StreamBuffer,
+    ) -> Vec<StreamEvent>;
+}
+```
+
+### StreamEvent
+
+```rust
+/// Streaming response event
+pub enum StreamEvent {
+    /// Text content chunk
+    Chunk { content: String },
+    /// Reasoning content chunk (thinking mode)
+    ReasoningChunk { content: String },
+    /// Tool call
+    ToolCall { id: String, name: String, arguments: String },
+    /// Usage statistics
+    Usage { prompt_tokens: i32, completion_tokens: i32, total_tokens: i32 },
+    /// Done
+    Done,
+    /// Error
+    Error { message: String },
+}
+```
+
+## Provider Default Protocol Mapping
+
+```typescript
+const PROVIDER_DEFAULT_PROTOCOL: Record<string, ProtocolType> = {
+    // OpenAI compatible
+    'openai': 'openai',
+    'deepseek': 'openai',
+    'groq': 'openai',
+    'together': 'openai',
+    'openrouter': 'openai',
+    'mistral': 'openai',
+    'xai': 'openai',
+    'fireworks': 'openai',
+    'perplexity': 'openai',
+    'cerebras': 'openai',
+    'ollama': 'openai',
+    'lmstudio': 'openai',
+
+    // Anthropic
+    'anthropic': 'anthropic',
+
+    // Google
+    'google': 'google',
+
+    // AWS
+    'kiro': 'aws',
+    'bedrock': 'aws',
+
+    // Custom defaults to OpenAI
+    'custom': 'openai',
+};
+```
+
+## Test Cases
+
+### Protocol Selection Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-001 | Built-in provider auto-selects protocol | provider=openai | Uses openai protocol |
+| TC-PROTO-002 | Built-in provider auto-selects protocol | provider=anthropic | Uses anthropic protocol |
+| TC-PROTO-003 | Built-in provider auto-selects protocol | provider=google | Uses google protocol |
+| TC-PROTO-004 | Built-in provider auto-selects protocol | provider=kiro | Uses aws protocol |
+| TC-PROTO-005 | Custom provider default protocol | provider=custom, protocol=undefined | Uses openai protocol |
+| TC-PROTO-006 | Custom provider specified protocol | provider=custom, protocol=anthropic | Uses anthropic protocol |
+| TC-PROTO-007 | Model overrides protocol | provider=custom, model.protocol=google | Uses google protocol |
+
+### Protocol Selector i18n Tests (v0.9.5)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-I18N-001 | Chinese environment protocol labels | language=zh | Dropdown options show Chinese labels and descriptions |
+| TC-PROTO-I18N-002 | English environment protocol labels | language=en | Dropdown options show English labels and descriptions |
+| TC-PROTO-I18N-003 | Chinese environment protocol hints | language=zh, custom protocol | Hint text shows in Chinese |
+| TC-PROTO-I18N-004 | English environment protocol hints | language=en, default protocol | Hint text shows in English |
+
+### Message Format Conversion Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-MSG-001 | OpenAI message format | messages=[{role,content}] | Keeps original format |
+| TC-PROTO-MSG-002 | Anthropic message format | messages=[{role,content}] | Converts to [{role, content:[{type,text}]}] |
+| TC-PROTO-MSG-003 | Google message format | messages=[{role,content}] | Converts to [{role, parts:[{text}]}] |
+| TC-PROTO-MSG-004 | AWS message format | messages=[{role,content}] | Converts to conversationState format |
+| TC-PROTO-MSG-005 | System prompt handling | system_prompt="xxx" | Each protocol handles correctly |
+
+### Streaming Response Parsing Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-STREAM-001 | OpenAI SSE parsing | data: {"choices":[...]} | Correctly extracts content |
+| TC-PROTO-STREAM-002 | Anthropic SSE parsing | event: content_block_delta\ndata: {...} | Correctly extracts delta.text |
+| TC-PROTO-STREAM-003 | Google SSE parsing | data: {"candidates":[...]} | Correctly extracts parts[0].text |
+| TC-PROTO-STREAM-004 | AWS Event Stream parsing | Binary message | Correctly parses assistantResponseEvent |
+| TC-PROTO-STREAM-005 | Tool call parsing | tool_calls data | Correctly extracts tool call info |
+
+### Google Tool Call Tests (v4.1.37)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-GOOGLE-TOOL-001 | Tool registration | request.tools non-empty | build_body includes tools.functionDeclarations |
+| TC-PROTO-GOOGLE-TOOL-002 | functionCall message conversion | assistant message with tool_calls | Converts to model role functionCall part |
+| TC-PROTO-GOOGLE-TOOL-003 | functionResponse message conversion | tool role message | Converts to user role functionResponse part |
+| TC-PROTO-GOOGLE-TOOL-004 | thought_signature passback | tool_call contains thought_signature | functionCall part includes thought_signature |
+| TC-PROTO-GOOGLE-TOOL-005 | Response parsing functionCall | Response contains functionCall part | Generates ToolCallComplete event |
+| TC-PROTO-GOOGLE-TOOL-006 | Response parsing thought_signature | Response functionCall contains thoughtSignature | ToolCallComplete event contains thought_signature |
+| TC-PROTO-GOOGLE-TOOL-007 | Merge consecutive same-role messages | Two consecutive user messages | Merged into one user message |
+| TC-PROTO-GOOGLE-TOOL-008 | Fill placeholder results for incomplete tool calls | assistant has tool_calls but no corresponding tool result | Auto-fills placeholder functionResponse |
+| TC-PROTO-GOOGLE-TOOL-009 | Message truncation to prevent exceeding limits | Overly long message list | Truncates old messages, keeps recent conversation |
+
+### Kiro Input Length Tests (v4.1.37)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-KIRO-001 | chatHistory deduplicates currentMessage | Last user message | chatHistory excludes last message, currentMessage contains it |
+| TC-PROTO-KIRO-002 | Message truncation | Message list exceeding 200k characters | Truncates old messages from the beginning |
+| TC-PROTO-KIRO-003 | First message after truncation must be user | First message after truncation is assistant | Removes first message, ensures it starts with user |
+| TC-PROTO-KIRO-004 | Tool result message handling | tool role message | Correctly wraps as toolResults format |
+
+### Anthropic URL Building Tests (v4.1.46)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-ANTHROPIC-URL-001 | Default endpoint | endpoint=None | `https://api.anthropic.com/v1/messages` |
+| TC-PROTO-ANTHROPIC-URL-002 | OAuth mode | OAuth token + endpoint=None | `https://api.anthropic.com/v1/messages?beta=true` |
+| TC-PROTO-ANTHROPIC-URL-003 | Base URL input | endpoint=`https://api.anthropic.com` | `https://api.anthropic.com/v1/messages` |
+| TC-PROTO-ANTHROPIC-URL-004 | Full URL input | endpoint=`https://api.anthropic.com/v1/messages` | `https://api.anthropic.com/v1/messages` |
+| TC-PROTO-ANTHROPIC-URL-005 | Trailing slash handling | endpoint=`https://api.anthropic.com/` | `https://api.anthropic.com/v1/messages` |
+| TC-PROTO-ANTHROPIC-URL-006 | Custom proxy | endpoint=`https://proxy.example.com` | `https://proxy.example.com/v1/messages` |
+
+### test_anthropic URL Building Tests (v4.1.47)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-TEST-ANTHROPIC-URL-001 | Default endpoint | endpoint=None | `https://api.anthropic.com/v1/messages` |
+| TC-TEST-ANTHROPIC-URL-002 | Base URL input (without /v1) | endpoint=`https://api.anthropic.com` | `https://api.anthropic.com/v1/messages` |
+| TC-TEST-ANTHROPIC-URL-003 | Full URL input (with /v1) | endpoint=`https://api.anthropic.com/v1` | `https://api.anthropic.com/v1/messages` |
+| TC-TEST-ANTHROPIC-URL-004 | Trailing slash handling | endpoint=`https://api.anthropic.com/` | `https://api.anthropic.com/v1/messages` |
+| TC-TEST-ANTHROPIC-URL-005 | Custom proxy | endpoint=`https://proxy.example.com` | `https://proxy.example.com/v1/messages` |
+
+### Response Format Detection Tests (v4.1.46)
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PROTO-FORMAT-001 | Normal SSE response | Standard SSE stream | Parses normally, no errors |
+| TC-PROTO-FORMAT-002 | HTML response detection | Response is HTML page | Detects HTML, returns error to user |
+| TC-PROTO-FORMAT-003 | Request URL logging | Any request | Prints request URL to log |
+| TC-PROTO-FORMAT-004 | Response status code logging | Any response | Prints response status code to log |
+
+## File Structure
+
+```
+src-tauri/src/
+├── protocol/
+│   ├── mod.rs          # Protocol trait definition and dispatch logic
+│   ├── openai.rs       # OpenAI protocol implementation
+│   ├── anthropic.rs    # Anthropic protocol implementation
+│   ├── google.rs       # Google protocol implementation
+│   └── aws.rs          # AWS protocol implementation
+└── lib.rs              # Modify chat_stream_message to use protocol dispatch
+
+src/
+├── types/index.ts      # Add ProtocolType type
+└── data/
+    └── protocols.ts    # Protocol configuration data
+```
+
+## Error Handling
+
+### Error Type Definitions
+
+All error messages must support internationalization, using i18n keys instead of hardcoded strings.
+
+#### AppError Base Class
+
+```typescript
+/**
+ * Application error base class
+ *
+ * All custom errors should inherit from this class, supporting i18n and parameter interpolation
+ */
+export class AppError extends Error {
+  /** i18n translation key */
+  readonly i18nKey: string;
+  /** Translation parameters */
+  readonly params?: Record<string, string | number>;
+  /** Original error (if any) */
+  readonly cause?: Error;
+
+  constructor(i18nKey: string, params?: Record<string, string | number>, cause?: Error) {
+    super(i18nKey);
+    this.name = this.constructor.name;
+    this.i18nKey = i18nKey;
+    this.params = params;
+    this.cause = cause;
+  }
+}
+```
+
+#### Specific Error Classes
+
+| Error Class | i18n Key Prefix | Use Case |
+|-------------|-----------------|----------|
+| SkillNotFoundError | errors.skill.notFound | Skill does not exist |
+| SkillInstallError | errors.skill.installFailed | Skill installation failed |
+| ModelFetchError | errors.model.fetchFailed | Model fetch failed |
+| ProviderConnectionError | errors.provider.connectionFailed | Provider connection failed |
+| OAuthError | errors.oauth.* | OAuth authentication failed |
+| ProtocolError | errors.protocol.* | Protocol processing error |
+
+### Error Message Internationalization
+
+#### Chinese (zh.ts)
+
+```typescript
+export const zh = {
+  errors: {
+    skill: {
+      notFound: '技能 "{{skillId}}" 不存在',
+      installFailed: '安装技能失败：{{reason}}',
+    },
+    model: {
+      fetchFailed: '获取模型列表失败：{{reason}}',
+      fallbackToCache: '使用缓存数据',
+      fallbackToBuiltin: '使用内置数据',
+    },
+    provider: {
+      connectionFailed: '连接提供商失败：{{provider}}',
+      invalidCredentials: '认证信息无效',
+    },
+    oauth: {
+      authorizationFailed: 'OAuth 授权失败',
+      tokenRefreshFailed: 'Token 刷新失败',
+    },
+    protocol: {
+      unsupportedProtocol: '不支持的协议：{{protocol}}',
+      parseError: '解析响应失败：{{reason}}',
+    },
+  },
+};
+```
+
+#### English (en.ts)
+
+```typescript
+export const en = {
+  errors: {
+    skill: {
+      notFound: 'Skill "{{skillId}}" not found',
+      installFailed: 'Failed to install skill: {{reason}}',
+    },
+    model: {
+      fetchFailed: 'Failed to fetch model list: {{reason}}',
+      fallbackToCache: 'Using cached data',
+      fallbackToBuiltin: 'Using built-in data',
+    },
+    provider: {
+      connectionFailed: 'Failed to connect to provider: {{provider}}',
+      invalidCredentials: 'Invalid credentials',
+    },
+    oauth: {
+      authorizationFailed: 'OAuth authorization failed',
+      tokenRefreshFailed: 'Token refresh failed',
+    },
+    protocol: {
+      unsupportedProtocol: 'Unsupported protocol: {{protocol}}',
+      parseError: 'Failed to parse response: {{reason}}',
+    },
+  },
+};
+```
+
+### Error Handling Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-I18N-001 | Chinese environment error message | locale=zh, throw SkillNotFoundError('test-skill') | Displays "技能 \"test-skill\" 不存在" |
+| TC-I18N-002 | English environment error message | locale=en, throw SkillNotFoundError('test-skill') | Displays "Skill \"test-skill\" not found" |
+| TC-I18N-003 | Error parameter interpolation | throw ModelFetchError({reason: 'Network error'}) | Correctly replaces {{reason}} parameter |
+
+### OAuth Service Test Cases
+
+#### Google OAuth Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-OAUTH-GOOGLE-001 | Successful authorization flow | Correct authorization code | Returns accessToken and refreshToken |
+| TC-OAUTH-GOOGLE-002 | Authorization code exchange failure | Invalid authorization code | Returns type='failed' with error message |
+| TC-OAUTH-GOOGLE-003 | State verification failure | Mismatched state | Returns CSRF error |
+| TC-OAUTH-GOOGLE-004 | Token refresh success | Valid refreshToken | Returns new accessToken |
+| TC-OAUTH-GOOGLE-005 | Token refresh failure | Invalid refreshToken | Returns type='failed' |
+| TC-OAUTH-GOOGLE-006 | Antigravity onboard | New user authorization | Auto-creates GCP project, returns projectId |
+
+#### Anthropic OAuth Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-OAUTH-ANTHROPIC-001 | Max mode authorization success | mode='max', correct authorization code | Returns OAuth token |
+| TC-OAUTH-ANTHROPIC-002 | Console mode authorization success | mode='console', correct authorization code | Returns API Key |
+| TC-OAUTH-ANTHROPIC-003 | Authorization code format error | Authorization code missing state | Correctly parses and exchanges |
+| TC-OAUTH-ANTHROPIC-004 | Token refresh success | Valid refreshToken | Returns new accessToken |
+| TC-OAUTH-ANTHROPIC-005 | Token refresh failure | Invalid refreshToken | Returns type='failed' |
+
+#### OpenAI OAuth Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-OAUTH-OPENAI-001 | Successful authorization flow | Correct authorization code | Returns accessToken and idToken |
+| TC-OAUTH-OPENAI-002 | Authorization code exchange failure | Invalid authorization code | Returns type='failed' |
+| TC-OAUTH-OPENAI-003 | State verification failure | Mismatched state | Returns CSRF error |
+| TC-OAUTH-OPENAI-004 | Token refresh success | Valid refreshToken | Returns new accessToken |
+| TC-OAUTH-OPENAI-005 | Token refresh failure | Invalid refreshToken | Returns type='failed' |
+
+#### Token Refresher Tests
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-REFRESH-001 | Start auto-renewal service | Call start() | isRunning=true, starts periodic check |
+| TC-REFRESH-002 | Stop auto-renewal service | Call stop() | isRunning=false, clears timer |
+| TC-REFRESH-003 | Detect soon-to-expire Token | expiresAt within 30 minutes | Auto-refreshes Token |
+| TC-REFRESH-004 | Detect expired Token | expiresAt < now | Auto-refreshes Token |
+| TC-REFRESH-005 | Refresh success | Valid refreshToken | Updates credentials, notifies callback |
+| TC-REFRESH-006 | Refresh fails but Token not expired | Refresh fails, Token has 10 minutes left | Graceful degradation, continues using old Token |
+| TC-REFRESH-007 | Refresh fails and Token expired | Refresh fails, Token expired | Returns failure, notifies callback |
+| TC-REFRESH-008 | Retry mechanism | 1st attempt fails, 2nd succeeds | Auto-retries, eventually succeeds |
+| TC-REFRESH-009 | Prevent duplicate refresh | Call refreshToken 2 times simultaneously | Only executes 1 refresh |
+| TC-REFRESH-010 | Manual Token refresh | Call refreshByProviderId | Immediately refreshes specified provider |
+
+## Logging Standards
+
+### Log Level Usage
+
+| Level | Use Case | Example |
+|-------|----------|---------|
+| debug | Development debug info | Function parameters, intermediate variables |
+| info | Important business milestones | User login, model switch, skill installation |
+| warn | Recoverable exceptions | API failure falling back to cache |
+| error | Unrecoverable errors | Network request failure, parsing errors |
+
+### LogTags Definition
+
+```typescript
+export enum LogTags {
+  APP = 'APP',           // Application main flow
+  STORAGE = 'STORAGE',   // Storage operations
+  MODEL = 'MODEL',       // Model management
+  PROVIDER = 'PROVIDER', // Provider management
+  SKILL = 'SKILL',       // Skill management
+  OAUTH = 'OAUTH',       // OAuth authentication
+  PROTOCOL = 'PROTOCOL', // Protocol processing
+  MCP = 'MCP',           // MCP service
+  AGENT = 'AGENT',       // Agent management
+}
+```
+
+### Log Message Internationalization
+
+All log messages must use i18n keys; hardcoded Chinese or English is not allowed.
+
+#### Incorrect Examples
+
+```typescript
+// Hardcoded Chinese
+logger.info(LogTags.MODEL, '开始获取模型列表');
+console.log('模型获取成功');
+
+// Hardcoded English
+logger.error(LogTags.OAUTH, 'Token refresh failed');
+```
+
+#### Correct Examples
+
+```typescript
+// Using i18n key
+logger.info(LogTags.MODEL, t('logs.model.fetchStart'));
+logger.error(LogTags.OAUTH, t('logs.oauth.tokenRefreshFailed'), { error });
+```
+
+### Log Internationalization Configuration
+
+#### Chinese (zh.ts)
+
+```typescript
+export const zh = {
+  logs: {
+    model: {
+      fetchStart: '开始获取模型列表',
+      fetchSuccess: '模型列表获取成功',
+      fetchFailed: '模型列表获取失败',
+      fallbackToCache: '回退到缓存数据',
+    },
+    provider: {
+      connecting: '正在连接提供商：{{provider}}',
+      connected: '提供商连接成功',
+      disconnected: '提供商已断开',
+    },
+    oauth: {
+      authStart: '开始 OAuth 授权',
+      authSuccess: 'OAuth 授权成功',
+      tokenRefreshFailed: 'Token 刷新失败',
+    },
+  },
+};
+```
+
+#### English (en.ts)
+
+```typescript
+export const en = {
+  logs: {
+    model: {
+      fetchStart: 'Fetching model list',
+      fetchSuccess: 'Model list fetched successfully',
+      fetchFailed: 'Failed to fetch model list',
+      fallbackToCache: 'Falling back to cached data',
+    },
+    provider: {
+      connecting: 'Connecting to provider: {{provider}}',
+      connected: 'Provider connected successfully',
+      disconnected: 'Provider disconnected',
+    },
+    oauth: {
+      authStart: 'Starting OAuth authorization',
+      authSuccess: 'OAuth authorization successful',
+      tokenRefreshFailed: 'Token refresh failed',
+    },
+  },
+};
+```
+
+### Logging Standards Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-LOG-001 | Chinese environment log | locale=zh, logger.info(LogTags.MODEL, t('logs.model.fetchStart')) | Outputs "[MODEL] 开始获取模型列表" |
+| TC-LOG-002 | English environment log | locale=en, logger.info(LogTags.MODEL, t('logs.model.fetchStart')) | Outputs "[MODEL] Fetching model list" |
+| TC-LOG-003 | Log parameter interpolation | logger.info(LogTags.PROVIDER, t('logs.provider.connecting', {provider: 'OpenAI'})) | Correctly replaces {{provider}} parameter |
+| TC-LOG-004 | Prohibit console.log | Scan all source code | Zero console.log except in test files |
+
+### Log Sanitization Standards
+
+Sensitive information must be sanitized before logging:
+
+```typescript
+// Correct: Sanitize API Key
+logger.info(LogTags.OAUTH, t('logs.oauth.tokenReceived'), {
+  token: maskToken(token), // Only shows first 4 and last 4 characters
+});
+
+// Incorrect: Logging sensitive info directly
+logger.info(LogTags.OAUTH, 'Token:', token);
+```
+
+## Change Log
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2024-01-XX | v0.9.0 | Initial version, protocol abstraction layer design | - |
+| 2026-03-04 | v4.1.46 | Anthropic protocol auto-completes /v1 path; all streaming protocols add request URL and response status code logging; all streaming protocols add HTML response format detection; remove duplicate message merging logic in anthropic.rs | - |
+| 2026-03-04 | v0.9.1 | Add error handling and logging standards sections; define AppError base class and specific error classes; add error message and log message i18n configuration; add test cases TC-I18N-001~003, TC-LOG-001~004 | - |
+| 2026-03-06 | v4.1.47 | Fix test_anthropic function URL building logic, auto-complete /v1 path; add test cases TC-TEST-ANTHROPIC-URL-001~005 | - |
+| 2026-03-13 | v0.9.5 | Fix protocol selector hardcoded Chinese issue, use getLocalizedText to dynamically display protocol labels and descriptions based on current language | - |
+
+---
+
+<a id="中文"></a>
 
 ## 模块职责
 

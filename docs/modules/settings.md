@@ -1,6 +1,612 @@
-# Settings 设置模块
+# Settings Module / Settings 设置模块
 
-## 📋 模块概述
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Module Overview
+
+The Settings module provides system configuration, notification management, and import/export functionality.
+
+| Property | Value |
+|----------|-------|
+| Module Path | `src/components/features/Settings` |
+| Theme Management | `src/theme/index.tsx` (v2.6.0) |
+| Internationalization | `src/i18n/index.tsx` (v2.6.0) |
+| Rust Commands | `src-tauri/src/lib.rs` |
+| Created Date | 2026-01-18 |
+| Last Updated | 2026-01-24 |
+
+---
+
+## Feature List
+
+### General Settings
+- [x] Theme switching (Light/Dark/System)
+- [x] **Theme persistence** (v2.6.0) - Tauri filesystem persistence, resolves Dev/Build data inconsistency
+- [x] **System theme listener** (v2.3.0) - Automatically responds to system theme changes in System mode
+- [x] **macOS window title bar adaptation** (v2.6.0) - Transparent title bar follows theme
+- [x] Language settings (Chinese/English)
+- [x] **Language persistence** (v2.6.0) - Tauri filesystem persistence, resolves Dev/Build data inconsistency
+- [ ] Font size adjustment
+
+### Data Management
+- [x] Export configuration (calls ExportModal)
+- [x] **Export modal dark mode** (v2.6.0) - Selected item purple background adapts to dark theme
+- [x] Import configuration (calls ImportModal)
+- [x] Clear all data (v2.3.0)
+- [x] Storage space usage statistics (v2.3.0) - Dynamic calculation of actual usage
+- [x] **Skills persistence** (v2.6.0) - Tauri backend save_skills/load_skills commands
+
+### About
+- [x] Version information
+- [ ] Check for updates - Connect to GitHub Releases API (to be implemented)
+- [x] Developer information
+- [ ] License information
+
+### Notification System
+- [x] Notification list display
+- [x] Unread badge management
+
+---
+
+## Component Structure
+
+```
+Settings/
+├── index.tsx              # Module entry (SettingsPage)
+├── GeneralSettings.tsx    # General settings (Theme, Language)
+├── DataSettings.tsx       # Data management (Export/Import)
+├── AboutSettings.tsx      # About information
+├── Notifications/         # Notification components
+│   └── NotificationPanel.tsx
+├── Export/                # Export components
+│   └── ExportModal.tsx
+├── Import/                # Import components
+│   └── ImportModal.tsx
+└── types.ts               # Type definitions
+
+theme/
+└── index.tsx              # ThemeProvider (v2.3.0)
+```
+
+---
+
+## Data Structures
+
+### Theme (v2.3.0)
+
+```typescript
+// src/theme/index.tsx
+type Theme = 'light' | 'dark' | 'system';
+
+interface ThemeContextType {
+  theme: Theme;                    // User-selected theme
+  setTheme: (theme: Theme) => void;
+  effectiveTheme: 'light' | 'dark'; // Actually applied theme
+}
+```
+
+### Notification
+
+```typescript
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  createdAt: Date;
+  read: boolean;
+}
+```
+
+### ExportConfig (v2.6.5)
+
+```typescript
+interface ExportConfig {
+  models: boolean;           // v2.6.1: AI model config export
+  agents: boolean;
+  skills: boolean;
+  mcp: boolean;
+  chats: boolean;
+  roundtableChats: boolean;  // v2.6.5: Roundtable chat export
+  settings: boolean;         // v2.6.5: App settings export
+}
+
+interface ImportOptions {
+  merge: boolean;          // true=merge, false=overwrite
+  backup: boolean;         // Backup before import
+}
+```
+
+---
+
+## API Interface
+
+### Data Management
+Currently implemented mainly through `src/services/storage.ts` and frontend logic.
+
+- **LocalStorage**: Used to store configurations, chat history, Agents, Skills, etc.
+- **Export**: Generates JSON files for user download.
+- **Import**: Reads user-uploaded JSON files and merges/overwrites local storage.
+
+### localStorage Key Names
+
+| Key | Description |
+|-----|-------------|
+| `mobaus_theme` | Theme setting (light/dark/system) |
+| `mobaus_language` | Language setting (zh/en) |
+| `mobaus_chats` | Chat history |
+| `mobaus_agents` | Agent configurations |
+| `mobaus_skills` | Custom skills |
+| `mobaus_mcp_servers` | MCP server configurations (v2.6.1: corrected key name) |
+| `mobaus_models` | AI model configurations (v2.6.1: added export support) |
+| `mobaus_settings` | App settings |
+
+### Tauri Commands (v2.6.0)
+
+Settings persistence has been migrated to the Rust backend, resolving Dev/Build environment data inconsistency issues.
+
+| Command | Description |
+|---------|-------------|
+| `save_settings` | Save app settings to filesystem |
+| `load_settings` | Load app settings from filesystem |
+| `save_skills` | Save custom skills |
+| `load_skills` | Load custom skills |
+
+**Storage Path:** `~/Library/Application Support/com.mobaus.studio/settings.json`
+
+---
+
+## Test Cases
+
+### Theme Persistence Tests (v2.6.0)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-01 | Theme switch - Dark | Select Dark | Theme switches to dark, persisted | [x] |
+| SET-02 | Theme switch - Light | Select Light | Theme switches to light, persisted | [x] |
+| SET-03 | Theme switch - Follow system | Select System | Automatically switches based on system settings | [x] |
+| SET-06 | **Theme restore on restart** | Restart app | Automatically restores saved theme settings | [x] |
+| SET-07 | **System theme listener** | Switch system theme in System mode | Automatically responds and updates UI | [x] |
+| SET-30 | **Dev/Build consistency** | Set theme in Dev then start Build | Theme settings are consistent | [x] |
+
+### Language Persistence Tests (v2.6.0)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-04 | Language switch - Chinese | Select Chinese | UI switches to Chinese | [x] |
+| SET-05 | Language switch - English | Select English | UI switches to English | [x] |
+| SET-08 | **Language restore on restart** | Restart app | Automatically restores saved language settings | [x] |
+| SET-31 | **Dev/Build consistency** | Set language in Dev then start Build | Language settings are consistent | [x] |
+
+### settingsStorage Tests (v2.6.0)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-40 | Sync load defaults | localStorage is empty | Returns {theme:'system', language:'zh'} | [x] |
+| SET-41 | Sync save settings | Call saveSync | localStorage updated | [x] |
+| SET-42 | Async save settings | Call save in Tauri environment | Calls save_settings command | [x] |
+| SET-43 | Async load settings | Call loadAsync in Tauri environment | Calls load_settings command | [x] |
+| SET-44 | Tauri fallback | Tauri command fails | Falls back to localStorage | [x] |
+
+### Data Management Tests
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-10 | Storage stats display | Page load | Shows current storage size (KB/MB) | [x] |
+| SET-11 | Storage progress bar | Page load | Progress bar shows actual usage percentage | [x] |
+| SET-12 | Open export modal | Click export button | Shows export options modal | [x] |
+| SET-13 | Execute export | Select then click export | Downloads JSON file | [x] |
+| SET-14 | Open import modal | Click import button | Shows import options modal | [x] |
+| SET-15 | Execute import | Select file then import | Config updated, page refreshes | [x] |
+| SET-16 | Clear data confirmation | Click clear button | Shows confirmation dialog | [x] |
+| SET-17 | Confirm clear | Click confirm | Data cleared, page refreshes | [x] |
+| SET-18 | Cancel clear | Click cancel | Data preserved | [x] |
+
+### Export Completeness Tests (v2.6.1)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-50 | Export Models config | Check Models for export | JSON contains models field | [x] |
+| SET-51 | Export Agents config | Check Agents for export | JSON contains agents field | [x] |
+| SET-52 | Export Skills config | Check Skills for export | JSON contains skills field | [x] |
+| SET-53 | Export MCP config | Check MCP for export | JSON contains mcp field (using correct key mobaus_mcp_servers) | [x] |
+| SET-54 | Export chat history | Check Chats for export | JSON contains chats field | [x] |
+| SET-55 | Export all | Check all options | JSON contains all fields with complete data | [x] |
+| SET-56 | Import with Models | Import JSON containing models | Models data correctly restored | [x] |
+| SET-57 | Import with MCP | Import JSON containing mcp | MCP server config correctly restored | [x] |
+
+### Export Enhancement Tests (v2.6.2)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-60 | Chat export completeness | Check Chats for export | JSON contains complete chat data (loaded from storage service) | [x] |
+| SET-61 | Export success notification | Click export | Shows "Export successful" notification | [x] |
+| SET-62 | Tauri save dialog | Export in Tauri environment | File save dialog appears to choose location | [x] |
+| SET-63 | Browser environment fallback | Export in browser environment | Auto-downloads to default location | [x] |
+| SET-64 | Tauri import notification | Import success in Tauri environment | Uses native message dialog, can be closed normally | [x] |
+| SET-65 | Browser import notification | Import success in browser environment | Uses browser alert, can be closed normally | [x] |
+
+### Clear Data Tests (v2.6.5)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-70 | Tauri environment clear | Click clear in Tauri environment | Calls storage services to clear filesystem data | [x] |
+| SET-71 | Browser environment clear | Click clear in browser environment | Clears localStorage data | [x] |
+| SET-72 | Post-clear data verification | Restart app after clearing | All data is empty, no residuals | [x] |
+
+### Export Enhancement Tests (v2.6.5)
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-75 | Export Roundtable Chats | Check Roundtable for export | JSON contains roundtableChats field | [x] |
+| SET-76 | Export Settings | Check Settings for export | JSON contains settings field (theme, language, etc.) | [x] |
+| SET-77 | Import Roundtable Chats | Import JSON containing roundtableChats | Roundtable chat data correctly restored | [x] |
+| SET-78 | Import Settings | Import JSON containing settings | App settings correctly restored | [x] |
+
+### About Information Tests
+
+| ID | Test Scenario | Input | Expected Output | Status |
+|----|---------------|-------|-----------------|--------|
+| SET-20 | Display version number | Page load | Shows current version number | [x] |
+| SET-21 | Check update - already latest | Click check for updates | Shows already latest version | [ ] |
+| SET-22 | Check update - update available | New version exists | Shows new version info and download link | [ ] |
+| SET-23 | Check update - network error | No network connection | Shows error notification | [ ] |
+
+### Test Files
+
+- `src/test/components/Settings/GeneralSettings.test.tsx`
+- `src/test/components/Settings/DataSettings.test.tsx`
+- `src/test/components/Settings/SettingsPage.test.tsx`
+- `src/test/components/Settings/ExportModal.test.tsx`
+- `src/test/components/Settings/ImportModal.test.tsx`
+- `src/test/theme/ThemeProvider.test.tsx` (v2.3.0)
+
+---
+
+## Change History
+
+| Date | Version | Change Description |
+|------|---------|-------------------|
+| 2026-01-18 | 1.0.0 | Initial version |
+| 2026-01-23 | 2.3.0 | ThemeProvider refactoring, theme/language persistence fix, storage progress bar dynamic calculation |
+| 2026-01-24 | 2.6.0 | Settings Tauri persistence, resolving Dev/Build data inconsistency |
+| 2026-01-24 | 2.6.1 | Fix incomplete export: 1) MCP key name corrected to mobaus_mcp_servers; 2) Added Models export support |
+| 2026-01-24 | 2.6.2 | Export enhancement: 1) Fix chat export to use storage service; 2) Add export success notification; 3) Tauri environment uses file dialog for save location; 4) Import notification changed to Tauri message dialog to fix alert not closing issue |
+| 2026-01-24 | 2.6.3 | Import fix: Use storage services to save data, ensuring correct persistence to filesystem in Tauri environment |
+| 2026-01-24 | 2.6.4 | Import merge deduplication: Deduplicate by ID, records with same ID are overwritten by import data, avoiding duplicate imports |
+| 2026-01-25 | 2.6.5 | 1) Clear data improvement: Tauri environment uses storage services to clear filesystem data; 2) Export enhancement: Added Roundtable Chats and Settings export support |
+| 2026-01-25 | 2.6.6 | Clear data dialog fix: Tauri environment uses message dialog instead of alert, resolving duplicate dialog issue |
+| 2026-01-28 | 3.0.25 | Import enhancement: Auto-create missing Skills and MCP dependency resources when importing Agents, log warnings for missing Models |
+
+---
+
+## Implementation Details
+
+### ThemeProvider (v2.6.0)
+
+Theme management uses settingsStorage to implement Tauri filesystem persistence, resolving the Dev/Build environment data inconsistency issue.
+
+```tsx
+// src/theme/index.tsx
+import { settingsStorage } from '../services/storage';
+
+export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    // Sync load ensures UI is immediately available
+    const [theme, setThemeState] = useState<Theme>(() => {
+        const settings = settingsStorage.load();
+        return settings.theme;
+    });
+
+    // Async load from Tauri on app startup
+    useEffect(() => {
+        const loadFromTauri = async () => {
+            const settings = await settingsStorage.loadAsync();
+            if (settings.theme !== theme) {
+                setThemeState(settings.theme);
+            }
+        };
+        loadFromTauri();
+    }, []);
+
+    // Set theme and async persist
+    const setTheme = useCallback((newTheme: Theme) => {
+        setThemeState(newTheme);
+        const currentSettings = settingsStorage.load();
+        settingsStorage.save({ ...currentSettings, theme: newTheme });
+    }, []);
+    // ...
+};
+```
+
+### settingsStorage (v2.6.0)
+
+Unified settings storage service supporting both Tauri and browser environments.
+
+```typescript
+// src/services/storage.ts
+export const settingsStorage = {
+    // Async save: calls save_settings command in Tauri environment
+    async save(settings: AppSettings): Promise<void>,
+
+    // Sync save: falls back to localStorage
+    saveSync(settings: AppSettings): void,
+
+    // Async load: calls load_settings command in Tauri environment
+    async loadAsync(): Promise<AppSettings>,
+
+    // Sync load: reads from localStorage
+    load(): AppSettings,
+};
+```
+
+**Key Features:**
+- Tauri environment: Persists to `settings.json` via filesystem
+- Browser environment: Falls back to localStorage
+- Sync methods ensure immediate availability during UI initialization
+- Async methods load latest settings from Tauri after app startup
+- Access and modify settings from any component via `useTheme()` / `useI18n()` hooks
+
+### usePersistedState (v4.1.48)
+
+Unified persisted state management Hook, replacing the scattered useState + useEffect + save pattern in App.tsx.
+
+**File Path:** `src/hooks/usePersistedState.ts`
+
+**Problems Solved:**
+- Inconsistent persistence strategies (some debounced, some immediate save)
+- Multiple setState + save scattered across multiple useEffects
+- `STORAGE_DEBOUNCE_DELAY` constant defined but never used
+- High-frequency IO and unnecessary re-renders
+
+```typescript
+/** Storage adapter interface - compatible with existing storage services */
+interface StorageAdapter<T> {
+  load: () => Promise<T[]>;
+  save: (items: T[]) => Promise<void>;
+}
+
+/** Hook configuration options */
+interface UsePersistedStateOptions<T> {
+  storage: StorageAdapter<T>;      // Storage adapter
+  initialValue: T[];                // Initial value
+  immediate?: boolean;              // Whether to save immediately (no debounce), default false
+  debounceDelay?: number;           // Custom debounce delay (ms), default STORAGE_DEBOUNCE_DELAY
+  transform?: (raw: T[]) => T[];   // Post-load data transform (e.g., reset MCP status)
+}
+
+/** Hook return value */
+interface UsePersistedStateReturn<T> {
+  data: T[];
+  setData: Dispatch<SetStateAction<T[]>>;
+  loading: boolean;
+  loaded: boolean;
+  flush: () => Promise<void>;       // Manual immediate save
+}
+```
+
+**Usage Example:**
+
+```typescript
+// High-frequency update data (debounce 1000ms)
+const { data: chats, setData: setChats, loaded } = usePersistedState({
+  storage: chatsStorage,
+  initialValue: [],
+});
+
+// Critical config (immediate save)
+const { data: models, setData: setModels } = usePersistedState({
+  storage: modelsStorage,
+  initialValue: [],
+  immediate: true,
+});
+
+// Post-load data transform (e.g., reset MCP connection status)
+const { data: mcpServers, setData: setMcpServers } = usePersistedState({
+  storage: mcpServersStorage,
+  initialValue: [],
+  immediate: true,
+  transform: (servers) => servers.map(s => ({
+    ...s,
+    status: 'disconnected',
+  })),
+});
+```
+
+**Persistence Strategy:**
+
+| Data Type | Mode | Reason |
+|-----------|------|--------|
+| chats, roundtableChats | Debounce 1000ms | High-frequency updates during streaming output |
+| models, agents, skills, mcpServers | Immediate save | User config operations, low-frequency updates |
+
+### usePersistedState Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-PERSIST-001 | Initial load success | storage.load returns data | data is loaded data, loaded=true |
+| TC-PERSIST-002 | Initial load empty | storage.load returns empty array | data is initialValue |
+| TC-PERSIST-003 | Initial load failure | storage.load throws exception | data is initialValue, loaded=true |
+| TC-PERSIST-004 | Immediate save mode | immediate=true, setData | Immediately calls storage.save |
+| TC-PERSIST-005 | Debounce save mode | 500ms after setData | Does not trigger save |
+| TC-PERSIST-006 | Debounce save trigger | Wait 1000ms after setData | Triggers storage.save |
+| TC-PERSIST-007 | Debounce merge | setData three times within 1000ms | Only triggers save once, saves final value |
+| TC-PERSIST-008 | No save before load | setData when loaded=false | Does not call storage.save |
+| TC-PERSIST-009 | flush manual save | Call flush | Saves immediately, cancels debounce timer |
+| TC-PERSIST-010 | Save on unmount | Unmount with pending save data | Triggers save |
+| TC-PERSIST-011 | transform data | Provide transform function | Loaded data is transformed |
+| TC-PERSIST-012 | Concurrent save protection | Rapidly trigger saves | Does not concurrently call storage.save |
+
+### useAppBootstrap (v4.1.48)
+
+App startup bootstrap Hook, initialization logic extracted from App.tsx. Responsible for data loading, MCP auto-connect, credential refresh, and analytics service initialization.
+
+**File Path:** `src/hooks/useAppBootstrap.ts`
+
+**Problems Solved:**
+- App.tsx file too large (5400+ lines), initialization logic mixed with UI logic
+- Initialization useEffect exceeds 370 lines, difficult to test and maintain
+- Token refresh callback useEffect, Skills save useEffect, and other closely related initialization logic scattered
+
+**Responsibilities:**
+1. Use `usePersistedState` to manage models, chats, agents, mcpServers, roundtableChats
+2. Skills loading (built-in + custom merge) and saving
+3. Providers state management (built-in + custom provider merge)
+4. MCP server auto-connect (autoStart)
+5. Provider credential loading and expired OAuth Token refresh
+6. Model cache service initialization
+7. OAuth Token auto-renewal service
+8. token_expired event listener
+9. Mixpanel operational analytics initialization
+
+```typescript
+/** Hook configuration options */
+interface UseAppBootstrapOptions {
+  addToast: (toast: Omit<ToastItem, 'id'>) => void;
+}
+
+/** Hook return value */
+interface UseAppBootstrapReturn {
+  // Persisted data
+  models: AIModelConfig[];
+  setModels: Dispatch<SetStateAction<AIModelConfig[]>>;
+  chats: Chat[];
+  setChats: Dispatch<SetStateAction<Chat[]>>;
+  agents: Agent[];
+  setAgents: Dispatch<SetStateAction<Agent[]>>;
+  skills: Skill[];
+  setSkills: Dispatch<SetStateAction<Skill[]>>;
+  mcpServers: MCPServer[];
+  setMcpServers: Dispatch<SetStateAction<MCPServer[]>>;
+  roundtableChats: RoundtableChat[];
+  setRoundtableChats: (updater: ...) => void;
+  providers: AIProvider[];
+  setProviders: Dispatch<SetStateAction<AIProvider[]>>;
+  // Loading state
+  isDataLoaded: boolean;
+  // Refs
+  timeoutIdsRef: MutableRefObject<Set<ReturnType<typeof setTimeout>>>;
+  roundtableChatsRef: MutableRefObject<RoundtableChat[]>;
+  // Cleanup
+  cleanup: () => void;
+}
+```
+
+**Initialization Flow:**
+1. `usePersistedState` loads 5 core datasets in parallel
+2. After all `loaded` flags are true (`coreDataLoaded`)
+3. Execute `initApp`: Skills merge -> MCP auto-connect -> Custom providers -> Credential refresh -> Model cache -> OAuth service -> Analytics service
+4. `setInitDone(true)` -> `isDataLoaded = coreDataLoaded && initDone`
+
+### useAppBootstrap Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-BOOT-001 | Core data load complete | All storage.load succeed | isDataLoaded=true |
+| TC-BOOT-002 | Skills merge | 3 built-in + 2 custom | skills length 5, built-in first |
+| TC-BOOT-003 | MCP auto-connect | Server with autoStart=true | Calls mcp_connect + mcp_list_tools |
+| TC-BOOT-004 | Custom provider load | customProviderStorage returns data | providers include custom providers |
+| TC-BOOT-005 | Expired Token auto-refresh | Has expired OAuth credential | Calls tokenRefresher.refreshToken |
+| TC-BOOT-006 | Token refresh failure callback | refreshToken fails | Provider status becomes disconnected, shows toast |
+| TC-BOOT-007 | Token refresh success callback | refreshToken succeeds | Provider status becomes connected |
+| TC-BOOT-008 | Cleanup on unmount | Unmount | Clears timers, stops tokenRefresher, cancels event listeners |
+| TC-BOOT-009 | Skills save | setSkills update | skillsStorage.save is called |
+| TC-BOOT-010 | Init failure non-blocking | initApp throws exception | isDataLoaded still true |
+
+### useChatStream (v4.1.48)
+
+Chat streaming output Hook, streaming message processing logic extracted from App.tsx. Responsible for event listening, RAF batch updates, and content accumulation.
+
+**File Path:** `src/hooks/useChatStream.ts`
+
+**Problems Solved:**
+- Streaming output logic mixed with UI logic in handleSendMessage (~1000 lines)
+- RAF batch updates, event listeners, cleanup logic scattered
+- Complex management of pendingContentRef, rafIdRef, unlistenMapRef
+
+**Responsibilities:**
+1. Register `listen('chat-event')` event listener
+2. Handle `chunk`/`reasoning_chunk` events, accumulate content to pendingContentRef
+3. RAF batch updates: scheduleUpdate + flushPendingUpdates
+4. Handle `done`/`error` events, trigger callbacks
+5. Manage unlistenMapRef, support stop generation
+6. Clean up all listeners and RAF on component unmount
+
+**Not Included:**
+- Tool call loop (kept in handleSendMessage, complex business logic)
+- Token validation, message building (business logic)
+- Roundtable streaming output (independent scenario, not extracted for now)
+
+```typescript
+/** Hook configuration options */
+interface UseChatStreamOptions {
+  chatId: string;
+  onChunk: (data: { messageId: string; content: string; reasoning: string }) => void;
+  onDone: (data: { messageId: string; usage?: TokenUsage }) => void;
+  onError: (error: string) => void;
+  onToolCalls?: (toolCalls: ToolCall[]) => Promise<void>;
+}
+
+/** Hook return value */
+interface UseChatStreamReturn {
+  startListening: () => Promise<UnlistenFn>;
+  stopListening: () => void;
+  flushPending: () => void;
+}
+```
+
+**Usage Example:**
+
+```typescript
+const { startListening, stopListening, flushPending } = useChatStream({
+  chatId: 'chat-123',
+  onChunk: ({ messageId, content, reasoning }) => {
+    // Update message content
+    setChats(prev => prev.map(c =>
+      c.id === chatId ? {
+        ...c,
+        messages: c.messages.map(m =>
+          m.id === messageId ? { ...m, content, reasoning } : m
+        )
+      } : c
+    ));
+  },
+  onDone: ({ messageId, usage }) => {
+    // Update token usage, set generation complete
+    setGenerating(chatId, false);
+  },
+  onError: (error) => {
+    // Show error message
+    addErrorMessage(chatId, error);
+  },
+});
+
+// Start listening
+const unlisten = await startListening();
+
+// Stop generation
+stopListening();
+```
+
+### useChatStream Test Cases
+
+| Case ID | Scenario | Input | Expected Result |
+|---------|----------|-------|-----------------|
+| TC-STREAM-001 | Register event listener | startListening | listen('chat-event') is called |
+| TC-STREAM-002 | chunk event accumulation | Receive chunk event | Content accumulated to pendingContentRef |
+| TC-STREAM-003 | RAF batch update | Multiple chunks arrive rapidly | Only triggers onChunk once (RAF merge) |
+| TC-STREAM-004 | done event trigger | Receive done event | Calls flushPending + onDone |
+| TC-STREAM-005 | error event trigger | Receive error event | Calls flushPending + onError |
+| TC-STREAM-006 | Stop listening | stopListening | Cancels event listener, RAF, cleans refs |
+| TC-STREAM-007 | Cleanup on unmount | Unmount | Cleans all listeners and RAF |
+| TC-STREAM-008 | Manual flush | flushPending | Immediately triggers onChunk |
+
+---
+
+<a id="中文"></a>
+
+## 模块概述
 
 Settings模块提供系统配置、通知管理和导入导出功能。
 
@@ -15,7 +621,7 @@ Settings模块提供系统配置、通知管理和导入导出功能。
 
 ---
 
-## 🎯 功能列表
+## 功能列表
 
 ### 通用设置 (General)
 - [x] 主题切换 (Light/Dark/System)
@@ -46,7 +652,7 @@ Settings模块提供系统配置、通知管理和导入导出功能。
 
 ---
 
-## 🏗️ 组件结构
+## 组件结构
 
 ```
 Settings/
@@ -68,7 +674,7 @@ theme/
 
 ---
 
-## 📐 数据结构
+## 数据结构
 
 ### Theme (v2.3.0)
 
@@ -117,7 +723,7 @@ interface ImportOptions {
 
 ---
 
-## 📐 API 接口
+## API 接口
 
 ### 数据管理
 目前主要通过 `src/services/storage.ts` 和前端逻辑实现。
@@ -154,7 +760,7 @@ Settings 持久化已迁移到 Rust 后端，解决 Dev/Build 环境数据不一
 
 ---
 
-## 🧪 测试用例
+## 测试用例
 
 ### 主题持久化测试 (v2.6.0)
 
@@ -261,24 +867,24 @@ Settings 持久化已迁移到 Rust 后端，解决 Dev/Build 环境数据不一
 
 ---
 
-## 📝 修改历史
+## 修改历史
 
-| 日期 | 版本 | 修改人 | 修改内容 |
-|------|------|--------|---------|
-| 2026-01-18 | 1.0.0 | - | 初始版本 |
-| 2026-01-23 | 2.3.0 | - | ThemeProvider 重构，主题/语言持久化修复，存储进度条动态计算 |
-| 2026-01-24 | 2.6.0 | - | Settings Tauri 持久化，解决 Dev/Build 数据不一致问题 |
-| 2026-01-24 | 2.6.1 | - | 修复导出功能不完全：1) MCP 键名修正为 mobaus_mcp_servers；2) 新增 Models 导出支持 |
-| 2026-01-24 | 2.6.2 | - | 导出功能增强：1) 修复对话导出使用 storage 服务；2) 添加导出成功提示；3) Tauri 环境使用文件对话框选择保存位置；4) 导入提示改用 Tauri message dialog 解决 alert 无法关闭问题 |
-| 2026-01-24 | 2.6.3 | - | 导入功能修复：使用 storage services 保存数据，确保 Tauri 环境正确持久化到文件系统 |
-| 2026-01-24 | 2.6.4 | - | 导入合并去重：根据 ID 去重，相同 ID 的记录用导入数据覆盖，避免重复导入 |
-| 2026-01-25 | 2.6.5 | - | 1) 清理数据功能完善：Tauri 环境使用 storage services 清理文件系统数据；2) 导出功能增强：新增 Roundtable Chats 和 Settings 导出支持 |
-| 2026-01-25 | 2.6.6 | - | 清理数据弹窗修复：Tauri 环境使用 message dialog 替代 alert，解决重复弹窗问题 |
-| 2026-01-28 | 3.0.25 | - | 导入增强：Agent 导入时自动创建缺失的 Skills 和 MCP 依赖资源，对于缺失的 Model 记录警告日志 |
+| 日期 | 版本 | 修改内容 |
+|------|------|---------|
+| 2026-01-18 | 1.0.0 | 初始版本 |
+| 2026-01-23 | 2.3.0 | ThemeProvider 重构，主题/语言持久化修复，存储进度条动态计算 |
+| 2026-01-24 | 2.6.0 | Settings Tauri 持久化，解决 Dev/Build 数据不一致问题 |
+| 2026-01-24 | 2.6.1 | 修复导出功能不完全：1) MCP 键名修正为 mobaus_mcp_servers；2) 新增 Models 导出支持 |
+| 2026-01-24 | 2.6.2 | 导出功能增强：1) 修复对话导出使用 storage 服务；2) 添加导出成功提示；3) Tauri 环境使用文件对话框选择保存位置；4) 导入提示改用 Tauri message dialog 解决 alert 无法关闭问题 |
+| 2026-01-24 | 2.6.3 | 导入功能修复：使用 storage services 保存数据，确保 Tauri 环境正确持久化到文件系统 |
+| 2026-01-24 | 2.6.4 | 导入合并去重：根据 ID 去重，相同 ID 的记录用导入数据覆盖，避免重复导入 |
+| 2026-01-25 | 2.6.5 | 1) 清理数据功能完善：Tauri 环境使用 storage services 清理文件系统数据；2) 导出功能增强：新增 Roundtable Chats 和 Settings 导出支持 |
+| 2026-01-25 | 2.6.6 | 清理数据弹窗修复：Tauri 环境使用 message dialog 替代 alert，解决重复弹窗问题 |
+| 2026-01-28 | 3.0.25 | 导入增强：Agent 导入时自动创建缺失的 Skills 和 MCP 依赖资源，对于缺失的 Model 记录警告日志 |
 
 ---
 
-## 🔧 实现细节
+## 实现细节
 
 ### ThemeProvider (v2.6.0)
 
@@ -597,4 +1203,3 @@ stopListening();
 | TC-STREAM-006 | 停止监听 | stopListening | 取消事件监听、RAF、清理 refs |
 | TC-STREAM-007 | 卸载时清理 | unmount | 清理所有监听器和 RAF |
 | TC-STREAM-008 | 手动 flush | flushPending | 立即触发 onChunk |
-

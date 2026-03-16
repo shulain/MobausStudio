@@ -1,4 +1,540 @@
-# Google 协议 Thought Signature 修复
+# Google Protocol Thought Signature Fix / Google 协议 Thought Signature 修复
+
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Problem Description
+
+### Problem 1: 400 Error on First Message Send
+
+**Error Message:**
+```
+API Error 400 Bad Request: {
+  "error": {
+    "code": 400,
+    "message": "Function call is missing a thought_signature in functionCall parts..."
+  }
+}
+```
+
+**Cause:**
+- Google Gemini API requires all functionCall parts to include `thoughtSignature`
+- No historical thought_signature available on the first request
+- Results in API returning 400 error
+
+### Problem 2: Guaranteed 429 Error After Tool Call Completion
+
+**Cause:**
+- Request after tool call is missing thought_signature
+- Triggers endpoint degradation and retries
+- May cause quota to be consumed too quickly
+
+### Problem 3: Empty thought_signature Causing Cache Miss (v0.9.2.2)
+
+**Error Message:**
+```
+Function call is missing a thought_signature in functionCall parts.
+```
+
+**Cause:**
+- Frontend may pass back empty string or null `thought_signature`
+- Original logic: `if let Some(ts) = tc.get("thought_signature")` would match empty values
+- Would not enter the `else` branch to retrieve from cache
+- Resulting request is missing `thoughtSignature`
+
+**Fix:**
+```rust
+// Before fix
+if let Some(ts) = tc.get("thought_signature") {
+    if ts.is_string() && !ts.as_str().unwrap_or("").is_empty() {
+        fc["thoughtSignature"] = ts.clone();
+    }
+} else {
+    // Only reaches here when completely absent
+    Retrieve from cache...
+}
+
+// After fix
+let has_valid_signature = tc.get("thought_signature")
+    .and_then(|ts| ts.as_str())
+    .map(|s| !s.is_empty())
+    .unwrap_or(false);
+
+if has_valid_signature {
+    fc["thoughtSignature"] = tc["thought_signature"].clone();
+} else {
+    // Both empty and absent values reach here
+    Retrieve from cache...
+}
+```
+
+### Problem 4: 400 Error When Cache Misses (v0.9.2.4)
+
+**Error Message:**
+```
+API Error 400 Bad Request: {
+  "error": {
+    "code": 400,
+    "message": "Function call is missing a thought_signature in functionCall parts..."
+  }
+}
+```
+
+**Cause:**
+- Session cache expired or cleared, causing cache miss
+- Original logic only logged a warning without injecting any `thoughtSignature`
+- Google API requires all functionCall parts to include `thoughtSignature`
+
+**Fix: Add Global Fallback Signature Mechanism**
+```rust
+// Update global fallback signature when caching (only keep the longest signature)
+pub fn cache_session_signature(&self, session_id: &str, signature: String) {
+    // ... session cache logic ...
+
+    // Also update global fallback signature
+    if let Ok(mut global) = get_global_signature_storage().lock() {
+        let should_update = match &*global {
+            None => true,
+            Some(existing) => signature.len() > existing.len(),
+        };
+        if should_update {
+            *global = Some(signature);
+        }
+    }
+}
+
+// Prefer session cache when retrieving, fall back to global fallback
+pub fn get_session_signature(&self, session_id: &str) -> Option<String> {
+    // Prefer session cache
+    if let Some(entry) = cache.get(session_id) {
+        return Some(entry.value.clone());
+    }
+
+    // Use global fallback signature when session cache misses
+    if let Some(fallback_sig) = global.as_ref() {
+        return Some(fallback_sig.clone());
+    }
+
+    None
+}
+```
+
+### Problem 5: functionCall/functionResponse Order Error (v0.9.2.6)
+
+**Error Message:**
+```
+API Error 400 Bad Request: {
+  "error": {
+    "code": 400,
+    "message": "Please ensure that function response turn comes immediately after a function call turn"
+  }
+}
+```
+
+**Cause:**
+- When user clicks the "Continue" button, frontend inserts a new user message
+- This message is inserted between functionCall and functionResponse
+- Google API strictly requires functionResponse to immediately follow functionCall
+
+**Fix: Add Message Order Validation**
+```rust
+// Validate and adjust message order
+let mut validated_contents: Vec<serde_json::Value> = Vec::new();
+let mut pending_function_call: Option<serde_json::Value> = None;
+
+for entry in contents.iter() {
+    let has_fc = entry.get("parts")
+        .and_then(|p| p.as_array())
+        .map(|arr| arr.iter().any(|p| p.get("functionCall").is_some()))
+        .unwrap_or(false);
+
+    let has_fr = entry.get("parts")
+        .and_then(|p| p.as_array())
+        .map(|arr| arr.iter().any(|p| p.get("functionResponse").is_some()))
+        .unwrap_or(false);
+
+    if has_fc {
+        // Save functionCall, wait for functionResponse
+        pending_function_call = Some(entry.clone());
+    } else if has_fr {
+        // Found functionResponse, add the previous functionCall first
+        if let Some(pending) = pending_function_call.take() {
+            validated_contents.push(pending);
+        }
+        validated_contents.push(entry.clone());
+    } else if role == "user" && pending_function_call.is_some() {
+        // Skip user messages that break functionCall/functionResponse order
+        warn!("[chat_stream_google] Skipping user message that breaks functionCall/functionResponse order");
+        continue;
+    } else {
+        validated_contents.push(entry.clone());
+    }
+}
+```
+
+### Problem 6: Claude API Error Response Displays Garbled Text (v0.9.2.7)
+
+**Error Message:**
+```
+⚠️ Request failed: API Error 400 Bad Request: �������4�� �0D咵Hv�...
+```
+
+**Cause:**
+- Anthropic API error responses may be gzip compressed or in binary format
+- Original logic directly used `response.text().await` to parse
+- Binary data was incorrectly interpreted as UTF-8 text
+
+**Fix: Improve Error Response Handling**
+```rust
+// Read as bytes first
+let err_bytes = response.bytes().await.unwrap_or_default();
+
+// Try to parse as JSON
+let err_text = if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&err_bytes) {
+    serde_json::to_string_pretty(&json)
+        .unwrap_or_else(|_| String::from_utf8_lossy(&err_bytes).to_string())
+} else {
+    // Try to parse as UTF-8 text
+    match String::from_utf8(err_bytes.to_vec()) {
+        Ok(s) => s,
+        Err(_) => {
+            // If binary data, display byte info
+            format!(
+                "Binary response ({} bytes, first 50 bytes): {:?}",
+                err_bytes.len(),
+                &err_bytes[..err_bytes.len().min(50)]
+            )
+        }
+    }
+};
+```
+
+### Problem 7: Claude API Error Response gzip Compression (v0.9.2.8)
+
+**Error Message:**
+```
+⚠️ Request failed: API Error 400 Bad Request: Binary response (169 bytes, first 50 bytes): [31, 139, 8, 0, 0, 0, 0, 0, 0, 3, 52, 141, 65, 10, 131, 48, 20, 68, 175, 242, 201, 90, 68, 139, 197, 226, 174, 180, 120, 6, 237, 38, 196, 228, 183, 126, 106, 18, 77, 162, 85, 196, 187, 215, 66, 93, 13, 111, 120, 204]
+```
+
+**Cause:**
+- v0.9.2.7 could identify binary data but did not decompress it
+- Byte sequence `[31, 139, 8, 0...]` is the gzip magic number
+- Anthropic API may return gzip-compressed error responses in some cases
+
+**Fix: Add gzip Decompression Support**
+```rust
+// Check if gzip compressed (magic number: 0x1f 0x8b)
+let decompressed_bytes = if err_bytes.len() >= 2 && err_bytes[0] == 0x1f && err_bytes[1] == 0x8b {
+    debug!("[chat_stream_anthropic] Detected gzip compressed response, attempting decompression");
+    match decompress_gzip(&err_bytes) {
+        Ok(data) => {
+            debug!("[chat_stream_anthropic] gzip decompression successful, original {} bytes -> {} bytes",
+                err_bytes.len(), data.len());
+            data
+        }
+        Err(e) => {
+            warn!("[chat_stream_anthropic] gzip decompression failed: {}", e);
+            err_bytes.to_vec()
+        }
+    }
+} else {
+    err_bytes.to_vec()
+};
+
+// Decompression helper function
+fn decompress_gzip(data: &[u8]) -> Result<Vec<u8>, String> {
+    use flate2::read::GzDecoder;
+    let mut decoder = GzDecoder::new(data);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)
+        .map_err(|e| format!("gzip decompression failed: {}", e))?;
+    Ok(decompressed)
+}
+```
+
+**Dependency Changes:**
+- Added `flate2 = "1.0"` to Cargo.toml
+- Added `use std::io::Read;` to lib.rs
+
+### Problem 8: Claude API cache_control Exceeds Limit (v0.9.2.9)
+
+**Error Message:**
+```json
+{
+  "error": {
+    "message": "A maximum of 4 blocks with cache_control may be provided. Found 22.",
+    "type": "invalid_request_error"
+  },
+  "request_id": "req_011CYZyY7wo62LuuwaAjRdKS",
+  "type": "error"
+}
+```
+
+**Cause:**
+- Original logic added `cache_control` to all system blocks, all assistant messages, all user messages, and all tools
+- When message count is high, cache_control block count far exceeds Anthropic's limit of 4
+- Anthropic API requires a maximum of 4 blocks with cache_control
+
+**Fix: Optimize cache_control Usage Strategy**
+```rust
+// Strategy: system(1) + tools(1) + last 2 messages(2) = 4 total
+
+// 1. Only add cache_control to the last system block
+if let Some(last) = system_content.last_mut() {
+    last["cache_control"] = serde_json::json!({ "type": "ephemeral" });
+}
+
+// 2. Only add cache_control to the last tool
+if let Some(last_tool) = anthropic_tools.last_mut() {
+    last_tool["cache_control"] = serde_json::json!({ "type": "ephemeral" });
+}
+
+// 3. Only add cache_control to the last content block of the last 2 messages
+let cache_message_count = 2.min(messages.len());
+for msg in messages.iter_mut().rev().take(cache_message_count) {
+    if let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) {
+        if let Some(last_block) = content.last_mut() {
+            // Only add to text or tool_result type blocks
+            let block_type = last_block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            if block_type == "text" || block_type == "tool_result" {
+                last_block["cache_control"] = serde_json::json!({ "type": "ephemeral" });
+            }
+        }
+    }
+}
+```
+
+**Optimization Results:**
+- Regardless of message count, cache_control block count is always <= 4
+- Prioritizes caching the most important content: system prompt, tools, recent conversation
+- Complies with Anthropic's best practices and API limits
+
+### Problem 9: Claude API Streaming Response gzip Compression Prevents Parsing (v0.9.2.10)
+
+**Symptoms:**
+- Request returns 200 OK successfully
+- Chunk data received, but content is garbled (gzip-compressed binary data)
+- Unable to parse SSE events, frontend keeps showing "Waiting for generation"
+
+**Cause:**
+- In OAuth mode, `Accept-Encoding: gzip, deflate` header was manually set
+- Server returns gzip-compressed streaming response
+- Because the header was manually set, reqwest does not automatically decompress
+- Received chunks are compressed binary data that cannot be parsed as SSE text
+
+**Fix: Remove Manually Set Accept-Encoding Header**
+```rust
+// Before fix
+.header("Accept-Encoding", "gzip, deflate")
+
+// After fix (removed the line)
+// v0.9.2.10: Remove manual Accept-Encoding, let reqwest handle gzip decompression automatically
+// .header("Accept-Encoding", "gzip, deflate")
+```
+
+**Principle:**
+- reqwest automatically adds `Accept-Encoding` header by default
+- And automatically decompresses gzip/deflate responses
+- Manual setting overrides the default behavior, preventing automatic decompression
+
+**Optimization Results:**
+- Streaming responses are automatically decompressed, receiving readable SSE text
+- SSE events parsed correctly (message_start, content_block_delta, etc.)
+- Frontend displays streaming output normally
+
+## Solution
+
+### 1. Thought Signature Caching Mechanism
+
+Implemented a global cache to manage thought_signature:
+
+```rust
+// Cache structure
+pub struct SignatureCache {
+    session_signatures: Mutex<HashMap<String, CacheEntry>>,
+}
+
+// Usage
+SignatureCache::global().cache_session_signature(session_id, signature);
+SignatureCache::global().get_session_signature(session_id);
+```
+
+**Features:**
+- Session-level cache (using message_id as session_id)
+- 30-minute expiration time
+- Minimum signature length validation (10 characters)
+- Default placeholder (used when cache is empty)
+
+### 2. Inject Thought Signature on Request
+
+When building functionCall, if thought_signature is missing, retrieve from cache:
+
+```rust
+// If frontend didn't pass thought_signature
+if let Some(ts) = tc.get("thought_signature") {
+    fc["thoughtSignature"] = ts.clone();
+} else {
+    // Retrieve from cache
+    if let Some(sig) = SignatureCache::global().get_session_signature(&msg_id) {
+        fc["thoughtSignature"] = json!(sig);
+    }
+}
+```
+
+### 3. Cache Thought Signature on Response
+
+When parsing the response, cache the thought_signature returned by the API:
+
+```rust
+if let Some(ts) = part.get("thoughtSignature") {
+    tc["thought_signature"] = ts.clone();
+    // Cache for subsequent requests
+    if let Some(sig_str) = ts.as_str() {
+        SignatureCache::global().cache_session_signature(&msg_id, sig_str.to_string());
+    }
+}
+```
+
+## Implementation Details
+
+### File Changes
+
+**New Files:**
+- `src-tauri/src/signature_cache.rs` - Thought Signature cache implementation
+
+**Modified Files:**
+- `src-tauri/src/lib.rs`
+  - Added signature_cache module
+  - Defined msg_id at the beginning of `chat_stream_google` function
+  - Inject thought_signature on request (both OAuth and API Key modes)
+  - Cache thought_signature on response (both OAuth and API Key modes)
+
+### Caching Strategy
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Expiration Time | 30 minutes | Avoid long-term memory usage |
+| Minimum Length | 10 characters | Filter invalid signatures |
+| Cache Miss | Returns None | Do not inject thought_signature |
+
+**Important:** When cache misses, `None` is returned instead of a default placeholder. This is because Google API requires `thought_signature` to be valid Base64-encoded byte data, and invalid placeholders would cause 400 errors.
+
+### Workflow
+
+```
+First request (no tool call):
+  User message -> API -> Returns response -> No thought_signature
+
+First tool call:
+  User message -> API -> Returns functionCall + thoughtSignature
+  -> Cache thoughtSignature -> Send to frontend
+
+Tool result return (cache hit):
+  Frontend sends functionResponse -> Backend checks cache
+  -> Inject thoughtSignature -> API -> Success ✓
+
+Tool result return (cache miss):
+  Frontend sends functionResponse -> Backend checks cache
+  -> Cache miss, no injection -> API -> May return 400 error
+  -> User needs to restart conversation
+
+Subsequent tool calls:
+  Use cached thoughtSignature -> API -> Success ✓
+```
+
+**Note:** If cache expires or is cleared, tool calls may fail. It is recommended that users periodically save conversation state during long conversations.
+
+## Test Results
+
+### Unit Tests
+
+All tests passed (52/52, including 4 signature_cache tests)
+
+**signature_cache module tests:**
+- `test_cache_and_retrieve`: Cache and retrieval functionality
+- `test_global_fallback`: Global fallback signature mechanism (v0.9.2.4)
+- `test_global_fallback_prefers_longer`: Prefers longer global fallback signature (v0.9.2.4)
+- `test_min_length_filter`: Minimum length filter (10 characters)
+
+**Other module tests:**
+- Google protocol related: 8 tests
+- OpenAI protocol related: 5 tests
+- Protocol abstraction layer: 6 tests
+- MCP transport layer: 5 tests
+- Others: 24 tests
+
+### Integration Tests
+
+Verified in actual usage:
+- First tool call works normally (v0.9.2.4 global fallback signature)
+- Post-tool-call works normally (v0.9.2.5 placeholder filtering)
+- Multi-round tool calls work normally (v0.9.2.2 empty value handling)
+- functionCall/functionResponse order is correct (v0.9.2.6)
+- cache_control limited to 4 or fewer (v0.9.2.9)
+- Streaming response parsed normally (v0.9.2.10 gzip auto-decompression)
+
+## Usage Instructions
+
+### No Frontend Changes Required
+
+The fix is entirely implemented in the backend; no frontend code changes are needed.
+
+### Log Monitoring
+
+Optimized logs display thought_signature caching and injection information:
+
+```
+[SignatureCache] Cached session signature: msg_123 (length: 256)
+[chat_stream_google] Injected thought_signature from cache (length: 256)
+[SignatureCache] Session signature hit: msg_123 (length: 256)
+```
+
+### Clear Cache
+
+To clear the cache (usually not needed):
+
+```rust
+signature_cache::SignatureCache::global().clear();
+```
+
+## Performance Impact
+
+- **Memory Usage**: ~256 bytes per session
+- **CPU Overhead**: Negligible (HashMap lookup)
+- **Latency Impact**: None (synchronous operation)
+
+## Future Optimizations
+
+1. **Persistent Cache**: Save cache to disk so it survives application restarts
+2. **Smart Expiration**: Dynamically adjust expiration time based on usage frequency
+3. **Multi-model Support**: Different models use different caching strategies
+
+## References
+
+- Antigravity-Manager SignatureCache implementation
+- Google Gemini API Thought Signature documentation
+- https://ai.google.dev/gemini-api/docs/thought-signatures
+
+## Change Log
+
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2026-02-28 | v0.9.2 | Implemented Thought Signature caching mechanism | - |
+| 2026-02-28 | v0.9.2.1 | Fixed Base64 decoding error caused by default placeholder | - |
+| 2026-02-28 | v0.9.2.2 | Fixed cache miss caused by empty thought_signature | - |
+| 2026-02-28 | v0.9.2.3 | Cleaned invalid thought_signature placeholders from historical messages | - |
+| 2026-02-28 | v0.9.2.4 | Added global fallback signature mechanism to resolve 400 errors on cache miss | - |
+| 2026-02-28 | v0.9.2.5 | Filtered invalid thought_signature placeholders from frontend, completely resolved 400 errors | - |
+| 2026-02-28 | v0.9.2.6 | Fixed functionCall/functionResponse order issue, prevented user message interruption | - |
+| 2026-02-28 | v0.9.2.7 | Optimized Claude API error response handling, resolved garbled text display | - |
+| 2026-02-28 | v0.9.2.8 | Added gzip decompression support, fully parsed Claude API compressed error responses | - |
+| 2026-02-28 | v0.9.2.9 | Optimized cache_control usage strategy, limited to max 4 blocks to avoid API errors | - |
+| 2026-02-28 | v0.9.2.10 | Fixed streaming response gzip compression issue, removed manual Accept-Encoding header | - |
+
+---
+
+<a id="中文"></a>
 
 ## 问题描述
 
@@ -445,7 +981,7 @@ if let Some(ts) = part.get("thoughtSignature") {
 
 ### 单元测试
 
-✅ 所有测试通过（52/52，包括 signature_cache 的 4 个测试）
+所有测试通过（52/52，包括 signature_cache 的 4 个测试）
 
 **signature_cache 模块测试：**
 - `test_cache_and_retrieve`: 缓存和检索功能
@@ -462,7 +998,7 @@ if let Some(ts) = part.get("thoughtSignature") {
 
 ### 集成测试
 
-✅ 实际使用验证通过：
+实际使用验证通过：
 - 首次工具调用正常工作（v0.9.2.4 全局降级签名）
 - 工具调用完成后正常工作（v0.9.2.5 占位符过滤）
 - 多轮工具调用正常工作（v0.9.2.2 空值处理）

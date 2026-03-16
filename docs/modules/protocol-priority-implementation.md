@@ -1,4 +1,167 @@
-# 协议优先级实现记录 (v0.9.5)
+# Protocol Priority Implementation Record (v0.9.5) / 协议优先级实现记录 (v0.9.5)
+
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Implementation Date
+2026-03-09
+
+## Background
+
+Users requested that the config-switcher should obtain provider information from protocol configuration instead of model configuration when synchronizing provider logic.
+
+## Protocol Priority Rules
+
+Based on the `getEffectiveProtocol()` function in `src/data/protocols.ts`, the protocol priority is:
+
+1. **Model-specified protocol** (`model.protocol`) - Highest priority
+2. **Provider default protocol** (`PROVIDER_DEFAULT_PROTOCOL[providerId]`) - Medium priority
+3. **Inferred protocol** (`getDefaultProtocol(providerId)`) - Lowest priority (fallback)
+
+## Implementation Plan
+
+### 1. Frontend Changes
+
+**File**: `src/components/features/ConfigSwitcher/index.tsx`
+
+**Changes**:
+1. Import protocol-related functions:
+   ```typescript
+   import { getDefaultProtocol, getEffectiveProtocol } from '../../../data/protocols';
+   ```
+
+2. Use protocol priority logic in the `handleEnable` function:
+   ```typescript
+   // Get the provider's default protocol
+   const providerDefaultProtocol = getDefaultProtocol(providerId);
+
+   // When preparing the model list, use protocol priority logic
+   const models = providerModels.reduce((acc, model) => {
+     const effectiveProtocol = getEffectiveProtocol(
+       model.protocol,           // Model protocol (highest priority)
+       providerDefaultProtocol,  // Provider default protocol
+       providerId                // For inference (fallback)
+     );
+
+     // Use modelId as key (the model's real identifier), fall back to id if not available
+     const modelKey = model.modelId || model.id;
+     acc[modelKey] = {
+       name: model.name,
+       endpoint: model.endpoint,
+       protocol: effectiveProtocol,
+     };
+     return acc;
+   }, {});
+   ```
+
+**Important Fix (v0.9.5.2)**:
+- **Corrected OpenCode configuration format** (compliant with official specification):
+  1. Removed `endpoint` and `protocol` fields from the models object
+  2. Models object now only contains empty configuration: `{ "model-id": {} }`
+  3. `endpoint` is configured at the provider level in `options.baseURL`
+  4. `protocol` is used for selecting npm packages (`@ai-sdk/anthropic`, `@ai-sdk/openai-compatible`, etc.)
+- **Corrected model ID usage**:
+  1. Prefer `model.modelId` (the model's real identifier, e.g., `claude-opus-4-6`)
+  2. If `modelId` doesn't exist, normalize `model.name` to ID format (lowercase, spaces replaced with hyphens)
+  3. No longer use `model.id` (internal UUID or timestamp) as fallback
+- Example: `"Claude Opus 4.6"` -> key: `"claude-opus-4.6"`, value: `{}`
+
+### 2. Backend Unchanged
+
+The backend's `export_provider_with_name` function already supports extracting protocol from model data, no changes needed.
+
+### 3. Documentation Update
+
+**File**: `docs/modules/config-switcher.md`
+
+**Changes**:
+1. Updated configuration flow diagram, added protocol priority decision step
+2. Added change record: v4.2.0 - Protocol priority implementation
+
+## Test Verification
+
+### Protocol Configuration Tests
+```bash
+npm test -- src/test/data/protocols.test.ts --run
+```
+Result: 35 tests all passed
+
+### ConfigSwitcher Component Tests
+```bash
+npm test -- src/test/components/ConfigSwitcher --run
+```
+Result: 25 tests all passed
+
+### Full Test Suite
+```bash
+npm test -- --run
+```
+Result: 1474 tests all passed
+
+## Protocol Mapping Examples
+
+Based on the `PROVIDER_DEFAULT_PROTOCOL` definition:
+
+| Provider ID | Default Protocol | Description |
+|-------------|-----------------|-------------|
+| openai | openai | OpenAI Chat Completions API |
+| deepseek | openai | DeepSeek uses OpenAI-compatible protocol |
+| groq | openai | Groq uses OpenAI-compatible protocol |
+| anthropic | anthropic | Anthropic Messages API |
+| google | google | Google Gemini API |
+| kiro | aws | Kiro uses AWS Bedrock protocol |
+| bedrock | aws | AWS Bedrock API |
+| custom | openai | Custom providers default to OpenAI protocol |
+
+## Runtime Example
+
+From the test logs, the protocol priority logic works correctly:
+
+```
+[ConfigSwitcher] All models: [
+  {
+    id: 'claude-opus-4-6',
+    name: 'Claude Opus 4.6',
+    provider: 'anthropic',
+    endpoint: 'https://api.anthropic.com',
+    protocol: 'anthropic'
+  }
+]
+[ConfigSwitcher] Provider default protocol: anthropic
+[ConfigSwitcher] Formatted models with protocols: {
+  'claude-opus-4-6': {
+    name: 'Claude Opus 4.6',
+    endpoint: 'https://api.anthropic.com',
+    protocol: 'anthropic'
+  }
+}
+```
+
+## Advantages
+
+1. **Unified Management**: Protocol configuration is centralized in `src/data/protocols.ts` for easy maintenance
+2. **Flexibility**: Supports model-level protocol overrides
+3. **Fallback Mechanism**: Even if neither model nor provider specifies a protocol, it can be inferred via `getDefaultProtocol`
+4. **Type Safety**: Uses TypeScript's `ProtocolType` type to ensure protocol value correctness
+
+## Related Files
+
+- `src/data/protocols.ts` - Protocol configuration and utility functions
+- `src/components/features/ConfigSwitcher/index.tsx` - ConfigSwitcher main page
+- `src/types/index.ts` - Type definitions (ProtocolType, AIProvider, AIModelConfig)
+- `docs/modules/config-switcher.md` - ConfigSwitcher module documentation
+- `src/test/data/protocols.test.ts` - Protocol configuration tests
+
+## Future Optimization Suggestions
+
+1. Consider displaying the currently used protocol in the UI (for debugging)
+2. Support users manually selecting protocols in the model configuration interface
+3. Add protocol compatibility checks (e.g., some models may not support certain protocols)
+
+---
+
+<a id="中文"></a>
 
 ## 实现日期
 2026-03-09

@@ -1,6 +1,368 @@
-# Token 消耗优化 (v4.1.38)
+# Token Consumption Optimization / Token 消耗优化 (v4.1.38)
 
-## 📋 优化概述
+> [English](#english) | [中文](#中文)
+
+<a id="english"></a>
+
+## Optimization Overview
+
+Implements a sliding window mechanism to limit history message count, addressing the quadratic token growth problem in long conversation scenarios.
+
+| Property | Value |
+|----------|-------|
+| Optimization Module | `src/utils/chatUtils.ts` |
+| Implementation Date | 2026-02-28 |
+| Version | v4.1.38 |
+
+---
+
+## Problem Analysis
+
+### Quadratic Growth of Token Consumption
+
+All AI APIs (OpenAI, Anthropic, Google) use a **full context** billing model:
+
+```
+Each API call sends the complete history = historical messages + new message
+```
+
+**Example: Token consumption for 10 conversation rounds**
+
+| Round | New Message | History Accumulated | Sent This Round | Total Consumed |
+|-------|-------------|---------------------|-----------------|----------------|
+| 1 | 100 | 0 | 100 | 100 |
+| 2 | 100 | 100 | 200 | 300 |
+| 3 | 100 | 200 | 300 | 600 |
+| 4 | 100 | 300 | 400 | 1,000 |
+| 5 | 100 | 400 | 500 | 1,500 |
+| ... | ... | ... | ... | ... |
+| 10 | 100 | 900 | 1,000 | 5,500 |
+
+**Actual useful content: 1,000 tokens (10 x 100)**
+**Total consumed: 5,500 tokens**
+**Waste rate: 81.8%**
+
+### Tool Calls Make It Worse
+
+Each round of tool calls requires 2 API requests:
+
+```
+Round 1:
+  - User message: 100 tokens -> sends 100 tokens
+  - Tool continuation: 150 tokens -> sends 250 tokens (100 history + 150 new)
+
+Round 2:
+  - User message: 100 tokens -> sends 350 tokens (250 history + 100 new)
+  - Tool continuation: 150 tokens -> sends 500 tokens (350 history + 150 new)
+
+After 10 rounds total consumed: ~11,000 tokens (2x more than without tool calls)
+```
+
+### Token Explosion in Long Conversations
+
+| Conversation Rounds | Unlimited Consumption | Waste Rate |
+|---------------------|----------------------|------------|
+| 10 rounds | 5.5k tokens | 81.8% |
+| 100 rounds | 505k tokens | 99.0% |
+| 500 rounds | 12.5M tokens | 99.96% |
+
+---
+
+## Optimization Solution
+
+### Sliding Window Mechanism
+
+Keep only the most recent **100** history messages, automatically truncating older messages.
+
+```typescript
+// src/utils/chatUtils.ts
+const MAX_HISTORY_MESSAGES = 100;
+
+// Keep only the most recent 100 messages
+let windowedHistory = historyMessages.slice(-MAX_HISTORY_MESSAGES);
+```
+
+### Tool Call Integrity Guarantee
+
+If the first message in the window is a `tool` message, automatically search backward for the corresponding `assistant` message:
+
+```typescript
+// Check if the first message is a tool result
+if (windowedHistory[0].toolResults) {
+    const firstToolCallId = windowedHistory[0].toolResults[0].callId;
+
+    // Search backward in full history for the assistant message containing this tool_call_id
+    const assistantIndex = historyMessages.findIndex(
+        m => m.toolCalls?.some(tc => tc.id === firstToolCallId)
+    );
+
+    // Start from the assistant message to ensure tool call completeness
+    if (assistantIndex >= 0) {
+        windowedHistory = historyMessages.slice(assistantIndex);
+    }
+}
+```
+
+**Why is this needed?**
+
+The API requires that `tool` messages must have a corresponding `tool_calls`, otherwise it returns a 400 error:
+
+```
+Bad example:
+[
+  { role: 'tool', tool_call_id: 'call_123', content: 'Result' },  // No corresponding tool_calls
+  { role: 'user', content: 'Next' }
+]
+
+Good example:
+[
+  { role: 'assistant', tool_calls: [{ id: 'call_123', ... }] },  // Contains tool_calls
+  { role: 'tool', tool_call_id: 'call_123', content: 'Result' },
+  { role: 'user', content: 'Next' }
+]
+```
+
+---
+
+## Optimization Results
+
+### Token Consumption Comparison
+
+Assuming 500 tokens per round:
+
+| Conversation Rounds | Before Optimization | After Optimization | Savings |
+|---------------------|--------------------|--------------------|---------|
+| 10 rounds | 5.5k | 5.5k | 0% |
+| 50 rounds | 127.5k | 127.5k | 0% |
+| 100 rounds | 505k | 505k | 0% |
+| 200 rounds | 2.01M | 505k | **75%** |
+| 500 rounds | 12.5M | 505k | **96%** |
+| 1000 rounds | 50M | 505k | **99%** |
+
+### Cost Savings
+
+Using Gemini 2.0 Flash as an example ($0.075 / 1M input tokens):
+
+| Conversation Rounds | Cost Before | Cost After | Savings |
+|---------------------|-------------|------------|---------|
+| 100 rounds | $0.038 | $0.038 | $0 |
+| 500 rounds | $0.938 | $0.038 | **$0.90** |
+| 1000 rounds | $3.75 | $0.038 | **$3.71** |
+
+**Heavy users (1000 rounds of conversation) can save 99% in costs!**
+
+---
+
+## Test Cases
+
+### TC-TOKEN-001: Sliding Window Basic Functionality
+
+```typescript
+it('should limit history to 100 messages (sliding window)', () => {
+    // Create 150 history messages
+    const history: Message[] = Array.from({ length: 150 }, (_, i) => ({
+        id: `msg_${i}`,
+        chatId: 'c1',
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: `Message ${i}`,
+        createdAt: new Date(),
+    }));
+
+    const result = buildApiMessages(history, 'New message', []);
+
+    // Should only keep the most recent 100 history + 1 current message = 101 messages
+    expect(result).toHaveLength(101);
+    // First message should be the 50th history message (150 - 100 = 50)
+    expect(result[0].content).toBe('Message 50');
+    // Last message is the current message
+    expect(result[100].content).toBe('New message');
+});
+```
+
+### TC-TOKEN-002: Tool Call Integrity Guarantee
+
+```typescript
+it('should preserve tool call integrity when windowing', () => {
+    // Create 110 messages, last few contain tool calls
+    const history: Message[] = [
+        ...Array.from({ length: 108 }, (_, i) => ({ /* normal messages */ })),
+        {
+            id: 'msg_108',
+            role: 'assistant',
+            toolCalls: [{ id: 'call_important', ... }],
+            toolResults: [{ callId: 'call_important', ... }],
+        },
+        { id: 'msg_109', role: 'user', content: 'Thanks' },
+    ];
+
+    const result = buildApiMessages(history, 'Continue', []);
+
+    // Should start from the assistant message containing tool_calls
+    const firstAssistant = result.find(m => m.role === 'assistant' && m.tool_calls);
+    expect(firstAssistant).toBeDefined();
+
+    // Should include the corresponding tool result
+    const toolResult = result.find(m => m.role === 'tool');
+    expect(toolResult).toBeDefined();
+});
+```
+
+### TC-TOKEN-003: Tool Continuation Empty Message Handling
+
+```typescript
+it('should handle empty current message in tool continuation', () => {
+    const history: Message[] = [
+        { id: '1', role: 'user', content: 'Hello' },
+    ];
+
+    // During tool continuation, currentContent and currentAttachments are both empty
+    const result = buildApiMessages(history, '', []);
+
+    // Should only return history messages, not add an empty user message
+    expect(result).toHaveLength(1);
+});
+```
+
+---
+
+## Configuration Guide
+
+### Adjusting Window Size
+
+To modify the window size, edit `src/utils/chatUtils.ts`:
+
+```typescript
+/**
+ * Maximum number of history messages (sliding window size)
+ *
+ * Recommended values:
+ * - 50 messages: Suitable for short conversation scenarios, maximum token savings
+ * - 100 messages: Default value, balances context and cost
+ * - 200 messages: Suitable for scenarios requiring long context
+ */
+const MAX_HISTORY_MESSAGES = 100;  // Modify this value
+```
+
+### Window Size Selection Guide
+
+| Window Size | Use Case | Token Consumption (500 rounds) | Context Retained |
+|-------------|----------|-------------------------------|-----------------|
+| 50 messages | Simple Q&A, code generation | 252.5k tokens | Last 50 rounds |
+| 100 messages | General use (recommended) | 505k tokens | Last 100 rounds |
+| 200 messages | Complex tasks, long context | 1.01M tokens | Last 200 rounds |
+
+---
+
+## Important Notes
+
+### 1. Context Loss
+
+History messages beyond the window size will be truncated, and the AI cannot access earlier conversation content.
+
+**Affected scenarios:**
+- User references conversation content from much earlier
+- Tasks requiring complete conversation history (e.g., summarizing the entire conversation)
+
+**Solutions:**
+- For scenarios requiring complete history, temporarily increase the window size
+- Use message summarization feature (future version)
+
+### 2. Tool Call Chains
+
+If a tool call chain is very long (> 100 rounds), earlier tool calls will be truncated.
+
+**Impact:**
+- Usually not an issue, as tool call results are already reflected in subsequent messages
+- In rare cases, tools may need to be re-executed
+
+### 3. Backend Truncation
+
+The backend (Google/Kiro protocol) also has independent truncation mechanisms:
+
+- Google: 800k characters (~200k tokens)
+- Kiro: Similar limits
+
+**Relationship:**
+- Frontend sliding window is the first line of defense (100 messages)
+- Backend truncation is the second line of defense (prevents exceeding model context window)
+
+---
+
+## Future Optimization Directions
+
+### 1. Intelligent Summarization
+
+Compress old messages into summaries while retaining key information:
+
+```typescript
+const messages = [
+    { role: 'system', content: 'Summary of first 50 rounds: User asked about weather, news, stocks...' },
+    ...most recent 20 original messages
+];
+```
+
+**Effect:**
+- Summary: 500 tokens
+- Most recent 20 messages: ~10k tokens
+- Total: ~10.5k tokens (80% less than complete history)
+
+### 2. Gemini cachedContent API
+
+Google's context caching feature:
+
+```typescript
+// First time: Upload history and cache
+const cache = await createCachedContent({
+    model: 'gemini-2.0-flash',
+    contents: first100Messages,  // Cache first 100 messages
+    ttl: '3600s'
+});
+
+// Subsequent requests: Only send new messages + cache ID
+await generateContent({
+    cachedContent: cache.name,
+    contents: [newMessage]  // Only send new message
+});
+```
+
+**Effect:**
+- Cached messages are billed at 1/10 the price
+- New messages are billed at normal rate
+- Saves 90% token cost
+
+### 3. Dynamic Window Size
+
+Automatically adjust the window based on conversation type:
+
+```typescript
+const windowSize = {
+    'simple-qa': 50,      // Simple Q&A
+    'code-gen': 100,      // Code generation
+    'complex-task': 200,  // Complex tasks
+}[conversationType];
+```
+
+---
+
+## Related Documentation
+
+- [Chat Conversation Module](./chat.md)
+- [Google Protocol Optimization](./google-protocol-optimization.md)
+- [Kiro Message Truncation](./kiro.md)
+
+---
+
+## Change History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-02-28 | 4.1.38 | Initial version: Added sliding window mechanism, limiting history message count to 100 |
+
+---
+
+<a id="中文"></a>
+
+## 优化概述
 
 针对长对话场景的 token 二次增长问题，实施滑动窗口机制限制历史消息数量。
 
@@ -12,7 +374,7 @@
 
 ---
 
-## 🎯 问题分析
+## 问题分析
 
 ### Token 消耗的二次增长
 
@@ -64,7 +426,7 @@
 
 ---
 
-## ✅ 优化方案
+## 优化方案
 
 ### 滑动窗口机制
 
@@ -120,7 +482,7 @@ API 要求 `tool` 消息必须有对应的 `tool_calls`，否则返回 400 错�
 
 ---
 
-## 📊 优化效果
+## 优化效果
 
 ### Token 消耗对比
 
@@ -149,7 +511,7 @@ API 要求 `tool` 消息必须有对应的 `tool_calls`，否则返回 400 错�
 
 ---
 
-## 🧪 测试用例
+## 测试用例
 
 ### TC-TOKEN-001: 滑动窗口基本功能
 
@@ -221,7 +583,7 @@ it('should handle empty current message in tool continuation', () => {
 
 ---
 
-## 📝 配置说明
+## 配置说明
 
 ### 调整窗口大小
 
@@ -249,7 +611,7 @@ const MAX_HISTORY_MESSAGES = 100;  // 修改此值
 
 ---
 
-## ⚠️ 注意事项
+## 注意事项
 
 ### 1. 上下文丢失
 
@@ -284,7 +646,7 @@ const MAX_HISTORY_MESSAGES = 100;  // 修改此值
 
 ---
 
-## 🔄 未来优化方向
+## 未来优化方向
 
 ### 1. 智能摘要
 
@@ -340,7 +702,7 @@ const windowSize = {
 
 ---
 
-## 📚 相关文档
+## 相关文档
 
 - [Chat 对话模块](./chat.md)
 - [Google 协议优化](./google-protocol-optimization.md)
@@ -348,8 +710,8 @@ const windowSize = {
 
 ---
 
-## 📝 修改历史
+## 修改历史
 
-| 日期 | 版本 | 修改人 | 修改内容 |
-|------|------|--------|---------|
-| 2026-02-28 | 4.1.38 | - | 初始版本：添加滑动窗口机制，限制历史消息数量为 100 条 |
+| 日期 | 版本 | 修改内容 |
+|------|------|---------|
+| 2026-02-28 | 4.1.38 | 初始版本：添加滑动窗口机制，限制历史消息数量为 100 条 |
