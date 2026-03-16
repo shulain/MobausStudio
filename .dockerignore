@@ -1,0 +1,29 @@
+# 依赖目录
+node_modules
+
+# 构建产物
+dist
+target
+
+# Tauri 相关
+src-tauri/target
+
+# 开发文件
+*.log
+.git
+.gitignore
+.github
+coverage
+*.md
+!README.md
+
+# IDE
+.vscode
+.idea
+
+# 测试
+tests
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx

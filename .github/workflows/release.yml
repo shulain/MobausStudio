@@ -1,0 +1,300 @@
+# 构建并发布 Release
+#
+# 触发条件：
+# 1. 推送 v* 格式的 tag
+# 2. 手动触发并输入版本号
+#
+# 前置条件（GitHub Secrets）：
+# - APPLE_CERTIFICATE: Apple 开发者证书 (Base64)
+# - APPLE_CERTIFICATE_PASSWORD: 证书密码
+# - APPLE_SIGNING_IDENTITY: 签名身份
+# - APPLE_ID: Apple ID
+# - APPLE_PASSWORD: App-specific password
+# - APPLE_TEAM_ID: Team ID
+# - TAURI_SIGNING_PRIVATE_KEY: Tauri 更新签名私钥
+# - TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 签名私钥密码
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号 (如 0.5.0)"
+        required: true
+
+jobs:
+  # 验证并准备发布
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.content }}
+    steps:
+      - name: 获取版本号
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          # 验证版本号格式
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ 版本号格式错误: $VERSION"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 版本号: $VERSION"
+
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 提取 Changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHANGELOG_FILE="user-guide/en/changelog.md"
+
+          if [ -f "$CHANGELOG_FILE" ]; then
+            CONTENT=$(awk -v ver="$VERSION" '
+              /^## \[/ {
+                if (found) exit
+                if (index($0, "["ver"]")) found=1
+              }
+              found && !/^## \[/ { print }
+            ' "$CHANGELOG_FILE")
+
+            if [ -n "$CONTENT" ]; then
+              echo "$CONTENT" > /tmp/changelog.md
+            else
+              echo "首次发布" > /tmp/changelog.md
+            fi
+          else
+            echo "版本更新" > /tmp/changelog.md
+          fi
+
+          {
+            echo 'content<<EOF'
+            cat /tmp/changelog.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: "MobausStudio v${{ steps.version.outputs.version }}"
+          body: |
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+
+            ## 📥 Download Instructions
+
+            | Platform | File |
+            |------|------|
+            | macOS (Apple Silicon) | `.dmg` (aarch64) |
+            | macOS (Intel) | `.dmg` (x86_64) |
+            | Windows | `.msi` or `.exe` |
+            | Linux (Debian/Ubuntu) | `.deb` |
+            | Linux (Fedora/RHEL) | `.rpm` |
+            | Linux (General) | `.AppImage` |
+
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 构建桌面应用
+  build-desktop:
+    needs: [prepare-release]
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+            target: "x86_64-apple-darwin"
+          - platform: "windows-latest"
+            args: ""
+            target: ""
+          - platform: "ubuntu-22.04"
+            args: ""
+            target: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备构建环境
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if command -v jq &> /dev/null; then
+            jq ".version = \"$VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+            jq ".version = \"$VERSION\"" src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          else
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json && rm -f package.json.bak
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json && rm -f src-tauri/tauri.conf.json.bak
+          fi
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: 安装系统依赖 (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update > /dev/null 2>&1
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf > /dev/null 2>&1
+
+      - name: 安装依赖
+        shell: bash
+        run: npm ci --silent > /dev/null 2>&1
+
+      - name: 导入签名证书 (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "⚠️ 未配置证书，跳过签名"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $RUNNER_TEMP/certificate.p12
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH 2>/dev/null
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH 2>/dev/null
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
+          security list-keychain -d user -s $KEYCHAIN_PATH 2>/dev/null
+
+      - name: 构建应用
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v${{ steps.version.outputs.version }}
+          releaseName: "MobausStudio v${{ steps.version.outputs.version }}"
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # 构建 Web 版本
+  build-web:
+    needs: [prepare-release]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: 构建 Web 版本
+        shell: bash
+        run: |
+          npm ci --silent > /dev/null 2>&1
+          npm run build > /dev/null 2>&1
+
+      - name: 打包并上传
+        run: |
+          cd dist && zip -rq ../MobausStudio-web.zip .
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: MobausStudio-web.zip
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 构建 Docker 镜像
+  build-docker:
+    needs: [prepare-release]
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 设置镜像名称
+        id: image
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+
+          echo "name=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ needs.prepare-release.outputs.version }}
+            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.major_minor }}
+            ${{ steps.image.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false

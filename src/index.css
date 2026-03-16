@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/* 启用基于类的深色模式 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 全局主题过渡 - 确保所有元素同时变色 */
+* {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* 深色模式全局样式 */
+.dark {
+    color-scheme: dark;
+}
+
+.dark body {
+    background-color: #111827;
+    color: #f9fafb;
+}
+
+/* 深色模式下的组件样式覆盖 */
+/* 使用更高特异性选择器确保覆盖 Tailwind 样式 */
+html.dark .bg-white,
+.dark .bg-white {
+    background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-50 {
+    background-color: #111827 !important;
+}
+
+.dark .bg-gray-100 {
+    background-color: #1f2937 !important;
+}
+
+.dark .border-gray-200 {
+    border-color: #374151 !important;
+}
+
+.dark .border-gray-100 {
+    border-color: #374151 !important;
+}
+
+.dark .text-gray-800 {
+    color: #f9fafb !important;
+}
+
+.dark .text-gray-700 {
+    color: #e5e7eb !important;
+}
+
+.dark .text-gray-600 {
+    color: #d1d5db !important;
+}
+
+.dark .text-gray-500 {
+    color: #9ca3af !important;
+}
+
+.dark .text-gray-400 {
+    color: #9ca3af !important;
+}
+
+.dark .text-gray-900 {
+    color: #f9fafb !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+    background-color: #374151 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+    background-color: #374151 !important;
+}
+
+/* 深色模式下的输入框 */
+.dark input,
+.dark textarea,
+.dark select {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: #9ca3af;
+}
+
+/* 深色模式下的模态框 */
+.dark .bg-black\/50 {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* 深色模式下的紫色背景（导出弹窗等） */
+.dark .bg-purple-50 {
+    background-color: rgba(139, 92, 246, 0.15) !important;
+}
+
+.dark .border-purple-400 {
+    border-color: #a78bfa !important;
+}
+
+/* 深色模式下的红色相关样式 */
+.dark .hover\:bg-red-50:hover {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* v2.5.3: Toast 动画 */
+@keyframes slide-in-right {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+}
+
+/* ConfigSwitcher 切换动画 - 优化避免闪烁 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.25s ease-out forwards;
+}

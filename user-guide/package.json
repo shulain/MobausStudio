@@ -1,0 +1,14 @@
+{
+  "name": "mobausstudio-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "clean": "rm -rf .vitepress/dist .vitepress/cache"
+  },
+  "devDependencies": {
+    "vitepress": "^1.5.0"
+  }
+}

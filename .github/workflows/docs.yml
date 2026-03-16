@@ -1,0 +1,62 @@
+# 构建并部署文档站到 GitHub Pages
+#
+# 触发条件：
+# 1. main 分支的 user-guide/ 目录有变更时
+# 2. 手动触发
+
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "user-guide/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        with:
+          enablement: true
+
+      - name: Install dependencies
+        run: cd user-guide && npm install
+
+      - name: Build VitePress
+        run: cd user-guide && npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: user-guide/.vitepress/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
