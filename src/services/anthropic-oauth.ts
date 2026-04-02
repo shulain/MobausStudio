@@ -47,6 +47,7 @@ export interface AnthropicAuthResult {
     expiresAt?: number;
     /** API Key 模式：直接返回 API Key */
     apiKey?: string;
+    error?: string;
 }
 
 /**
@@ -234,7 +235,7 @@ export async function refreshAnthropicToken(refreshToken: string): Promise<Anthr
         };
     } catch (error) {
         logger.error(LogTags.AUTH, 'Anthropic Token 刷新失败', error);
-        return { type: 'failed' };
+        return { type: 'failed', error: error instanceof Error ? error.message : String(error) };
     }
 }
 

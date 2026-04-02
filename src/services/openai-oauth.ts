@@ -214,7 +214,7 @@ export async function refreshOpenAIToken(refreshToken: string): Promise<OpenAIAu
         };
     } catch (error) {
         logger.error(LogTags.AUTH, 'OpenAI Token 刷新失败', error);
-        return { type: 'failed', error: 'Token refresh failed' };
+        return { type: 'failed', error: error instanceof Error ? error.message : String(error) };
     }
 }
 

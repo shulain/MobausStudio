@@ -183,6 +183,11 @@ class TokenRefresherService {
                     continue;
                 }
 
+                // 防止短时间内重复刷新同一个 provider
+                if (this.refreshingProviders.has(credential.providerId)) {
+                    continue;
+                }
+
                 // v2.4.2: 检查是否已过期或即将过期（在缓冲时间内）
                 const timeUntilExpiry = credential.expiresAt - now;
                 const isExpired = timeUntilExpiry <= 0;
@@ -195,6 +200,8 @@ class TokenRefresherService {
                         isExpired,
                     });
 
+                    // 使用 await 串行刷新，避免并发更新凭证时出现读写竞争
+                    // providerCredentialsStorage.add 和 remove 不是原子的，并发执行可能导致相互覆盖
                     await this.refreshToken(credential);
                 }
             }
@@ -378,7 +385,17 @@ class TokenRefresherService {
                     });
                     return { success: true, providerId, newExpiresAt: openaiResult.expiresAt };
                 }
-                return { success: false, providerId, error: openaiResult.error || 'OpenAI token refresh failed' };
+                const isInvalidGrant = openaiResult.error?.includes('invalid_grant') || false;
+                if (isInvalidGrant) {
+                    logger.warn(LogTags.AUTH, 'OpenAI Token 不可恢复，删除失效凭证', { providerId });
+                    await providerCredentialsStorage.remove(providerId);
+                }
+                return {
+                    success: false,
+                    providerId,
+                    error: openaiResult.error || 'OpenAI token refresh failed',
+                    needsReauth: isInvalidGrant
+                };
             }
 
             case 'google': {
@@ -393,7 +410,18 @@ class TokenRefresherService {
                     });
                     return { success: true, providerId, newExpiresAt: googleResult.expiresAt };
                 }
-                return { success: false, providerId, error: googleResult.error || 'Google token refresh failed' };
+
+                const isInvalidGrant = googleResult.error?.includes('invalid_grant') || false;
+                if (isInvalidGrant) {
+                    logger.warn(LogTags.AUTH, 'Google Token 不可恢复，删除失效凭证', { providerId });
+                    await providerCredentialsStorage.remove(providerId);
+                }
+                return {
+                    success: false,
+                    providerId,
+                    error: googleResult.error || 'Google token refresh failed',
+                    needsReauth: isInvalidGrant
+                };
             }
 
             case 'anthropic': {
@@ -408,7 +436,18 @@ class TokenRefresherService {
                     });
                     return { success: true, providerId, newExpiresAt: anthropicResult.expiresAt };
                 }
-                return { success: false, providerId, error: 'Anthropic token refresh failed' };
+
+                const isInvalidGrant = anthropicResult.error?.includes('invalid_grant') || false;
+                if (isInvalidGrant) {
+                    logger.warn(LogTags.AUTH, 'Anthropic Token 不可恢复，删除失效凭证', { providerId });
+                    await providerCredentialsStorage.remove(providerId);
+                }
+                return {
+                    success: false,
+                    providerId,
+                    error: anthropicResult.error || 'Anthropic token refresh failed',
+                    needsReauth: isInvalidGrant
+                };
             }
 
             // v0.9.0: Kiro Token 刷新

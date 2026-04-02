@@ -3922,7 +3922,7 @@ async fn anthropic_refresh_token(
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
     let response = client
-        .post("https://console.anthropic.com/v1/oauth/token")
+        .post("https://api.anthropic.com/v1/oauth/token")
         .header("Content-Type", "application/json")
         .header("User-Agent", "MobausStudio/1.0")
         .json(&serde_json::json!({
@@ -3948,8 +3948,7 @@ async fn anthropic_refresh_token(
             error_text
         );
         return Err(format!(
-            "Token 刷新失败 ({}): {}",
-            status.as_u16(),
+            "Token 刷新失败: {}",
             error_text
         ));
     }
@@ -4608,8 +4607,7 @@ async fn openai_refresh_token_v2(
             error_text
         );
         return Err(format!(
-            "Token 刷新失败 ({}): {}",
-            status.as_u16(),
+            "Token 刷新失败: {}",
             error_text
         ));
     }
@@ -5170,8 +5168,7 @@ async fn google_refresh_token(
             error_text
         );
         return Err(format!(
-            "Token 刷新失败 ({}): {}",
-            status.as_u16(),
+            "Token 刷新失败: {}",
             error_text
         ));
     }
@@ -5185,7 +5182,8 @@ async fn google_refresh_token(
 
     Ok(GoogleTokenResponse {
         access_token: data["access_token"].as_str().unwrap_or("").to_string(),
-        refresh_token: Some(refresh_token), // Google 不返回新的 refresh_token
+        // Google might return a new refresh token, so we should use it if it exists
+        refresh_token: data["refresh_token"].as_str().map(|s| s.to_string()).or(Some(refresh_token)),
         expires_in: data["expires_in"].as_u64().unwrap_or(3600),
         token_type: data["token_type"].as_str().unwrap_or("Bearer").to_string(),
     })

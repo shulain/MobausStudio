@@ -266,6 +266,7 @@ export async function refreshGoogleToken(refreshToken: string): Promise<GoogleAu
         // 注意：clientSecret 已移至后端安全存储，不再从前端传递
         const tokenResponse = await invoke<{
             access_token: string;
+            refresh_token?: string;
             expires_in: number;
             token_type: string;
         }>('google_refresh_token', {
@@ -276,12 +277,12 @@ export async function refreshGoogleToken(refreshToken: string): Promise<GoogleAu
         return {
             type: 'success',
             accessToken: tokenResponse.access_token,
-            refreshToken, // Google 不会返回新的 refresh token
+            refreshToken: tokenResponse.refresh_token || refreshToken,
             expiresAt: Date.now() + tokenResponse.expires_in * 1000,
         };
     } catch (error) {
         logger.error(LogTags.AUTH, 'Google Token 刷新失败', error);
-        return { type: 'failed', error: 'Token refresh failed' };
+        return { type: 'failed', error: error instanceof Error ? error.message : String(error) };
     }
 }
 

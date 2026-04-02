@@ -176,7 +176,7 @@ describe('OpenAI OAuth 服务测试', () => {
             const result = await refreshOpenAIToken('invalid-refresh-token');
 
             expect(result.type).toBe('failed');
-            expect(result.error).toBe('Token refresh failed');
+            expect(result.error).toBe('Invalid refresh token');
         });
     });
 

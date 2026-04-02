@@ -584,4 +584,92 @@ describe('tokenRefresher 服务测试', () => {
             expect(mockRemove).not.toHaveBeenCalled();
         });
     });
+
+    describe('TC-MULTI-001: 多个 Token 刷新', () => {
+        it('单次检查能够顺序刷新多个提供商的凭证', async () => {
+            const now = Date.now();
+            const credentials: ProviderCredential[] = [
+                {
+                    providerId: 'google',
+                    type: 'oauth',
+                    accessToken: 'old-google',
+                    refreshToken: 'refresh-google',
+                    expiresAt: now - 300 * 1000,
+                    createdAt: new Date(now - 60 * 60 * 1000),
+                    updatedAt: new Date(now - 60 * 60 * 1000),
+                },
+                {
+                    providerId: 'openai',
+                    type: 'oauth',
+                    accessToken: 'old-openai',
+                    refreshToken: 'refresh-openai',
+                    expiresAt: now - 300 * 1000,
+                    createdAt: new Date(now - 60 * 60 * 1000),
+                    updatedAt: new Date(now - 60 * 60 * 1000),
+                }
+            ];
+
+            mockLoad.mockResolvedValue(credentials);
+            mockGet.mockImplementation(async (id) => credentials.find(c => c.providerId === id) || null);
+
+            // Mock responses
+            mockRefreshGoogle.mockResolvedValue({ type: 'success', accessToken: 'new-google', expiresAt: now + 3600000 });
+            mockRefreshOpenAI.mockResolvedValue({ type: 'success', accessToken: 'new-openai', expiresAt: now + 3600000 });
+
+            // Trigger checkAndRefresh
+            await tokenRefresher.checkAndRefresh();
+
+            expect(mockRefreshGoogle).toHaveBeenCalled();
+            expect(mockRefreshOpenAI).toHaveBeenCalled();
+
+            // Should've made two adds sequentially
+            expect(mockAdd).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('TC-REFRESH-OAUTH-001: Google & Anthropic & OpenAI invalid_grant', () => {
+        it('当错误包含 invalid_grant 时应该删除凭证并返回 needsReauth', async () => {
+            const now = Date.now();
+            const providers = ['google', 'anthropic', 'openai'];
+
+            for (const provider of providers) {
+                const credential: ProviderCredential = {
+                    providerId: provider,
+                    type: 'oauth',
+                    accessToken: `old-${provider}`,
+                    refreshToken: `refresh-${provider}`,
+                    expiresAt: now + 10 * 60 * 1000, // 还有 10 分钟才过期
+                    createdAt: new Date(now - 60 * 60 * 1000),
+                    updatedAt: new Date(now - 60 * 60 * 1000),
+                };
+
+                mockGet.mockResolvedValue(credential);
+                mockLoad.mockResolvedValue([credential]);
+
+                // Mock to return failed with invalid_grant
+                if (provider === 'google') {
+                    mockRefreshGoogle.mockResolvedValue({ type: 'failed', error: 'invalid_grant' });
+                } else if (provider === 'anthropic') {
+                    mockRefreshAnthropic.mockResolvedValue({ type: 'failed', error: 'invalid_grant' });
+                } else if (provider === 'openai') {
+                    mockRefreshOpenAI.mockResolvedValue({ type: 'failed', error: 'invalid_grant' });
+                }
+
+                // Mock storage.remove
+                const storage = await import('../../services/storage');
+                const mockRemove = vi.fn().mockResolvedValue(undefined);
+                storage.providerCredentialsStorage.remove = mockRemove;
+
+                const resultPromise = tokenRefresher.refreshByProviderId(provider);
+                await vi.advanceTimersByTimeAsync(0);
+
+                const result = await resultPromise;
+
+                expect(result.success).toBe(false);
+                expect(result.needsReauth).toBe(true);
+                expect(result.usedFallback).toBeUndefined(); // 没有使用降级
+                expect(mockRemove).toHaveBeenCalledWith(provider);
+            }
+        });
+    });
 });
