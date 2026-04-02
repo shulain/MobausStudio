@@ -113,8 +113,10 @@ export const logger = {
         if (shouldLog(LogLevel.DEBUG)) {
             const prefix = buildPrefix('[DEBUG]');
             if (data !== undefined) {
+                // eslint-disable-next-line no-console
                 console.debug(...prefix, tag, message, data);
             } else {
+                // eslint-disable-next-line no-console
                 console.debug(...prefix, tag, message);
             }
         }
@@ -131,8 +133,10 @@ export const logger = {
         if (shouldLog(LogLevel.INFO)) {
             const prefix = buildPrefix('[INFO]');
             if (data !== undefined) {
+                // eslint-disable-next-line no-console
                 console.info(...prefix, tag, message, data);
             } else {
+                // eslint-disable-next-line no-console
                 console.info(...prefix, tag, message);
             }
         }

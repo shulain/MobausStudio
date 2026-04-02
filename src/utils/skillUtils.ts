@@ -2741,7 +2741,7 @@ export async function fetchSkillFromSkillsSh(
             } else {
                 agentsMdContent = null;
             }
-        } catch (err) {
+        } catch {
             // AGENTS.md 不存在
             logger.info(LogTags.SKILL, `AGENTS.md 不存在`);
             agentsMdContent = null;

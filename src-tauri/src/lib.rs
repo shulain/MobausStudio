@@ -3947,10 +3947,7 @@ async fn anthropic_refresh_token(
             status.as_u16(),
             error_text
         );
-        return Err(format!(
-            "Token 刷新失败: {}",
-            error_text
-        ));
+        return Err(format!("Token 刷新失败: {}", error_text));
     }
 
     let data: serde_json::Value = response
@@ -4606,10 +4603,7 @@ async fn openai_refresh_token_v2(
             status.as_u16(),
             error_text
         );
-        return Err(format!(
-            "Token 刷新失败: {}",
-            error_text
-        ));
+        return Err(format!("Token 刷新失败: {}", error_text));
     }
 
     let data: serde_json::Value = response
@@ -5167,10 +5161,7 @@ async fn google_refresh_token(
             status.as_u16(),
             error_text
         );
-        return Err(format!(
-            "Token 刷新失败: {}",
-            error_text
-        ));
+        return Err(format!("Token 刷新失败: {}", error_text));
     }
 
     let data: serde_json::Value = response
@@ -5183,7 +5174,10 @@ async fn google_refresh_token(
     Ok(GoogleTokenResponse {
         access_token: data["access_token"].as_str().unwrap_or("").to_string(),
         // Google might return a new refresh token, so we should use it if it exists
-        refresh_token: data["refresh_token"].as_str().map(|s| s.to_string()).or(Some(refresh_token)),
+        refresh_token: data["refresh_token"]
+            .as_str()
+            .map(|s| s.to_string())
+            .or(Some(refresh_token)),
         expires_in: data["expires_in"].as_u64().unwrap_or(3600),
         token_type: data["token_type"].as_str().unwrap_or("Bearer").to_string(),
     })

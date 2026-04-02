@@ -187,7 +187,7 @@ export const RoundtableView: React.FC<RoundtableViewProps> = ({
         } else {
             setShowMentionMenu(false);
         }
-    }, [isFreeMode]);
+    }, []);
 
     /**
      * 选择提及的参与者

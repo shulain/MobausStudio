@@ -136,7 +136,7 @@ function getDeviceId(): string {
         } else {
             logDebug('使用已有设备 ID:', deviceId);
         }
-    } catch (error) {
+    } catch {
         // localStorage 不可用时，生成临时 ID
         deviceId = crypto.randomUUID();
         logDebug('localStorage 不可用，使用临时设备 ID:', deviceId);

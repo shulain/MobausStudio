@@ -17,6 +17,7 @@ import type { ToolId } from './types';
 import type { AIProvider, AIModelConfig, CustomProvider, MCPServer, Skill } from '../../../types';
 import { useI18n } from '../../../i18n';
 import { getDefaultProtocol, getEffectiveProtocol } from '../../../data/protocols';
+import { logger, LogTags } from '../../../utils/logger';
 
 interface ConfigSwitcherPageProps {
   providers: AIProvider[];
@@ -139,11 +140,11 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
       // 检查请求ID是否仍然有效（防止竞态条件）
       if (currentExportIdRef.current !== exportId) {
         // 请求已过期，需要清理已写入的配置文件
-        console.log('[ConfigSwitcher] 请求已过期，清理配置文件', { exportId, current: currentExportIdRef.current, targetToolId });
+        logger.debug(LogTags.SETTINGS, '[ConfigSwitcher] 请求已过期，清理配置文件', { exportId, current: currentExportIdRef.current, targetToolId });
         try {
           await invoke('disable_provider_for_tool', { toolName: targetToolId });
         } catch (cleanupError) {
-          console.error('[ConfigSwitcher] 清理配置文件失败', cleanupError);
+          logger.error(LogTags.SETTINGS, '[ConfigSwitcher] 清理配置文件失败', cleanupError);
         }
         return;
       }
@@ -160,7 +161,7 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
       // 检查请求ID是否仍然有效
       if (currentExportIdRef.current !== exportId) {
         // 请求已过期，丢弃错误
-        console.log('[ConfigSwitcher] 丢弃过期的导出请求错误', { exportId, current: currentExportIdRef.current });
+        logger.debug(LogTags.SETTINGS, '[ConfigSwitcher] 丢弃过期的导出请求错误', { exportId, current: currentExportIdRef.current });
         return;
       }
 

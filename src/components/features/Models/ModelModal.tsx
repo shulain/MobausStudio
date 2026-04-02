@@ -240,7 +240,7 @@ export const ModelModal: React.FC<ModelModalProps> = ({
 
     // v0.8.0: 模型列表直接使用 providers 传入的数据（已由 App.tsx 统一增强）
     // 不再需要单独获取动态模型，只需要获取 Google 的配额信息用于显示
-    const effectiveModels = selectedProvider?.models || [];
+    const effectiveModels = React.useMemo(() => selectedProvider?.models || [], [selectedProvider?.models]);
 
     // 🔍 调试日志：验证 Anthropic 模型列表
     React.useEffect(() => {

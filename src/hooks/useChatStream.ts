@@ -295,7 +295,7 @@ export function useChatStream(options: UseChatStreamOptions): UseChatStreamRetur
     unlistenRef.current = unlisten;
 
     return unlisten;
-  }, [chatId, onChunk, onDone, onError, onToolCalls, scheduleUpdate, flushPending]);
+  }, [chatId, onDone, onError, onToolCalls, scheduleUpdate, flushPending]);
 
   /**
    * 停止监听

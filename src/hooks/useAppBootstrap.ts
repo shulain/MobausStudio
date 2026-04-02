@@ -603,12 +603,14 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
       timeoutIdsRef.current.forEach((timerId) => {
         clearTimeout(timerId);
       });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       timeoutIdsRef.current.clear();
 
       // 清理引导阶段注册的事件监听器（如 token_expired）
       bootstrapUnlistenRef.current.forEach((unlisten) => {
         unlisten();
       });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       bootstrapUnlistenRef.current.clear();
 
       // 停止 Token 自动续期服务

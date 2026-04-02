@@ -146,11 +146,11 @@ export const translate = (
 ): string => {
     // 通过点号分隔的路径访问嵌套对象
     const keys = key.split('.');
-    let result: any = translations;
+    let result: unknown = translations;
 
     for (const k of keys) {
         if (result && typeof result === 'object' && k in result) {
-            result = result[k];
+            result = (result as Record<string, unknown>)[k];
         } else {
             // 如果找不到翻译，返回 key 本身
             return key;
@@ -165,11 +165,11 @@ export const translate = (
     // 替换参数
     if (params) {
         Object.entries(params).forEach(([paramKey, value]) => {
-            result = result.replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, 'g'), String(value));
+            result = (result as string).replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, 'g'), String(value));
         });
     }
 
-    return result;
+    return result as string;
 };
 
 export type { Language, Translations };

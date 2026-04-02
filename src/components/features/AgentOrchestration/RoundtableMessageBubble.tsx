@@ -197,7 +197,7 @@ export const RoundtableMessageBubble: React.FC<RoundtableMessageBubbleProps> = R
             }
         }
         return content;
-    }, [message.content, message.mentionedParticipantIds, participants, thinkingContent]);
+    }, [message.content, message.mentionedParticipantIds, message.toolCalls, participants, thinkingContent]);
 
     // 用户消息样式
     if (isUserMessage) {

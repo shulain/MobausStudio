@@ -225,7 +225,7 @@ export function usePersistedState<T>(
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [storage]);
 
   // 组件卸载时清理定时器并保存待保存数据
   useEffect(() => {

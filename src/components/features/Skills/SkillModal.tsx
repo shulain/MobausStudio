@@ -178,7 +178,7 @@ export const SkillModal: React.FC<SkillModalProps> = ({
             setPreviewValues({});
         }
         setShowPreview(false);
-    }, [skill, isOpen]);
+    }, [skill, isOpen, language]);
 
     // ==================== 预览提示词 ====================
 

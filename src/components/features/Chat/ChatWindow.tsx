@@ -156,13 +156,8 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
     // 获取当前选中 Agent 的工具数量
     // v2.3.0: 修复 - 需要同时检查 enableToolUse 是否开启
     // v2.4.0: 性能优化 - 使用 useMemo 缓存计算结果，避免每次渲染都重新计算
-    // v2.5.1: 修复依赖问题 - mcpServers 是对象，使用 JSON.stringify 创建稳定的依赖键
     // v2.6.0: 添加详细的 MCP 状态信息
     const selectedAgent = selectedAgentId ? agents.find(a => a.id === selectedAgentId) : undefined;
-    const mcpServersKey = useMemo(
-        () => JSON.stringify(selectedAgent?.mcpServers),
-        [selectedAgent?.mcpServers]
-    );
 
     /**
      * v2.6.0: 计算 Agent 关联的 MCP 服务器状态摘要
@@ -228,7 +223,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
             hasWarnings,
             isReady,
         };
-    }, [selectedAgent?.id, selectedAgent?.enableToolUse, mcpServersKey, mcpServers]);
+    }, [selectedAgent?.enableToolUse, selectedAgent?.mcpServers, mcpServers]);
 
     // 保持向后兼容的 toolCount
     const toolCount = mcpStatusSummary.totalTools;

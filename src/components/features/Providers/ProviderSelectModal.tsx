@@ -88,7 +88,7 @@ export const ProviderSelectModal: React.FC<ProviderSelectModalProps> = ({
         });
 
         return groups;
-    }, [providers, searchQuery]);
+    }, [providers, searchQuery, language]);
 
     // 处理选择
     const handleSelect = (provider: AIProvider) => {

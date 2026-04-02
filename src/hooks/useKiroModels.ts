@@ -228,7 +228,7 @@ export function useKiroModels(options: UseKiroModelsOptions): UseKiroModelsRetur
             setLoading(false);
             fetchingRef.current = false;
         }
-    }, [accessToken, profileArn, authMethod]);
+    }, [accessToken, profileArn, authMethod, ssoRegion]);
 
     /**
      * 手动刷新（强制清除缓存）

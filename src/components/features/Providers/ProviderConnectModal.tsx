@@ -146,7 +146,7 @@ export const ProviderConnectModal: React.FC<ProviderConnectModalProps> = ({
         };
 
         loadCredential();
-    }, [isOpen, provider]);
+    }, [isOpen, provider, t]);
 
     // 清理 OAuth 轮询
     useEffect(() => {

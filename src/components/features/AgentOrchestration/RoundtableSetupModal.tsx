@@ -349,6 +349,27 @@ export const RoundtableSetupModal: React.FC<RoundtableSetupModalProps> = ({
     }, []);
 
     /**
+     * 重置表单
+     * v4.1.7: 默认轮数改为不固定（999）
+     * v4.1.13: 重置背景和约束字段
+     */
+    const handleReset = useCallback(() => {
+        setTopic('');
+        setBackground('');
+        setConstraints('');
+        setShowBackground(false);
+        setShowConstraints(false);
+        setParticipants([]);
+        setSpeakMode('sequential');
+        setMaxRounds(999);
+        setAutoSummarize(true);
+        setAllowCrossReference(true);
+        setSummarizerAgentId('');
+        setShowAdvanced(false);
+        setError(null);
+    }, []);
+
+    /**
      * 创建圆桌会议
      * v4.1.13: 添加 background 和 constraints 可选字段
      */
@@ -397,28 +418,8 @@ export const RoundtableSetupModal: React.FC<RoundtableSetupModalProps> = ({
         summarizerAgentId,
         agents,
         onCreate,
+        handleReset,
     ]);
-
-    /**
-     * 重置表单
-     * v4.1.7: 默认轮数改为不固定（999）
-     * v4.1.13: 重置背景和约束字段
-     */
-    const handleReset = useCallback(() => {
-        setTopic('');
-        setBackground('');
-        setConstraints('');
-        setShowBackground(false);
-        setShowConstraints(false);
-        setParticipants([]);
-        setSpeakMode('sequential');
-        setMaxRounds(999);
-        setAutoSummarize(true);
-        setAllowCrossReference(true);
-        setSummarizerAgentId('');
-        setShowAdvanced(false);
-        setError(null);
-    }, []);
 
     /**
      * 关闭弹窗
