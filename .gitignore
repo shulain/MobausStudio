@@ -49,3 +49,7 @@ CLAUDE.md
 PROJECT_INSPECTION_REPORT.md
 FIXES_TODO.md
 .git.backup
+
+# Git Hooks
+.githooks/
+src-tauri/.playwright-mcp/

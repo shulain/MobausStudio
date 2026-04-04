@@ -7059,7 +7059,7 @@ async fn chat_send_message(request: ChatSendRequest) -> Result<ChatSendResponse,
     );
 
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .timeout(std::time::Duration::from_secs(600))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
@@ -8694,182 +8694,230 @@ async fn chat_stream_anthropic(
     let mut current_tool_input: String = String::new();
     let mut received_valid_sse = false; // 标记是否收到有效的 SSE 数据
 
-    // 循环读取 Chunk
-    while let Ok(Some(chunk)) = response.chunk().await {
-        let s = String::from_utf8_lossy(&chunk);
-        buffer.push_str(&s);
+    let start_time = std::time::Instant::now();
+    let timeout_duration = std::time::Duration::from_secs(600); // 10分钟超时
 
-        // v4.1.46: 检测响应格式是否正确（防止返回 HTML 等非 SSE 格式）
-        if !received_valid_sse && buffer.len() > 50 {
-            // 检查是否是 HTML 响应
-            let buffer_lower = buffer.to_lowercase();
-            if buffer_lower.contains("<!doctype") || buffer_lower.contains("<html") {
-                let preview = buffer.chars().take(200).collect::<String>();
-                error!(
+    // 循环读取 Chunk
+    loop {
+        // 检查超时
+        if start_time.elapsed() > timeout_duration {
+            error!("[chat_stream_anthropic] 读取响应超时（超过 600 秒）");
+            return Err("读取响应超时，请检查网络连接或 API 服务状态".to_string());
+        }
+
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                let s = String::from_utf8_lossy(&chunk);
+                buffer.push_str(&s);
+                // v4.2.3: 检测非标准的错误 JSON
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(buffer.trim()) {
+                    if let Some(err) = json.get("error") {
+                        let err_msg = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown error");
+                        error!("[chat_stream_anthropic] 检测到非标准错误返回: {}", err_msg);
+                        let _ = window.emit(
+                            "chat-event",
+                            serde_json::json!({
+                                "id": msg_id,
+                                "event": "error",
+                                "error": format!("API Error: {}", err_msg)
+                            }),
+                        );
+                        return Err(format!("API Error: {}", err_msg));
+                    }
+                }
+
+                // v4.1.46: 检测响应格式是否正确（防止返回 HTML 等非 SSE 格式）
+                if !received_valid_sse && buffer.len() > 50 {
+                    // 检查是否是 HTML 响应
+                    let buffer_lower = buffer.to_lowercase();
+                    if buffer_lower.contains("<!doctype") || buffer_lower.contains("<html") {
+                        let preview = buffer.chars().take(200).collect::<String>();
+                        error!(
                     "[chat_stream_anthropic] 响应格式错误：收到 HTML 而不是 SSE 流，前200字符: {}",
                     preview
                 );
 
-                let _ = window.emit("chat-event", serde_json::json!({
+                        let _ = window.emit("chat-event", serde_json::json!({
                     "id": msg_id,
                     "event": "error",
                     "error": format!("API 响应格式错误：收到 HTML 页面而不是流式数据。请检查：\n1. API 端点地址是否正确\n2. API Key 是否有效\n3. 网络代理配置是否正确\n\n响应预览：{}", preview)
                 }));
 
-                return Err("API 响应格式错误：收到 HTML 而不是 SSE 流".to_string());
-            }
+                        return Err("API 响应格式错误：收到 HTML 而不是 SSE 流".to_string());
+                    }
 
-            // 检查是否包含 SSE 格式的标记
-            if buffer.contains("event:") || buffer.contains("data:") {
-                received_valid_sse = true;
-            }
-        }
-
-        // 处理 SSE 数据（Anthropic 格式：event: xxx\ndata: xxx\n\n）
-        while let Some(pos) = buffer.find("\n\n") {
-            let line_block: String = buffer.drain(..pos + 2).collect();
-
-            // 解析 event 和 data
-            let mut event_type = "";
-            let mut data_str = "";
-
-            for line in line_block.lines() {
-                let line = line.trim();
-                if let Some(stripped) = line.strip_prefix("event: ") {
-                    event_type = stripped;
-                } else if let Some(stripped) = line.strip_prefix("data: ") {
-                    data_str = stripped;
+                    // 检查是否包含 SSE 格式的标记
+                    if buffer.contains("event:") || buffer.contains("data:") {
+                        received_valid_sse = true;
+                    }
                 }
-            }
 
-            if data_str.is_empty() {
-                continue;
-            }
+                // 处理 SSE 数据（Anthropic 格式：event: xxx\ndata: xxx\n\n）
+                while let Some(pos) = buffer.find("\n\n") {
+                    let line_block: String = buffer.drain(..pos + 2).collect();
 
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(data_str) {
-                match event_type {
-                    "message_start" => {
-                        // 消息开始，可以提取 usage
-                        if let Some(message) = json.get("message") {
-                            if let Some(usage) = message.get("usage") {
-                                usage_accumulator = Some(usage.clone());
-                            }
+                    // 解析 event 和 data
+                    let mut event_type = "";
+                    let mut data_str = "";
+
+                    for line in line_block.lines() {
+                        let line = line.trim();
+                        if let Some(stripped) = line.strip_prefix("event: ") {
+                            event_type = stripped;
+                        } else if let Some(stripped) = line.strip_prefix("data: ") {
+                            data_str = stripped;
                         }
                     }
-                    "content_block_start" => {
-                        // 内容块开始
-                        if let Some(content_block) = json.get("content_block") {
-                            let block_type = content_block["type"].as_str().unwrap_or("");
-                            if block_type == "tool_use" {
-                                current_tool_id =
-                                    content_block["id"].as_str().map(|s| s.to_string());
-                                current_tool_name =
-                                    content_block["name"].as_str().map(|s| s.to_string());
-                                current_tool_input = String::new();
-                            }
-                        }
-                    }
-                    "content_block_delta" => {
-                        // 内容增量
-                        if let Some(delta) = json.get("delta") {
-                            let delta_type = delta["type"].as_str().unwrap_or("");
 
-                            if delta_type == "text_delta" {
-                                if let Some(text) = delta["text"].as_str() {
-                                    if !text.is_empty() {
-                                        let _ = window.emit(
-                                            "chat-event",
-                                            serde_json::json!({
-                                                "id": msg_id,
-                                                "event": "chunk",
-                                                "content": text
-                                            }),
-                                        );
-                                    }
-                                }
-                            } else if delta_type == "input_json_delta" {
-                                // 工具调用参数增量
-                                if let Some(partial_json) = delta["partial_json"].as_str() {
-                                    current_tool_input.push_str(partial_json);
-                                }
-                            } else if delta_type == "thinking_delta" {
-                                // 思考内容（Claude 3.5 Sonnet 等）
-                                if let Some(thinking) = delta["thinking"].as_str() {
-                                    if !thinking.is_empty() {
-                                        let _ = window.emit(
-                                            "chat-event",
-                                            serde_json::json!({
-                                                "id": msg_id,
-                                                "event": "reasoning_chunk",
-                                                "content": thinking
-                                            }),
-                                        );
+                    if data_str.is_empty() {
+                        continue;
+                    }
+
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data_str) {
+                        match event_type {
+                            "message_start" => {
+                                // 消息开始，可以提取 usage
+                                if let Some(message) = json.get("message") {
+                                    if let Some(usage) = message.get("usage") {
+                                        usage_accumulator = Some(usage.clone());
                                     }
                                 }
                             }
-                        }
-                    }
-                    "content_block_stop" => {
-                        // 内容块结束，如果是工具调用则保存
-                        if let (Some(id), Some(name)) = (&current_tool_id, &current_tool_name) {
-                            tool_calls.push(serde_json::json!({
-                                "id": id,
-                                "type": "function",
-                                "function": {
-                                    "name": name,
-                                    "arguments": current_tool_input
+                            "content_block_start" => {
+                                // 内容块开始
+                                if let Some(content_block) = json.get("content_block") {
+                                    let block_type = content_block["type"].as_str().unwrap_or("");
+                                    if block_type == "tool_use" {
+                                        current_tool_id =
+                                            content_block["id"].as_str().map(|s| s.to_string());
+                                        current_tool_name =
+                                            content_block["name"].as_str().map(|s| s.to_string());
+                                        current_tool_input = String::new();
+                                    }
                                 }
-                            }));
-                            current_tool_id = None;
-                            current_tool_name = None;
-                            current_tool_input = String::new();
-                        }
-                    }
-                    "message_delta" => {
-                        // 消息增量，包含 stop_reason 和 usage
-                        if let Some(usage) = json.get("usage") {
-                            usage_accumulator = Some(usage.clone());
-                        }
-                    }
-                    "message_stop" => {
-                        // 消息结束
-                        // 如果有工具调用，发送 tool_calls 事件
-                        if !tool_calls.is_empty() {
-                            info!(
-                                "[chat_stream_anthropic] AI 请求工具调用，数量: {}",
-                                tool_calls.len()
-                            );
-                            let _ = window.emit(
-                                "chat-event",
-                                serde_json::json!({
+                            }
+                            "content_block_delta" => {
+                                // 内容增量
+                                if let Some(delta) = json.get("delta") {
+                                    let delta_type = delta["type"].as_str().unwrap_or("");
+
+                                    if delta_type == "text_delta" {
+                                        if let Some(text) = delta["text"].as_str() {
+                                            if !text.is_empty() {
+                                                let _ = window.emit(
+                                                    "chat-event",
+                                                    serde_json::json!({
+                                                        "id": msg_id,
+                                                        "event": "chunk",
+                                                        "content": text
+                                                    }),
+                                                );
+                                            }
+                                        }
+                                    } else if delta_type == "input_json_delta" {
+                                        // 工具调用参数增量
+                                        if let Some(partial_json) = delta["partial_json"].as_str() {
+                                            current_tool_input.push_str(partial_json);
+                                        }
+                                    } else if delta_type == "thinking_delta" {
+                                        // 思考内容（Claude 3.5 Sonnet 等）
+                                        if let Some(thinking) = delta["thinking"].as_str() {
+                                            if !thinking.is_empty() {
+                                                let _ = window.emit(
+                                                    "chat-event",
+                                                    serde_json::json!({
+                                                        "id": msg_id,
+                                                        "event": "reasoning_chunk",
+                                                        "content": thinking
+                                                    }),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            "content_block_stop" => {
+                                // 内容块结束，如果是工具调用则保存
+                                if let (Some(id), Some(name)) =
+                                    (&current_tool_id, &current_tool_name)
+                                {
+                                    tool_calls.push(serde_json::json!({
+                                        "id": id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": name,
+                                            "arguments": current_tool_input
+                                        }
+                                    }));
+                                    current_tool_id = None;
+                                    current_tool_name = None;
+                                    current_tool_input = String::new();
+                                }
+                            }
+                            "message_delta" => {
+                                // 消息增量，包含 stop_reason 和 usage
+                                if let Some(usage) = json.get("usage") {
+                                    usage_accumulator = Some(usage.clone());
+                                }
+                            }
+                            "message_stop" => {
+                                // 消息结束
+                                // 如果有工具调用，发送 tool_calls 事件
+                                if !tool_calls.is_empty() {
+                                    info!(
+                                        "[chat_stream_anthropic] AI 请求工具调用，数量: {}",
+                                        tool_calls.len()
+                                    );
+                                    let _ = window.emit(
+                                        "chat-event",
+                                        serde_json::json!({
+                                            "id": msg_id,
+                                            "event": "tool_calls",
+                                            "tool_calls": tool_calls
+                                        }),
+                                    );
+                                }
+
+                                // 发送 done 事件
+                                let mut done_payload = serde_json::json!({
                                     "id": msg_id,
-                                    "event": "tool_calls",
-                                    "tool_calls": tool_calls
-                                }),
-                            );
+                                    "event": "done"
+                                });
+                                if let Some(ref usage) = usage_accumulator {
+                                    done_payload["usage"] = usage.clone();
+                                }
+                                let _ = window.emit("chat-event", done_payload);
+                            }
+                            "error" => {
+                                // 错误事件
+                                let error_msg =
+                                    json["error"]["message"].as_str().unwrap_or("Unknown error");
+                                error!("[chat_stream_anthropic] 流式错误: {}", error_msg);
+                                return Err(format!("Stream error: {}", error_msg));
+                            }
+                            _ => {
+                                debug!("[chat_stream_anthropic] 未处理的事件类型: {}", event_type);
+                            }
                         }
-
-                        // 发送 done 事件
-                        let mut done_payload = serde_json::json!({
-                            "id": msg_id,
-                            "event": "done"
-                        });
-                        if let Some(ref usage) = usage_accumulator {
-                            done_payload["usage"] = usage.clone();
-                        }
-                        let _ = window.emit("chat-event", done_payload);
-                    }
-                    "error" => {
-                        // 错误事件
-                        let error_msg =
-                            json["error"]["message"].as_str().unwrap_or("Unknown error");
-                        error!("[chat_stream_anthropic] 流式错误: {}", error_msg);
-                        return Err(format!("Stream error: {}", error_msg));
-                    }
-                    _ => {
-                        debug!("[chat_stream_anthropic] 未处理的事件类型: {}", event_type);
                     }
                 }
+
+                // 处理 EOF 或连接断开
+                if chunk.is_empty() {
+                    debug!("[chat_stream_anthropic] 收到空的 chunk，假设连接关闭");
+                    break;
+                }
+            }
+            Ok(None) => {
+                debug!("[chat_stream_anthropic] 流式读取结束 (None)");
+                break;
+            }
+            Err(e) => {
+                error!("[chat_stream_anthropic] 流式读取错误: {}", e);
+                return Err(format!("Stream error: {}", e));
             }
         }
     }
@@ -12126,7 +12174,7 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
     // v4.1.50: 禁用连接池，避免多轮对话时连接复用导致的502错误
     // 特别是通过代理访问时，第一轮请求后连接可能被关闭，但客户端仍尝试复用
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .timeout(std::time::Duration::from_secs(600))
         .pool_max_idle_per_host(0) // 禁用连接池
         .build()
         .map_err(|e| format!("Client error: {}", e))?;
@@ -12286,12 +12334,12 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
     info!("[chat_stream_message] 开始读取流式响应");
     let mut chunk_count = 0;
     let start_time = std::time::Instant::now();
-    let timeout_duration = std::time::Duration::from_secs(120); // 2分钟超时
+    let timeout_duration = std::time::Duration::from_secs(600); // 2分钟超时
 
     loop {
         // v4.2.3: 检查超时
         if start_time.elapsed() > timeout_duration {
-            error!("[chat_stream_message] 读取响应超时（超过 120 秒）");
+            error!("[chat_stream_message] 读取响应超时（超过 600 秒）");
             return Err("读取响应超时，请检查网络连接或 API 服务状态".to_string());
         }
 
@@ -12299,6 +12347,27 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
             Ok(Some(chunk)) => {
                 chunk_count += 1;
                 let s = String::from_utf8_lossy(&chunk);
+
+                buffer.push_str(&s);
+                // v4.2.3: 检测非标准的错误 JSON
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(buffer.trim()) {
+                    if let Some(err) = json.get("error") {
+                        let err_msg = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("Unknown error");
+                        error!("[chat_stream_message] 检测到非标准错误返回: {}", err_msg);
+                        let _ = window.emit(
+                            "chat-event",
+                            serde_json::json!({
+                                "id": msg_id,
+                                "event": "error",
+                                "error": format!("API Error: {}", err_msg)
+                            }),
+                        );
+                        return Err(format!("API Error: {}", err_msg));
+                    }
+                }
 
                 // v4.2.3: 检测第一个 chunk 是否是 HTML（防止 Content-Type 检测失效）
                 if chunk_count == 1
@@ -12320,7 +12389,6 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
                 if chunk_count <= 3 {
                     info!("[chat_stream_message] Chunk #{}: {}", chunk_count, s);
                 }
-                buffer.push_str(&s);
             }
             Ok(None) => {
                 info!(

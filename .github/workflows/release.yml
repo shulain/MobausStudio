@@ -56,6 +56,8 @@ jobs:
 
       - name: 检出代码
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: 提取 Changelog
         id: changelog
@@ -140,6 +142,8 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: 准备构建环境
         id: version
@@ -158,6 +162,8 @@ jobs:
 
       - name: 安装 Node.js
         uses: actions/setup-node@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           node-version: 20
           cache: "npm"
@@ -226,9 +232,13 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: 安装 Node.js
         uses: actions/setup-node@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           node-version: 20
           cache: "npm"
@@ -261,6 +271,8 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
