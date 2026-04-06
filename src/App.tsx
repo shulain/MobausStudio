@@ -2205,6 +2205,7 @@ const handleRoundtableSummarize = useCallback(async (chatId: string) => {
         model_name: model.modelId || model.name,
         messages: apiMessages,
         endpoint: model.endpoint,
+        protocol: model.protocol || providers.find(p => p.id === model.provider)?.protocol || getDefaultProtocol(model.provider),  // v0.9.6: 补充缺失的 protocol 字段，使用三级回退逻辑
       }
     });
 
@@ -3244,7 +3245,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
       message_id: messageId,  // 传递 messageId 用于区分不同对话的消息
       account_id: accountId,  // v3.5.1: 使用实时获取的 accountId
       project_id: projectId,  // v3.5.1: 使用实时获取的 projectId
-      protocol: selectedModel.protocol,  // v0.9.0: 协议类型（自定义提供商可选）
+      protocol: selectedModel.protocol || providers.find(p => p.id === selectedModel.provider)?.protocol || getDefaultProtocol(selectedModel.provider),  // v0.9.6: 使用三级回退逻辑（model→provider→default），修复自定义提供商协议未传递的 bug
     };
 
     // v2.0.0: 构建系统提示词（Agent 基础提示词 + 技能提示词模板）
@@ -3409,7 +3410,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
         message_id: continueMessageId,  // 使用新的 messageId，每轮创建新消息
         account_id: continueAccountId,
         project_id: continueProjectId,
-        protocol: continueModel.protocol,
+        protocol: continueModel.protocol || providers.find(p => p.id === continueModel.provider)?.protocol || getDefaultProtocol(continueModel.provider),  // v0.9.6: 使用三级回退逻辑，修复自定义提供商协议未传递的 bug
       };
 
       // 添加系统提示词

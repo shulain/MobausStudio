@@ -734,6 +734,18 @@ const PROVIDER_DEFAULT_PROTOCOL: Record<string, ProtocolType> = {
 | TC-PROTO-006 | 自定义提供商指定协议 | provider=custom, protocol=anthropic | 使用 anthropic 协议 |
 | TC-PROTO-007 | 模型覆盖协议 | provider=custom, model.protocol=google | 使用 google 协议 |
 
+### 协议传递一致性测试 (v0.9.6)
+
+**背景**：自定义提供商设置 Anthropic 协议后，主聊天发送、工具续发、圆桌总结等路径未正确传递 protocol，导致 Rust 后端回退到 OpenAI `/chat/completions` 路径。
+
+| 用例ID | 场景 | 输入 | 预期结果 |
+|--------|------|------|----------|
+| TC-PROTO-PASS-001 | 主聊天发送传递提供商协议 | 自定义提供商 protocol=anthropic, model.protocol=undefined | 请求 protocol=anthropic，使用 /v1/messages 路径 |
+| TC-PROTO-PASS-002 | 主聊天发送传递模型协议（优先） | 自定义提供商 protocol=openai, model.protocol=anthropic | 请求 protocol=anthropic，模型协议优先 |
+| TC-PROTO-PASS-003 | 工具续发传递提供商协议 | 自定义提供商 protocol=anthropic, continueModel.protocol=undefined | 请求 protocol=anthropic |
+| TC-PROTO-PASS-004 | 圆桌总结传递协议 | 自定义提供商 protocol=anthropic | 请求包含 protocol=anthropic 字段 |
+| TC-PROTO-PASS-005 | 无协议时回退到默认 | 自定义提供商无 protocol, model.protocol=undefined | 回退到 getDefaultProtocol() 返回的默认协议 |
+
 ### 协议选择器国际化测试 (v0.9.5)
 
 | 用例ID | 场景 | 输入 | 预期结果 |
@@ -1129,3 +1141,4 @@ logger.info(LogTags.OAUTH, 'Token:', token);
 | 2026-03-04 | v0.9.1 | 添加错误处理和日志规范章节；定义 AppError 基类和具体错误类；添加错误消息和日志消息国际化配置；添加测试用例 TC-I18N-001~003、TC-LOG-001~004 | - |
 | 2026-03-06 | v4.1.47 | 修复 test_anthropic 函数 URL 构建逻辑，自动补全 /v1 路径；添加测试用例 TC-TEST-ANTHROPIC-URL-001~005 | - |
 | 2026-03-13 | v0.9.5 | 修复协议选择器硬编码中文问题，使用 getLocalizedText 根据当前语言动态显示协议标签和说明 | - |
+| 2026-04-06 | v0.9.6 | 修复自定义提供商协议传递 bug：主聊天发送(3247行)、工具续发(3412行)直接使用 selectedModel.protocol 导致 undefined；圆桌总结(2201行)完全缺失 protocol 字段。统一使用 getEffectiveProtocol 三级回退逻辑（model→provider→default）；添加测试用例 TC-PROTO-PASS-001~005 | - |
