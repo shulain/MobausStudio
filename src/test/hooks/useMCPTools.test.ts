@@ -224,6 +224,61 @@ describe('useMCPTools', () => {
             const apiTools = result.current.formatToolsForAPI();
             expect(apiTools).toHaveLength(0);
         });
+
+        // TC-CGWEB-021: 无参数 MCP 工具 formatToolsForAPI 防御性回退
+        it('无参数 MCP 工具 - properties/required 回退空值', () => {
+            // 模拟 MCP 工具 inputSchema 只有 type:"object"，无 properties/required
+            const noParamTool: MCPTool = {
+                name: 'check_login_status',
+                description: '检查登录状态',
+                inputSchema: {
+                    type: 'object',
+                } as any, // 故意省略 properties 和 required
+            };
+
+            const serverWithNoParamTool: MCPServer = {
+                ...mockConnectedServer,
+                id: 'server-no-param',
+                tools: [noParamTool],
+            };
+
+            const { result } = renderHook(() =>
+                useMCPTools({
+                    mcpServers: [serverWithNoParamTool],
+                })
+            );
+
+            const apiTools = result.current.formatToolsForAPI();
+
+            expect(apiTools).toHaveLength(1);
+            // 验证防御性回退：properties 为 {}，required 为 []
+            expect(apiTools[0].function.parameters).toEqual({
+                type: 'object',
+                properties: {},
+                required: [],
+            });
+        });
+
+        // TC-CGWEB-022: 有参数 MCP 工具 formatToolsForAPI 保持原值
+        it('有参数 MCP 工具 - properties/required 原样保留', () => {
+            const { result } = renderHook(() =>
+                useMCPTools({
+                    mcpServers: [mockConnectedServer],
+                })
+            );
+
+            const apiTools = result.current.formatToolsForAPI();
+
+            expect(apiTools).toHaveLength(1);
+            // 验证有参数时不被回退值覆盖
+            expect(apiTools[0].function.parameters).toEqual({
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: '文件路径' },
+                },
+                required: ['path'],
+            });
+        });
     });
 });
 

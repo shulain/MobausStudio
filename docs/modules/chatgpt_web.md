@@ -92,10 +92,9 @@ services/chatgpt_web/
 | 事件 | 字段 | 说明 |
 |------|------|------|
 | chunk | content | 文本内容增量 |
-| reasoning | content | 推理摘要增量 |
-| tool_calls_delta | tool_calls | 工具调用增量 |
-| usage | usage | 使用量信息 |
-| done | - | 流结束 |
+| reasoning_chunk | content | 推理内容增量 |
+| tool_calls | tool_calls | 累积后的完整工具调用数组（finish_reason 触发时一次性发送） |
+| done | usage（可选） | 流结束，附带 usage 使用量信息 |
 | error | error | 错误信息 |
 
 ### 内部模块
@@ -131,6 +130,13 @@ services/chatgpt_web/
 4. tool 消息 -> function_call_output items
 5. 强制 store=false, stream=true
 6. OAuth 模式删除 temperature/top_p/max_output_tokens
+7. tools 格式转换：Chat Completions 嵌套格式 `{ type, function: { name, description, parameters } }` -> Responses API 扁平格式 `{ type, name, description, parameters }`
+8. tools parameters schema 修补：Codex Responses API 要求 `object` 类型的 schema 必须包含 `properties` 字段，若缺失则补 `"properties": {}`。递归处理以下位置的子 schema：
+   - `properties` 中的每个字段
+   - `items`（单个对象或数组形式）
+   - `anyOf` / `oneOf` / `allOf` 中的每个分支
+   - `additionalProperties`（当为对象 schema 时）
+   - `$defs` / `definitions` 中的每个定义
 
 #### transform::responses_event_to_chunks(event, ctx)
 
@@ -166,8 +172,17 @@ services/chatgpt_web/
 | TC-CGWEB-012 | 响应转换 - 工具调用 | output_item.added function_call | tool_calls chunk |
 | TC-CGWEB-013 | JWT 解析 account_id | 有效 ID Token | 正确提取 chatgpt_account_id |
 | TC-CGWEB-014 | JWT 解析无效 | 无效 JWT | 返回 None |
-| TC-CGWEB-015 | SSE 读取网络错误 | response.chunk() 返回 Err | 返回错误，触发 StreamEvent::Error |
-| TC-CGWEB-016 | response.failed 透传错误 | response.failed 事件 | 触发 StreamEvent::Error，包含错误信息 |
+| TC-CGWEB-015 | SSE 读取网络错误 | response.chunk() 返回 Err | 返回错误，触发 StreamEvent::Error（依赖 rquest，仅集成测试覆盖） |
+| TC-CGWEB-016a | response.failed 错误提取 - 有详情 | response.failed 事件含 error.message | 正确提取 error_type 和 message |
+| TC-CGWEB-016b | response.failed 错误提取 - 无详情 | response.failed 事件无 error 字段 | 返回默认错误信息 |
+| TC-CGWEB-016c | response.failed 不生成 chunk | response.failed 事件传给 responses_event_to_chunks | 返回空 chunks，不误发 Done |
+| TC-CGWEB-017 | 请求转换 - tools 格式转换 | Chat Completions 嵌套 tools | 转为 Responses API 扁平格式（name/description/parameters 提升到顶层） |
+| TC-CGWEB-018 | 请求转换 - 无 tools | tools 为 None | 转换后 tools 仍为 None |
+| TC-CGWEB-019 | 请求转换 - parameters schema 修补 | parameters 为 `{"type":"object"}` 无 properties | 自动补充 `"properties": {}` |
+| TC-CGWEB-020 | 请求转换 - schema 修补覆盖组合/定义类 | anyOf/oneOf/allOf/$defs/additionalProperties/tuple items 中的 object 子 schema | 递归修补所有位置 |
+| TC-CGWEB-021 | 前端防御 - 无参数 MCP 工具 formatToolsForAPI | inputSchema 只有 type:"object"，无 properties/required | properties 回退 {}，required 回退 [] |
+| TC-CGWEB-022 | 前端防御 - 有参数 MCP 工具 formatToolsForAPI | inputSchema 含完整 properties 和 required | 原样保留，不被回退值覆盖 |
+| TC-CGWEB-023 | 响应转换 - 多工具调用交错 argument delta | 两个 function_call 先后 added，argument delta 交错到达 | 每个 delta 通过 output_index→tool_call_index 映射路由到正确的工具调用 |
 
 ## 关键依赖
 
@@ -188,3 +203,12 @@ services/chatgpt_web/
 | 2026-04-07 | 修复路由：account_id 为 None 时也能走订阅代理，增加 JWT 兜底解析             | Kinzhi |
 | 2026-04-07 | 修复路由：修复 provider 匹配大小写问题，确保 OAuth 请求正确路由至订阅代理    | Kinzhi |
 | 2026-04-07 | 修复流结束：上游未发 [DONE] 时兜底发送 Done 事件，防止前端无限等待           | Kinzhi |
+| 2026-04-07 | 修复 tools 格式：Chat Completions 嵌套格式转为 Responses API 扁平格式        | Kinzhi |
+| 2026-04-07 | 修复 tools parameters：object 类型缺少 properties 时自动补空对象             | Kinzhi |
+| 2026-04-07 | 完善 schema 修补：递归覆盖 anyOf/oneOf/allOf/$defs/additionalProperties      | Kinzhi |
+| 2026-04-07 | 前端防御：getAgentTools 中 MCP 工具无参数时 properties/required 回退空值     | Kinzhi |
+| 2026-04-07 | 前端防御：formatToolsForAPI 中同步添加 properties/required 回退空值           | Kinzhi |
+| 2026-04-07 | 前端测试：新增 TC-CGWEB-021/022 覆盖无参数 MCP 工具格式化输出                | Kinzhi |
+| 2026-04-07 | 回归测试：新增 TC-CGWEB-016a/016b/016c 覆盖 response.failed 错误提取与空 chunk | Kinzhi |
+| 2026-04-08 | 文档修正：事件表 reasoning→reasoning_chunk、tool_calls_delta→tool_calls、usage 并入 done | Kinzhi |
+| 2026-04-08 | 回归测试：新增 TC-CGWEB-023 覆盖多工具调用交错 argument delta 路由                       | Kinzhi |

@@ -102,16 +102,7 @@ where
 
                             // response.failed: 上游失败，透传错误信息而非伪装成正常完成
                             if event.event_type == "response.failed" {
-                                let error_msg = event.response.as_ref()
-                                    .and_then(|r| r.error.as_ref())
-                                    .and_then(|e| e.message.as_ref())
-                                    .cloned()
-                                    .unwrap_or_else(|| "上游响应失败（未提供错误详情）".to_string());
-                                let error_type = event.response.as_ref()
-                                    .and_then(|r| r.error.as_ref())
-                                    .and_then(|e| e.error_type.as_ref())
-                                    .cloned()
-                                    .unwrap_or_default();
+                                let (error_type, error_msg) = extract_failed_error(&event);
                                 error!("[SSE Stream] response.failed: type={}, msg={}", error_type, error_msg);
                                 callback(StreamEvent::Error(error_msg.clone()))?;
                                 return Err(error_msg);
@@ -154,11 +145,7 @@ where
                 } else if let Ok(event) = serde_json::from_str::<ResponsesStreamEvent>(data_str) {
                     // 剩余缓冲区中也可能包含 response.failed
                     if event.event_type == "response.failed" {
-                        let error_msg = event.response.as_ref()
-                            .and_then(|r| r.error.as_ref())
-                            .and_then(|e| e.message.as_ref())
-                            .cloned()
-                            .unwrap_or_else(|| "上游响应失败（未提供错误详情）".to_string());
+                        let (_error_type, error_msg) = extract_failed_error(&event);
                         error!("[SSE Stream] response.failed (缓冲区): {}", error_msg);
                         callback(StreamEvent::Error(error_msg.clone()))?;
                         return Err(error_msg);
@@ -191,4 +178,29 @@ pub enum StreamEvent {
     Done,
     /// 上游错误（response.failed 或网络读取错误）
     Error(String),
+}
+
+/// 从 response.failed 事件中提取错误信息
+///
+/// 返回 (error_type, error_message) 元组。
+/// 若事件中没有 error 详情，error_message 回退为默认提示，error_type 为空字符串。
+///
+/// @param event response.failed 类型的 SSE 事件
+/// @returns (error_type, error_message)
+pub fn extract_failed_error(event: &ResponsesStreamEvent) -> (String, String) {
+    let error_msg = event
+        .response
+        .as_ref()
+        .and_then(|r| r.error.as_ref())
+        .and_then(|e| e.message.as_ref())
+        .cloned()
+        .unwrap_or_else(|| "上游响应失败（未提供错误详情）".to_string());
+    let error_type = event
+        .response
+        .as_ref()
+        .and_then(|r| r.error.as_ref())
+        .and_then(|e| e.error_type.as_ref())
+        .cloned()
+        .unwrap_or_default();
+    (error_type, error_msg)
 }

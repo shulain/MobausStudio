@@ -380,8 +380,10 @@ export function useMCPTools(options: UseMCPToolsOptions): UseMCPToolsReturn {
                 description: tool.description,
                 parameters: {
                     type: 'object' as const,
-                    properties: tool.inputSchema.properties,
-                    required: tool.inputSchema.required,
+                    // 防御性处理：MCP 工具无参数时 inputSchema 可能没有 properties/required
+                    // 后端 fix_object_schema_missing_properties 也会修补，这里前端先兜底
+                    properties: tool.inputSchema.properties || {},
+                    required: tool.inputSchema.required || [],
                 },
             },
         }));

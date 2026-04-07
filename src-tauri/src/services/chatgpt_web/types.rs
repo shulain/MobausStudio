@@ -174,8 +174,9 @@ pub struct ResponsesRequest {
     pub top_p: Option<f64>,
     pub stream: bool,
     pub store: bool,
+    /// 工具定义（Responses API 扁平格式，使用 Value 以区分 Chat Completions 嵌套格式）
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Tool>>,
+    pub tools: Option<Vec<serde_json::Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

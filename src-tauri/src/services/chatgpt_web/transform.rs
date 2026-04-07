@@ -105,6 +105,11 @@ pub fn chat_completions_to_responses(
         instructions = Some("You are a helpful coding assistant.".to_string());
     }
 
+    // 将 Chat Completions 嵌套格式的 tools 转为 Responses API 扁平格式
+    // Chat Completions: { type: "function", function: { name, description, parameters } }
+    // Responses API:    { type: "function", name, description, parameters }
+    let tools = convert_tools_to_responses_format(&req.tools);
+
     ResponsesRequest {
         model: model_override.to_string(),
         input,
@@ -115,7 +120,7 @@ pub fn chat_completions_to_responses(
         top_p: None,
         stream: true,
         store: false,
-        tools: req.tools.clone(),
+        tools,
         tool_choice: req.tool_choice.clone(),
         reasoning: req.reasoning_effort.as_ref().map(|effort| ReasoningConfig {
             effort: effort.clone(),
@@ -477,5 +482,126 @@ fn make_chunk(
             finish_reason,
         }],
         usage: None,
+    }
+}
+
+/// 将 Chat Completions 嵌套格式的 tools 转换为 Responses API 扁平格式
+///
+/// Chat Completions 格式：
+/// ```json
+/// { "type": "function", "function": { "name": "xxx", "description": "...", "parameters": {...} } }
+/// ```
+///
+/// Responses API 格式：
+/// ```json
+/// { "type": "function", "name": "xxx", "description": "...", "parameters": {...} }
+/// ```
+///
+/// 额外修补：Codex Responses API 要求 object 类型的 schema 必须包含 properties，
+/// 若缺失则自动补充 `"properties": {}`（递归处理嵌套 schema）
+///
+/// @param tools Chat Completions 格式的工具定义列表
+/// @returns Responses API 格式的工具定义列表（扁平化 + schema 修补）
+fn convert_tools_to_responses_format(tools: &Option<Vec<Tool>>) -> Option<Vec<serde_json::Value>> {
+    tools.as_ref().map(|tool_list| {
+        tool_list
+            .iter()
+            .map(|tool| {
+                let mut obj = json!({
+                    "type": tool.tool_type,
+                    "name": tool.function.name,
+                });
+                // 可选字段：description
+                if let Some(ref desc) = tool.function.description {
+                    obj["description"] = json!(desc);
+                }
+                // 可选字段：parameters（需要修补 schema）
+                if let Some(ref params) = tool.function.parameters {
+                    let mut patched = params.clone();
+                    fix_object_schema_missing_properties(&mut patched);
+                    obj["parameters"] = patched;
+                }
+                obj
+            })
+            .collect()
+    })
+}
+
+/// 递归修补 JSON Schema：为 type=object 但缺少 properties 的节点补上空 properties
+///
+/// Codex Responses API 严格要求 object 类型的 schema 必须包含 properties 字段，
+/// 而部分 MCP 工具生成的 schema 可能只有 `{"type": "object"}` 而没有 properties。
+///
+/// 递归处理的位置：
+/// - 顶层 schema
+/// - properties 内部的每个子 schema
+/// - items（单个对象或数组形式的 tuple items）
+/// - anyOf / oneOf / allOf 中的每个分支 schema
+/// - additionalProperties（当为对象 schema 时）
+/// - $defs / definitions 中的每个定义
+///
+/// @param schema 待修补的 JSON Schema（就地修改）
+fn fix_object_schema_missing_properties(schema: &mut serde_json::Value) {
+    if let serde_json::Value::Object(map) = schema {
+        // 当 type 为 "object" 且缺少 properties 时，补空对象
+        let is_object_type = map
+            .get("type")
+            .and_then(|v| v.as_str())
+            .map(|s| s == "object")
+            .unwrap_or(false);
+
+        if is_object_type && !map.contains_key("properties") {
+            map.insert(
+                "properties".to_string(),
+                serde_json::Value::Object(serde_json::Map::new()),
+            );
+        }
+
+        // 递归处理 properties 中的每个子 schema
+        if let Some(serde_json::Value::Object(props)) = map.get_mut("properties") {
+            for (_key, sub_schema) in props.iter_mut() {
+                fix_object_schema_missing_properties(sub_schema);
+            }
+        }
+
+        // 递归处理 items（单个对象 schema 或数组形式的 tuple items）
+        if let Some(items) = map.get_mut("items") {
+            match items {
+                serde_json::Value::Object(_) => {
+                    fix_object_schema_missing_properties(items);
+                }
+                serde_json::Value::Array(arr) => {
+                    for item in arr.iter_mut() {
+                        fix_object_schema_missing_properties(item);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // 递归处理 anyOf / oneOf / allOf 中的每个分支
+        for keyword in &["anyOf", "oneOf", "allOf"] {
+            if let Some(serde_json::Value::Array(branches)) = map.get_mut(*keyword) {
+                for branch in branches.iter_mut() {
+                    fix_object_schema_missing_properties(branch);
+                }
+            }
+        }
+
+        // 递归处理 additionalProperties（当为对象 schema 时，布尔值忽略）
+        if let Some(additional) = map.get_mut("additionalProperties") {
+            if additional.is_object() {
+                fix_object_schema_missing_properties(additional);
+            }
+        }
+
+        // 递归处理 $defs / definitions 中的每个定义
+        for keyword in &["$defs", "definitions"] {
+            if let Some(serde_json::Value::Object(defs)) = map.get_mut(*keyword) {
+                for (_name, def_schema) in defs.iter_mut() {
+                    fix_object_schema_missing_properties(def_schema);
+                }
+            }
+        }
     }
 }
