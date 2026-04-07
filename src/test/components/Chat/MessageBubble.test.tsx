@@ -1,5 +1,7 @@
+import React from 'react';
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import { renderWithI18n as render } from '../../testUtils';
 import { MessageBubble } from '../../../components/features/Chat/MessageBubble';
 import type { Message } from '../../../types';
 

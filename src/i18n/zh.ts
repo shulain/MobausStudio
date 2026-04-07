@@ -47,6 +47,17 @@ export const zh = {
         info: '提示',
         required: '必填',
         optional: '可选',
+        downloadImage: '下载图片',
+        imagePreview: '图片预览',
+        imageLoadFailed: '图片加载失败',
+        copyCode: '复制代码',
+        copied: '已复制',
+        collapse: '收起',
+        expand: '展开',
+        thinkingProcess: '思考过程',
+        copyThinkingProcess: '复制思考过程',
+        pleaseSelect: '请选择...',
+        connectedHint: '已连接',
     },
 
     // 导航
@@ -402,7 +413,8 @@ export const zh = {
         installing: '安装中...',
         installCount: '安装 {count} 个技能',
         invalidInputFormat: '无效的输入格式。请输入 URL 或安装命令（如：npx skills add <url>）',
-        specifiedSkillsNotFound: '命令中指定的技能 ({skills}) 在仓库中未找到。已显示所有可用技能。',
+        specifiedSkillsNotFound: '未找到技能 "{skills}"。已切换到仓库技能列表，请勾选后安装。可选技能：{availableSkills}',
+        specifiedSkillsNotFoundFallback: '未找到技能 "{skills}"。已加载仓库中的全部技能，请选择后安装。',
         fileParseError: '文件解析失败，请确保是有效的 JSON 格式',
         invalidFileFormat: '文件格式无效',
         noSkillDefinitions: '未能获取任何技能定义',
@@ -555,6 +567,8 @@ export const zh = {
         // v0.9.0: 协议选择
         protocol: '通信协议',
         protocolDesc: '选择与 API 服务通信的协议类型',
+        useCustomProtocol: '✓ 使用自定义协议：{useCases}',
+        useDefaultProtocol: '💡 将使用提供商默认协议 ({label})',
         // ModelCard
         statusOnline: '在线',
         statusOffline: '离线',
@@ -824,6 +838,10 @@ export const zh = {
         advancedOptions: '高级选项',
         summarizerAgent: '总结者 Agent',
         useFirstParticipant: '使用第一个参与者',
+        thinking: '正在思考中...',
+        unknownRole: '未知角色',
+        summary: '总结',
+        roundN: '第 {round} 轮',
         status: {
             setup: '准备中',
             discussing: '讨论中',

@@ -4,8 +4,11 @@
  * 测试工具调用 UI 展示组件
  */
 
+import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { ToolCallDisplay, ToolCallList } from '../../../components/features/Chat/ToolCallDisplay';
 import { containsMarkdownImage } from '../../../components/features/Chat/ToolCallDisplay';
 import { I18nProvider } from '../../../i18n';
@@ -63,7 +66,7 @@ const mockResultWithShortDuration: ToolResult = {
 describe('ToolCallDisplay', () => {
     describe('状态显示', () => {
         it('显示执行中状态', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     isExecuting={true}
@@ -76,7 +79,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('显示成功状态和结果', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockSuccessResult}
@@ -88,7 +91,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('显示错误状态', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockErrorResult}
@@ -102,7 +105,7 @@ describe('ToolCallDisplay', () => {
 
     describe('交互功能', () => {
         it('可折叠/展开详情', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockSuccessResult}
@@ -129,7 +132,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('正确显示工具参数', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockSuccessResult}
@@ -144,7 +147,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('错误状态显示错误标签', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockErrorResult}
@@ -163,7 +166,7 @@ describe('ToolCallDisplay', () => {
     // v2.4.0: 增强展示测试
     describe('v2.4.0 增强展示', () => {
         it('MCP-79: 执行完成后默认展开', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockSuccessResult}
@@ -178,7 +181,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('MCP-79a: 执行中默认展开显示参数', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     isExecuting={true}
@@ -190,7 +193,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('MCP-79b: 显示执行耗时（秒）', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockResultWithDuration}
@@ -204,7 +207,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('MCP-79b: 显示执行耗时（毫秒）', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockResultWithShortDuration}
@@ -218,7 +221,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('MCP-79c: 耗时未知不显示', async () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     result={mockSuccessResult}
@@ -236,7 +239,7 @@ describe('ToolCallDisplay', () => {
     // v2.5.0: serverName 显示测试
     describe('v2.5.0 serverName 显示', () => {
         it('MCP-81a: 优先显示 serverName', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCallWithServerName}
                     isExecuting={true}
@@ -249,7 +252,7 @@ describe('ToolCallDisplay', () => {
         });
 
         it('MCP-81b: serverName 为空时回退显示 serverId', () => {
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCall}
                     isExecuting={true}
@@ -267,7 +270,7 @@ describe('ToolCallDisplay', () => {
                 isError: false,
             };
 
-            render(
+            renderWithI18n(
                 <ToolCallDisplay
                     toolCall={mockToolCallWithServerName}
                     result={resultWithServerName}
@@ -453,7 +456,7 @@ describe('ToolCallDisplay 图片渲染 (v4.2.2)', () => {
             isError: false,
         };
 
-        const { container } = render(
+        const { container } = renderWithI18n(
             <ToolCallDisplay
                 toolCall={mockToolCall}
                 result={resultWithImage}
@@ -475,7 +478,7 @@ describe('ToolCallDisplay 图片渲染 (v4.2.2)', () => {
             isError: false,
         };
 
-        const { container } = render(
+        const { container } = renderWithI18n(
             <ToolCallDisplay
                 toolCall={mockToolCall}
                 result={resultWithMixed}
@@ -493,7 +496,7 @@ describe('ToolCallDisplay 图片渲染 (v4.2.2)', () => {
     });
 
     it('MCP-IMG-03: 纯文本结果保持 pre 标签渲染', async () => {
-        const { container } = render(
+        const { container } = renderWithI18n(
             <ToolCallDisplay
                 toolCall={mockToolCall}
                 result={mockSuccessResult}
@@ -519,7 +522,7 @@ describe('ToolCallDisplay 图片渲染 (v4.2.2)', () => {
             isError: false,
         };
 
-        const { container } = render(
+        const { container } = renderWithI18n(
             <ToolCallDisplay
                 toolCall={mockToolCall}
                 result={resultWithMultipleImages}
@@ -539,7 +542,7 @@ describe('ToolCallDisplay 图片渲染 (v4.2.2)', () => {
             isError: true,
         };
 
-        const { container } = render(
+        const { container } = renderWithI18n(
             <ToolCallDisplay
                 toolCall={mockToolCall}
                 result={errorResultWithImage}

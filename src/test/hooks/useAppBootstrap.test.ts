@@ -135,8 +135,13 @@ vi.mock('../../data/mockData', () => ({
 // 模拟 builtinProviders
 vi.mock('../../data/providers', () => ({
   builtinProviders: [
-    { id: 'openai', name: 'OpenAI', status: 'disconnected' },
-    { id: 'anthropic', name: 'Anthropic', status: 'disconnected' },
+    {
+      id: 'openai', name: 'OpenAI', status: 'disconnected', models: [
+        { id: 'gpt-4o', name: 'GPT-4o', maxTokens: 16384, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+        { id: 'gpt-5.4', name: 'GPT-5.4', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } }
+      ]
+    },
+    { id: 'anthropic', name: 'Anthropic', status: 'disconnected', models: [] },
   ],
 }));
 
@@ -446,6 +451,57 @@ describe('useAppBootstrap Hook 测试', () => {
     // 即使初始化失败，isDataLoaded 也应该为 true
     await waitFor(() => {
       expect(result.current.isDataLoaded).toBe(true);
+    });
+  });
+
+  // ==================== TC-MODEL-FETCH-002 ====================
+  it('TC-MODEL-FETCH-002: 启动缓存合并更新', async () => {
+    const { modelFetcher } = await import('../../services/modelFetcher');
+
+    // 模拟存在提供商凭证
+    mockProviderCredentialsStorage.load.mockResolvedValue([
+      { providerId: 'openai', type: 'api', apiKey: 'test' } as any
+    ]);
+
+    // 模拟获取到的缓存模型包含旧数据和缺失的新模型
+    (modelFetcher.getAllCachedModels as any).mockResolvedValue({
+      openai: [
+        {
+          id: 'gpt-4o',
+          name: 'GPT-4o (旧缓存名字)',
+          maxTokens: 4096, // 故意写错，应该是 16384
+          contextWindow: 8192, // 故意写错，应该是 128000
+          capabilities: { vision: false, functionCalling: false, streaming: false },
+        }
+      ] as any[]
+    });
+
+    const { result } = renderHook(() =>
+      useAppBootstrap({ addToast: mockAddToast }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isDataLoaded).toBe(true);
+      const provider = result.current.providers.find(p => p.id === 'openai');
+      expect(provider).toBeDefined();
+      if (provider) {
+        // 等待合并后的模型列表
+        expect(provider.models.length).toBeGreaterThan(1);
+
+        // 1. 验证合并后包含新内置模型
+        const newModel = provider.models.find(m => m.id === 'gpt-5.4');
+        expect(newModel).toBeDefined();
+
+        // 2. 验证缓存中已有的模型元数据被更新
+        const gpt4oModel = provider.models.find(m => m.id === 'gpt-4o');
+        expect(gpt4oModel).toBeDefined();
+        if (gpt4oModel) {
+          // 基础静态元数据应该用最新内置的覆盖
+          expect(gpt4oModel.maxTokens).toBe(16384);
+          expect(gpt4oModel.contextWindow).toBe(128000);
+          expect(gpt4oModel.capabilities?.vision).toBe(true);
+        }
+      }
     });
   });
 });

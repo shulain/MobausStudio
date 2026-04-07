@@ -192,10 +192,12 @@ function parseModelsFromResponse(providerId: string, data: unknown): ProviderMod
                     continue;
                 }
 
-                // 只保留聊天模型（gpt、o1、o3、chatgpt、codex 等）
+                // 只保留聊天模型（gpt、o1、o3、o4、chatgpt、codex 等）
+                // v4.3.0: 添加 o4 前缀支持（o4-mini 等）
                 const isChatModel = modelId.includes('gpt') ||
                     modelId.startsWith('o1') ||
                     modelId.startsWith('o3') ||
+                    modelId.startsWith('o4') ||
                     modelId.includes('chatgpt') ||
                     modelId.includes('codex') ||
                     modelId.includes('nano') ||
@@ -234,9 +236,9 @@ function parseModelsFromResponse(providerId: string, data: unknown): ProviderMod
                 const bNano = bId.includes('nano');
                 if (aNano && !bNano) return -1;
                 if (!aNano && bNano) return 1;
-                // mini 模型次之
-                const aMini = aId.includes('mini') && !aId.includes('o1-mini') && !aId.includes('o3-mini');
-                const bMini = bId.includes('mini') && !bId.includes('o1-mini') && !bId.includes('o3-mini');
+                // mini 模型次之（排除推理系列的 mini 变体和 codex-mini）
+                const aMini = aId.includes('mini') && !aId.includes('o1-mini') && !aId.includes('o3-mini') && !aId.includes('o4-mini') && !aId.includes('codex-mini');
+                const bMini = bId.includes('mini') && !bId.includes('o1-mini') && !bId.includes('o3-mini') && !bId.includes('o4-mini') && !bId.includes('codex-mini');
                 if (aMini && !bMini) return -1;
                 if (!aMini && bMini) return 1;
                 return a.id.localeCompare(b.id);
@@ -319,24 +321,28 @@ function formatModelName(modelId: string): string {
  * 根据模型 ID 猜测 maxTokens
  *
  * v3.3.2: 添加 o3、chatgpt、gpt-5、nano 等新模型支持
+ * v4.3.0: 添加 o3-pro、o4-mini、chatgpt-4o-latest 支持
+ * v4.3.2: GPT-5.x 系列统一 128000
  */
 function guessMaxTokens(modelId: string): number {
-    // GPT-5 系列
-    if (modelId.includes('gpt-5') && modelId.includes('codex')) return 128000;
+    // GPT-5 系列（包括 codex 变体）
     if (modelId.includes('gpt-5')) return 128000;
     // GPT-4.1 系列
     if (modelId.includes('gpt-4.1')) return 32768;
     // Nano 系列（最便宜）
     if (modelId.includes('nano')) return 32768;
     // GPT-4o 系列
+    if (modelId.includes('chatgpt-4o')) return 16384;
     if (modelId.includes('gpt-4o')) return 16384;
     if (modelId.includes('gpt-4-turbo')) return 4096;
     if (modelId.includes('gpt-4')) return 8192;
     if (modelId.includes('gpt-3.5')) return 4096;
     // o 系列推理模型
-    if (modelId.includes('o1')) return 100000;
+    if (modelId.includes('o4-mini')) return 100000;
+    if (modelId.includes('o3-pro')) return 100000;
+    if (modelId.includes('o3-mini')) return 100000;
     if (modelId.includes('o3')) return 100000;
-    if (modelId.includes('chatgpt')) return 16384;
+    if (modelId.includes('o1')) return 100000;
     if (modelId.includes('claude-3')) return 8192;
     if (modelId.includes('gemini')) return 8192;
     return 4096;
@@ -346,9 +352,14 @@ function guessMaxTokens(modelId: string): number {
  * 根据模型 ID 猜测 contextWindow
  *
  * v3.3.2: 添加 o3、chatgpt、gpt-5、nano 等新模型支持
+ * v4.3.0: 添加 o3-pro、o4-mini、chatgpt-4o-latest 支持
+ * v4.3.2: GPT-5.x 细化 codex 系列上下文窗口（codex/codex-max 为 1M，其他为 400K）
  */
 function guessContextWindow(modelId: string): number {
-    // GPT-5 系列（超大上下文）
+    // GPT-5 系列
+    // codex/codex-max 系列上下文更大（1M），标准 GPT-5 和 codex-mini 为 400K
+    if (modelId.includes('gpt-5') && modelId.includes('codex') && !modelId.includes('codex-mini')) return 1047576;
+    if (modelId.includes('gpt-5.4')) return 1047576;  // 5.4/5.4-mini 最新旗舰级上下文
     if (modelId.includes('gpt-5')) return 400000;
     // GPT-4.1 系列（超大上下文）
     if (modelId.includes('gpt-4.1')) return 1047576;
@@ -356,6 +367,7 @@ function guessContextWindow(modelId: string): number {
     if (modelId.includes('nano') && modelId.includes('gpt-5')) return 400000;
     if (modelId.includes('nano') && modelId.includes('gpt-4')) return 1047576;
     // GPT-4o 系列
+    if (modelId.includes('chatgpt-4o')) return 128000;
     if (modelId.includes('gpt-4o')) return 128000;
     if (modelId.includes('gpt-4-turbo')) return 128000;
     if (modelId.includes('gpt-4-32k')) return 32768;
@@ -363,9 +375,12 @@ function guessContextWindow(modelId: string): number {
     if (modelId.includes('gpt-3.5-turbo-16k')) return 16385;
     if (modelId.includes('gpt-3.5')) return 16385;
     // o 系列推理模型
-    if (modelId.includes('o1')) return 200000;
+    if (modelId.includes('o4-mini')) return 200000;
+    if (modelId.includes('o3-pro')) return 200000;
+    if (modelId.includes('o3-mini')) return 200000;
     if (modelId.includes('o3')) return 200000;
-    if (modelId.includes('chatgpt')) return 128000;
+    if (modelId.includes('o1-mini')) return 128000;
+    if (modelId.includes('o1')) return 200000;
     if (modelId.includes('claude-3')) return 200000;
     if (modelId.includes('gemini-1.5')) return 1000000;
     if (modelId.includes('gemini-2')) return 1000000;
@@ -376,17 +391,23 @@ function guessContextWindow(modelId: string): number {
  * 根据模型 ID 猜测能力
  *
  * v3.3.2: 添加 o3、chatgpt 等新模型支持
+ * v4.3.0: o3/o3-pro/o4-mini 支持函数调用和视觉，区分各模型能力
+ * v4.3.2: GPT-5.x codex 系列支持视觉和函数调用
  */
 function guessCapabilities(modelId: string): ProviderModel['capabilities'] {
     const hasVision = modelId.includes('vision') ||
         modelId.includes('gpt-4o') ||
         modelId.includes('gpt-4-turbo') ||
+        modelId.includes('gpt-4.1') ||
+        modelId.includes('gpt-5') ||
         modelId.includes('claude-3') ||
         modelId.includes('gemini') ||
-        modelId.includes('chatgpt-4o');
+        modelId.includes('chatgpt-4o') ||
+        modelId.includes('o3') ||
+        modelId.includes('o4-mini');
 
-    // o1/o3 系列不支持函数调用
-    const noFunctionCalling = modelId.includes('o1') || modelId.includes('o3');
+    // o1 系列不支持函数调用；o3/o3-pro/o4-mini 支持
+    const noFunctionCalling = modelId.includes('o1');
 
     return {
         vision: hasVision,
@@ -607,7 +628,7 @@ function convertModelsDevToProviderModels(
         // 标记低成本模型
         if (modelId.includes('nano')) {
             displayName = `${displayName} ⭐最便宜`;
-        } else if (modelId.includes('mini') && !modelId.includes('o1-mini') && !modelId.includes('o3-mini') && !modelId.includes('o4-mini')) {
+        } else if (modelId.includes('mini') && !modelId.includes('o1-mini') && !modelId.includes('o3-mini') && !modelId.includes('o4-mini') && !modelId.includes('codex-mini')) {
             displayName = `${displayName} ⭐推荐`;
         }
 
@@ -647,9 +668,9 @@ function convertModelsDevToProviderModels(
         if (aNano && !bNano) return -1;
         if (!aNano && bNano) return 1;
 
-        // mini 模型次之（排除 o1-mini、o3-mini、o4-mini）
-        const aMini = aId.includes('mini') && !aId.includes('o1-mini') && !aId.includes('o3-mini') && !aId.includes('o4-mini');
-        const bMini = bId.includes('mini') && !bId.includes('o1-mini') && !bId.includes('o3-mini') && !bId.includes('o4-mini');
+        // mini 模型次之（排除 o1-mini、o3-mini、o4-mini、codex-mini）
+        const aMini = aId.includes('mini') && !aId.includes('o1-mini') && !aId.includes('o3-mini') && !aId.includes('o4-mini') && !aId.includes('codex-mini');
+        const bMini = bId.includes('mini') && !bId.includes('o1-mini') && !bId.includes('o3-mini') && !bId.includes('o4-mini') && !bId.includes('codex-mini');
         if (aMini && !bMini) return -1;
         if (!aMini && bMini) return 1;
 
@@ -752,6 +773,15 @@ export const modelFetcher = {
         };
 
         // 1. 优先尝试从提供商 API 动态获取（最准确的数据源）
+        // v4.3.2: 如果是 OpenAI 的 OAuth Web 凭证，由于没有 api.model.read 权限，跳过动态获取和缓存
+        // 强制使用内置的 Web 可用模型列表（在 providers.ts 中定义的 GPT-5 系列）
+        if (providerId === 'openai' && apiKey && !apiKey.startsWith('sk-') && apiKey.length > 50) {
+            logger.info(LogTags.MODEL, '检测到 ChatGPT Plus/Pro OAuth 凭证，跳过 API 模型拉取，使用内置 Web 模型列表');
+            if (builtinModels && builtinModels.length > 0) {
+                return { models: builtinModels, source: 'builtin' };
+            }
+        }
+
         if (DYNAMIC_FETCH_PROVIDERS.includes(providerId) && apiKey) {
             try {
                 let models = await this.fetchFromApi(providerId, apiKey, baseUrl);

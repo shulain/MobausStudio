@@ -23,6 +23,7 @@ import {
     removeThinkingTags,
 } from '../../common/markdown';
 import { ToolCallList } from '../Chat/ToolCallDisplay';
+import { useI18n } from '../../../i18n';
 
 /**
  * 组件 Props
@@ -119,6 +120,7 @@ export const RoundtableMessageBubble: React.FC<RoundtableMessageBubbleProps> = R
     isUserMessage = false,
     onQuoteClick,
 }) => {
+    const { t } = useI18n();
     // 获取发言参与者信息
     const participant = useMemo(() => {
         return participants.find(p => p.id === message.participantId);
@@ -177,7 +179,7 @@ export const RoundtableMessageBubble: React.FC<RoundtableMessageBubbleProps> = R
             if (message.toolCalls && message.toolCalls.length > 0) {
                 return '';
             }
-            return '*(正在思考中...)*';
+            return `*(${t.roundtable.thinking || '正在思考中...'})*`;
         }
 
         if (!message.mentionedParticipantIds?.length) {
@@ -231,16 +233,16 @@ export const RoundtableMessageBubble: React.FC<RoundtableMessageBubbleProps> = R
                     <span className="text-xl">{participant?.avatar || '🤖'}</span>
                     {/* 角色名 */}
                     <span className={`text-sm font-medium ${colors.text}`}>
-                        {participant?.role || '未知角色'}
+                        {participant?.role || t.roundtable.unknownRole || '未知角色'}
                     </span>
                     {/* v4.1.5: 总结标识或轮次标识 */}
                     {message.isSummary ? (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium">
-                            📋 总结
+                            📋 {t.roundtable.summary || '总结'}
                         </span>
                     ) : (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-                            第 {message.round} 轮
+                            {(t.roundtable.roundN || '第 {round} 轮').replace('{round}', message.round.toString())}
                         </span>
                     )}
                 </div>

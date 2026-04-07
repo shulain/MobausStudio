@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Check, ChevronDown } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 interface InputProps {
     value: string;
@@ -61,9 +62,11 @@ interface SearchInputProps {
 export const SearchInput: React.FC<SearchInputProps> = ({
     value,
     onChange,
-    placeholder = '搜索...',
+    placeholder,
     className = '',
 }) => {
+    const { t } = useI18n();
+    const finalPlaceholder = placeholder || t.common.search || '搜索...';
     return (
         <div className={`relative ${className}`}>
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
@@ -71,7 +74,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
+                placeholder={finalPlaceholder}
                 className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-[10px] text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-purple-300 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-gray-700 transition-all"
             />
         </div>
@@ -145,13 +148,14 @@ export const Select: React.FC<SelectProps> = ({
     disabled = false,
     placeholder,
 }) => {
+    const { t } = useI18n();
     // v3.6.5: 下拉框展开状态
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // 获取当前选中项的标签
     const selectedOption = options.find(opt => opt.value === value);
-    const displayLabel = selectedOption?.label || placeholder || '请选择...';
+    const displayLabel = selectedOption?.label || placeholder || t.common.pleaseSelect || '请选择...';
 
     // v3.6.5: 点击外部关闭下拉框
     useEffect(() => {
@@ -221,10 +225,17 @@ export const Select: React.FC<SelectProps> = ({
 
     // v3.6.5: 解析标签，分离名称和连接状态
     const parseLabel = (label: string) => {
+        const connectedSuffix = ` ● ${t.common.connectedHint || '已连接'}`;
+        const fallbackSuffix = ' ● 已连接';
         // 检查是否包含 "● 已连接" 标识
-        if (label.includes(' ● 已连接')) {
+        if (label.includes(connectedSuffix)) {
             return {
-                name: label.replace(' ● 已连接', ''),
+                name: label.replace(connectedSuffix, ''),
+                connected: true,
+            };
+        } else if (label.includes(fallbackSuffix)) {
+            return {
+                name: label.replace(fallbackSuffix, ''),
                 connected: true,
             };
         }
@@ -262,7 +273,7 @@ export const Select: React.FC<SelectProps> = ({
                                 {connected && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full shrink-0">
                                         <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                                        已连接
+                                        {t.common.connectedHint || '已连接'}
                                     </span>
                                 )}
                             </span>

@@ -47,6 +47,7 @@ import type {
   Chat,
   MCPServer,
   MCPTool,
+  ProviderModel,
   RoundtableChat,
   Skill,
 } from '../types';
@@ -393,6 +394,28 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
           });
           const updatedNow = Date.now();
 
+          // ChatGPT Web 订阅代理：将 OpenAI OAuth 凭证同步到 rquest 浏览器指纹客户端
+          // 这样应用重启后，rquest 客户端也能获得凭证用于发送请求
+          const openaiCredential = updatedCredentials.find(
+            (c) => c.providerId === 'openai' && c.type === 'oauth' && c.accessToken
+          );
+          if (openaiCredential) {
+            try {
+              await invoke('chatgpt_web_set_credentials', {
+                accessToken: openaiCredential.accessToken,
+                refreshToken: openaiCredential.refreshToken || '',
+                expiresAt: openaiCredential.expiresAt ? Math.floor(openaiCredential.expiresAt / 1000) : 0,
+                clientId: null,
+                idToken: null,
+                accountId: openaiCredential.accountId || null,
+              });
+              logger.info(LogTags.APP, 'ChatGPT Web 订阅代理凭证已恢复');
+            } catch (e) {
+              // 非致命错误，不阻塞启动
+              logger.warn(LogTags.APP, 'ChatGPT Web 订阅代理凭证恢复失败', { error: e });
+            }
+          }
+
           // 使用纯函数更新 providers 状态
           setProviders(prev => mergeProvidersWithCredentials(prev, updatedCredentials, updatedNow));
         }
@@ -405,6 +428,7 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
           }
 
           // 恢复已连接提供商的缓存模型数据
+          // v4.3.3: 改为合并策略——缓存模型优先，内置列表中缓存缺失的新模型补充到末尾
           if (storedCredentials.length > 0) {
             const cachedModels = await modelFetcher.getAllCachedModels();
             const cachedProviderIds = Object.keys(cachedModels);
@@ -412,9 +436,46 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
               setProviders(prev => prev.map(p => {
                 const credential = storedCredentials.find(c => c.providerId === p.id);
                 if (credential && cachedModels[p.id]) {
+                  // v4.3.4: 深度合并缓存与内置模型，确保相同模型的基础元数据（maxTokens等）保持最新，并补充新增的内置模型
+                  const cached = cachedModels[p.id];
+                  const builtinProvider = builtinProviders.find(bp => bp.id === p.id);
+
+                  let mergedModels = [...cached];
+                  let newBuiltinModels: ProviderModel[] = [];
+
+                  if (builtinProvider) {
+                    const builtinModelsMap = new Map(builtinProvider.models.map(m => [m.id, m]));
+
+                    // 1. 更新缓存中已有模型的元数据
+                    mergedModels = mergedModels.map(cachedModel => {
+                      const builtinModel = builtinModelsMap.get(cachedModel.id);
+                      if (builtinModel) {
+                        return {
+                          ...cachedModel,
+                          // 使用内置最新的静态元数据覆盖旧缓存
+                          maxTokens: builtinModel.maxTokens,
+                          contextWindow: builtinModel.contextWindow,
+                          capabilities: builtinModel.capabilities,
+                          // name 可能被用户修改过，如果缓存里有特定标记(如价格)也可能不同，这里优先保留 name/pricing，或者可以考虑合并
+                        };
+                      }
+                      return cachedModel;
+                    });
+
+                    // 2. 找出内置列表中缓存没有的新模型
+                    const cachedIds = new Set(cached.map(m => m.id));
+                    newBuiltinModels = builtinProvider.models.filter(m => !cachedIds.has(m.id));
+                  }
+
+                  if (newBuiltinModels.length > 0 && import.meta.env.DEV) {
+                    logger.debug(LogTags.APP, '发现缓存中缺失的新内置模型，已补充', {
+                      providerId: p.id,
+                      newModels: newBuiltinModels.map(m => m.id),
+                    });
+                  }
                   return {
                     ...p,
-                    models: cachedModels[p.id],
+                    models: [...mergedModels, ...newBuiltinModels],
                   };
                 }
                 return p;

@@ -31,7 +31,7 @@ import {
     ArrowLeft,
 } from 'lucide-react';
 import { Modal, Button, Input } from '../../common';
-// import { useI18n } from '../../../i18n';
+import { useI18n } from '../../../i18n';
 import { logger, LogTags } from '../../../utils/logger';
 import {
     parseTemplate,
@@ -88,6 +88,8 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
     onCreateSkill,
     onCreateAgent,
 }) => {
+    const { t } = useI18n();
+
     // ==================== 状态 ====================
 
     const [activeTab, setActiveTab] = useState<InstallSourceType>('url');
@@ -117,8 +119,8 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
     // ==================== Tab 配置 ====================
 
     const TABS: { id: InstallSourceType; label: string; icon: React.ReactNode }[] = [
-        { id: 'url', label: '从 URL 安装', icon: <Link className="w-4 h-4" /> },
-        { id: 'file', label: '从文件导入', icon: <FileUp className="w-4 h-4" /> },
+        { id: 'url', label: t.templates.installFromUrl || '从 URL 安装', icon: <Link className="w-4 h-4" /> },
+        { id: 'file', label: t.templates.installFromFile || '从文件导入', icon: <FileUp className="w-4 h-4" /> },
     ];
 
     // ==================== 重置状态 ====================
@@ -168,7 +170,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
 
     const handleFetchTemplate = async () => {
         if (!url.trim()) {
-            setError('请输入有效的模板 URL');
+            setError(t.templates.errorInvalidUrl || '请输入有效的模板 URL');
             return;
         }
 
@@ -186,7 +188,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                 const templates = await discoverTemplatesFromRepo(trimmedUrl);
 
                 if (templates.length === 0) {
-                    setError('该仓库中没有找到有效的模板文件\n\n请确保仓库中包含符合格式的 JSON 文件');
+                    setError(t.templates.errorNoTemplates || '该仓库中没有找到有效的模板文件\n\n请确保仓库中包含符合格式的 JSON 文件');
                 } else if (templates.length === 1) {
                     // 只有一个模板，直接加载
                     await loadTemplateFromUrl(templates[0].rawUrl);
@@ -201,7 +203,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
             }
         } catch (err) {
             logger.error(LogTags.SKILL, '[Template] 获取模板失败', err);
-            setError(err instanceof Error ? err.message : '获取失败，请检查 URL 是否正确');
+            setError(err instanceof Error ? err.message : (t.templates.errorFetchFailed || '获取失败，请检查 URL 是否正确'));
         } finally {
             setIsLoading(false);
         }
@@ -244,7 +246,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
             await loadTemplateFromUrl(discovered.rawUrl);
         } catch (err) {
             logger.error(LogTags.SKILL, '[Template] 加载模板失败', err);
-            setError(err instanceof Error ? err.message : '加载模板失败');
+            setError(err instanceof Error ? err.message : (t.templates.errorLoadFailed || '加载模板失败'));
         } finally {
             setIsLoading(false);
         }
@@ -284,7 +286,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
             });
         } catch (err) {
             logger.error(LogTags.SKILL, '[Template] 解析文件失败', err);
-            setError(err instanceof Error ? err.message : '文件解析失败，请确保是有效的模板 JSON 格式');
+            setError(err instanceof Error ? err.message : (t.templates.errorParseFailed || '文件解析失败，请确保是有效的模板 JSON 格式'));
         } finally {
             setIsLoading(false);
         }
@@ -343,7 +345,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
             }
         } catch (err) {
             logger.error(LogTags.SKILL, '[Template] 安装失败', err);
-            setError(err instanceof Error ? err.message : '安装失败');
+            setError(err instanceof Error ? err.message : (t.templates.errorInstallFailed || '安装失败'));
         } finally {
             setIsLoading(false);
         }
@@ -366,7 +368,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                     type={variable.type === 'secret' ? 'password' : 'text'}
                     value={value}
                     onChange={(val) => handleVariableChange(variable.name, val)}
-                    placeholder={variable.description || `请输入 ${variable.label}`}
+                    placeholder={variable.description || (t.templates.enterVariable || '请输入 {label}').replace('{label}', variable.label)}
                     className="w-full"
                 />
                 {variable.description && (
@@ -473,14 +475,14 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                                     : 'text-yellow-700 dark:text-yellow-300'
                             }`}
                         >
-                            {installResult.success ? '安装完成' : '安装完成（部分失败）'}
+                            {installResult.success ? (t.templates.installComplete || '安装完成') : (t.templates.installPartialFail || '安装完成（部分失败）')}
                         </span>
                     </div>
                     <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        <p>✅ 已安装: {totalInstalled} 个组件</p>
-                        {totalSkipped > 0 && <p>⏭️ 已跳过: {totalSkipped} 个组件（已存在）</p>}
+                        <p>✅ {t.templates.installed || '已安装'}: {totalInstalled} {t.templates.components || '个组件'}</p>
+                        {totalSkipped > 0 && <p>⏭️ {t.templates.skipped || '已跳过'}: {totalSkipped} {t.templates.components || '个组件'} {t.templates.existingSkipped || '（已存在）'}</p>}
                         {installResult.errors.length > 0 && (
-                            <p>❌ 失败: {installResult.errors.length} 个组件</p>
+                            <p>❌ {t.templates.failed || '失败'}: {installResult.errors.length} {t.templates.components || '个组件'}</p>
                         )}
                     </div>
                 </div>
@@ -488,7 +490,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                 {/* 错误详情 */}
                 {installResult.errors.length > 0 && (
                     <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[10px]">
-                        <div className="font-medium text-red-700 dark:text-red-300 mb-2">安装错误:</div>
+                        <div className="font-medium text-red-700 dark:text-red-300 mb-2">{t.templates.installErrors || '安装错误:'}</div>
                         <ul className="text-sm text-red-600 dark:text-red-400 space-y-1">
                             {installResult.errors.map((err, index) => (
                                 <li key={index}>
@@ -517,10 +519,10 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                     </button>
                     <div>
                         <h3 className="font-semibold text-gray-800 dark:text-gray-100">
-                            发现 {discoveredTemplates.length} 个模板
+                            {(t.templates.discoveredTemplates || '发现 {count} 个模板').replace('{count}', discoveredTemplates.length.toString())}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                            选择要安装的模板
+                            {t.templates.selectTemplate || '选择要安装的模板'}
                         </p>
                     </div>
                 </div>
@@ -563,7 +565,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                                         {discovered.stats.skills > 0 && (
                                             <span className="flex items-center gap-1">
                                                 <Sparkles className="w-3 h-3" />
-                                                {discovered.stats.skills} 技能
+                                                {discovered.stats.skills} {t.templates.skills || '技能'}
                                             </span>
                                         )}
                                         {discovered.stats.agents > 0 && (
@@ -594,7 +596,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                 <div className="space-y-4">
                     {renderInstallResult()}
                     <div className="flex justify-end">
-                        <Button onClick={handleClose}>完成</Button>
+                        <Button onClick={handleClose}>{t.templates.done || '完成'}</Button>
                     </div>
                 </div>
             );
@@ -634,11 +636,11 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                     <div className="space-y-3">
                         <h4 className="font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                             <FolderOpen className="w-4 h-4" />
-                            将安装以下组件:
+                            {t.templates.willInstall || '将安装以下组件:'}
                         </h4>
 
                         {renderComponentSection(
-                            'MCP 服务器',
+                            t.templates.mcpServers || 'MCP 服务器',
                             <Server className="w-4 h-4" />,
                             'mcpServers',
                             template.components.mcpServers?.map((s) => ({
@@ -650,12 +652,12 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                         )}
 
                         {renderComponentSection(
-                            '技能',
+                            t.templates.skills || '技能',
                             <Sparkles className="w-4 h-4" />,
                             'skills',
                             template.components.skills?.map((s, i) => ({
                                 id: s.inline?.id || `skill-${i}`,
-                                name: s.inline?.name || s.url || '从 URL 安装',
+                                name: s.inline?.name || s.url || (t.templates.installFromUrl || '从 URL 安装'),
                                 description: s.inline?.description || s.url,
                             })) || [],
                             'text-blue-500'
@@ -679,7 +681,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                         <div className="space-y-3">
                             <h4 className="font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
                                 <Key className="w-4 h-4" />
-                                配置变量:
+                                {t.templates.configureVariables || '配置变量:'}
                             </h4>
                             <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-[10px]">
                                 {variables.map(renderVariableInput)}
@@ -697,7 +699,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                             className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                         />
                         <label htmlFor="skipExisting" className="text-sm text-gray-600 dark:text-gray-400">
-                            跳过已存在的组件（不覆盖）
+                            {t.templates.skipExisting || '跳过已存在的组件（不覆盖）'}
                         </label>
                     </div>
 
@@ -712,7 +714,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                     {/* 操作按钮 */}
                     <div className="flex justify-end gap-3">
                         <Button variant="secondary" onClick={() => setTemplate(null)}>
-                            返回
+                            {t.templates.back || '返回'}
                         </Button>
                         <Button
                             onClick={handleInstall}
@@ -722,12 +724,12 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                             {isLoading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    安装中...
+                                    {t.templates.installing || '安装中...'}
                                 </>
                             ) : (
                                 <>
                                     <Download className="w-4 h-4 mr-2" />
-                                    安装模板
+                                    {t.templates.install || '安装模板'}
                                 </>
                             )}
                         </Button>
@@ -762,13 +764,13 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                模板 URL 或 GitHub 仓库地址
+                                {t.templates.urlLabel || '模板 URL 或 GitHub 仓库地址'}
                             </label>
                             <div className="flex gap-2">
                                 <Input
                                     value={url}
                                     onChange={(val) => setUrl(val)}
-                                    placeholder="https://github.com/user/repo"
+                                    placeholder={t.templates.urlPlaceholder || 'https://github.com/user/repo'}
                                     className="flex-1"
                                     onKeyDown={(e) => e.key === 'Enter' && handleFetchTemplate()}
                                 />
@@ -776,13 +778,13 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                                     {isLoading ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
-                                        <><Search className="w-4 h-4 mr-1" />搜索</>
+                                        <><Search className="w-4 h-4 mr-1" />{t.templates.search || '搜索'}</>
                                     )}
                                 </Button>
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                <p>✨ 输入 GitHub 仓库地址，自动扫描发现所有模板文件</p>
-                                <p className="text-gray-400">支持格式: https://github.com/用户名/仓库名</p>
+                                <p>✨ {t.templates.urlHint || '输入 GitHub 仓库地址，自动扫描发现所有模板文件'}</p>
+                                <p className="text-gray-400">{t.templates.urlFormatHint || '支持格式: https://github.com/用户名/仓库名'}</p>
                             </div>
                         </div>
                     </div>
@@ -794,7 +796,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                         <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-[10px] p-8 text-center">
                             <FileUp className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                             <p className="text-gray-600 dark:text-gray-400 mb-4">
-                                拖拽 JSON 文件到此处，或点击选择文件
+                                {t.templates.dropFileHere || '拖拽 JSON 文件到此处，或点击选择文件'}
                             </p>
                             <label className="inline-block">
                                 <input
@@ -804,11 +806,11 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                                     className="hidden"
                                 />
                                 <span className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-[10px] cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                                    选择文件
+                                    {t.templates.selectFile || '选择文件'}
                                 </span>
                             </label>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                                支持 .json 格式的模板文件
+                                {t.templates.supportedFormat || '支持 .json 格式的模板文件'}
                             </p>
                         </div>
                     </div>
@@ -828,7 +830,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
                 {isLoading && (
                     <div className="flex items-center justify-center py-8">
                         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-                        <span className="ml-3 text-gray-600 dark:text-gray-400">正在加载模板...</span>
+                        <span className="ml-3 text-gray-600 dark:text-gray-400">{t.templates.loading || '正在加载模板...'}</span>
                     </div>
                 )}
             </div>
@@ -841,7 +843,7 @@ export const TemplateInstallModal: React.FC<TemplateInstallModalProps> = ({
         <Modal
             isOpen={isOpen}
             onClose={handleClose}
-            title="📦 安装 Agent 模板"
+            title={`📦 ${t.templates.title || '安装 Agent 模板'}`}
             size="lg"
         >
             <div className="p-4">{renderContent()}</div>

@@ -14,6 +14,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useI18n } from '../../../i18n';
 
 /**
  * CodeBlock 组件 Props
@@ -43,6 +44,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
     enableCopy = true,
     enableLazyLoad = true,
 }) => {
+    const { t } = useI18n();
+
     // 复制状态
     const [copied, setCopied] = useState(false);
     // 是否可见（用于懒加载）
@@ -104,17 +107,17 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
                     <button
                         onClick={handleCopy}
                         className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
-                        title={copied ? '已复制' : '复制代码'}
+                        title={copied ? t.common.copied : t.common.copyCode}
                     >
                         {copied ? (
                             <>
                                 <Check size={14} className="text-green-500" />
-                                <span>已复制</span>
+                                <span>{t.common.copied || '已复制'}</span>
                             </>
                         ) : (
                             <>
                                 <Copy size={14} />
-                                <span>复制</span>
+                                <span>{t.common.copy || '复制'}</span>
                             </>
                         )}
                     </button>

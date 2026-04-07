@@ -20,7 +20,10 @@ import type { AIModelConfig, ModelCreateInput } from '../../types';
 // ==================== 辅助函数 ====================
 
 /**
- * v4.2.5: 判断模型是否支持多模态
+ * v4.3.0: 判断模型是否支持多模态
+ *
+ * v4.2.5: 初始版本
+ * v4.3.0: 添加 o3/o4-mini/gpt-4.1/gpt-5/chatgpt-4o 系列支持
  *
  * @param modelName - 模型名称
  * @param provider - 提供商 ID
@@ -31,13 +34,19 @@ function supportsMultimodal(modelName: string, provider: string): boolean {
 
   // OpenAI 支持多模态的模型
   if (provider === 'openai' || provider === 'chatgpt') {
-    // o1/o3 系列不支持多模态
-    if (lowerName.includes('o1') || lowerName.includes('o3')) {
+    // o1 系列不支持多模态
+    if (lowerName.includes('o1')) {
       return false;
+    }
+    // o3/o4-mini 系列支持多模态
+    if (lowerName.includes('o3') || lowerName.includes('o4-mini')) {
+      return true;
     }
     return lowerName.includes('gpt-4o') ||
            lowerName.includes('gpt-4-turbo') ||
            lowerName.includes('gpt-4-vision') ||
+           lowerName.includes('gpt-4.1') ||
+           lowerName.includes('gpt-5') ||
            lowerName.includes('vision') ||
            lowerName.includes('chatgpt-4o');
   }

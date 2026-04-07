@@ -325,6 +325,11 @@ getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
 | 2026-03-13 | 3.6.3 | - | Fix ModelModal Google credential dirty value: clear googleAccessToken/googleProjectId when credential cannot be loaded |
 | 2026-03-13 | 3.6.4 | - | Fix credential matching case-sensitivity: storage.get/getSync and ModelModal submit use toLowerCase for providerId matching |
 | 2026-03-13 | 3.6.5 | - | Fix useGoogleModels disconnect race condition: increment requestIdRef when accessToken becomes empty so in-flight old requests auto-expire |
+| 2026-04-06 | 4.3.0 | - | Update OpenAI model list: add o3, o3-pro, o4-mini, chatgpt-4o-latest; update filter logic for o4 prefix; update multimodal detection for o4-mini vision; update guessMaxTokens/guessContextWindow for new models |
+| 2026-04-06 | 4.3.1 | - | Fix OAuth Token test connection issue: 1) Use safe model (gpt-4o-mini) for testing 2) Improve 429 error message distinguishing quota limits vs permissions 3) Clean up non-existent built-in models (gpt-5.1 series) |
+| 2026-04-06 | 4.3.2 | - | Add GPT-5.x series models support: 1) Add gpt-5.4 series to fallback list 2) Refine context window guess for codex series 3) Fix codex-mini incorrect sorting as mini priority 4) Add GPT-5.x test cases |
+| 2026-04-06 | 4.3.3 | - | Fix cached model overwriting new built-in models on startup: change `useAppBootstrap` cache recovery to merge strategy, preserving cached models and appending new ones from built-in list |
+| 2026-04-07 | 4.3.4 | - | 1) Fix `gpt-5.1-codex-mini` context window incorrectly guessed as 1M; 2) Upgrade startup cache merge strategy to deep merge, updating cached models with latest metadata from built-in list |
 
 ---
 
@@ -603,6 +608,13 @@ getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
 | TC-CRED-CI-002 | storage.getSync 大小写不敏感 | providerId='OPENAI', 存储为'openai' | 返回匹配的凭证 | [ ] |
 | TC-CRED-CI-003 | ModelModal 提交凭证匹配 | provider='Google', 凭证providerId='google' | 正确获取凭证 | [ ] |
 
+### 模型获取与缓存测试 (v4.3.4)
+
+| 用例ID | 测试场景 | 输入 | 期望输出 | 状态 |
+|--------|---------|------|---------|------|
+| TC-MODEL-FETCH-001 | guessContextWindow - gpt-5.1-codex-mini | 'gpt-5.1-codex-mini' | 返回 400000 | [ ] |
+| TC-MODEL-FETCH-002 | 启动缓存合并更新 | 包含旧元数据的模型与内置新元数据模型合并 | 缓存模型的 maxTokens、contextWindow 等更新为内置最新值 | [ ] |
+
 ### 服务层纯函数测试 (modelState)
 
 > 测试文件: `src/test/services/models/modelState.test.ts`
@@ -651,3 +663,8 @@ getAvailableModels: (models: AIModelConfig[]) => AIModelConfig[]
 | 2026-03-13 | 3.6.3 | - | 修复 ModelModal Google 凭证脏值：加载不到凭证时清空 googleAccessToken/googleProjectId |
 | 2026-03-13 | 3.6.4 | - | 修复凭证匹配大小写敏感：storage.get/getSync 和 ModelModal 提交时使用 toLowerCase 匹配 providerId |
 | 2026-03-13 | 3.6.5 | - | 修复 useGoogleModels 断开连接竞态：accessToken 变空时递增 requestIdRef 使进行中的旧请求自动失效 |
+| 2026-04-06 | 4.3.0 | - | 更新 OpenAI 模型列表：新增 o3、o3-pro、o4-mini、chatgpt-4o-latest；更新过滤逻辑支持 o4 前缀；更新多模态判断支持 o4-mini 视觉能力；更新 guessMaxTokens/guessContextWindow 支持新模型参数 |
+| 2026-04-06 | 4.3.1 | - | 修复 OAuth Token 测试模型连接问题：1) OAuth 测试时使用安全模型(gpt-4o-mini)而非用户选择的模型 2) 优化 429 错误提示区分配额不足和模型无权限 3) 清理内置列表中不存在的模型(gpt-5.1系列)，保留已确认可用的模型 |
+| 2026-04-06 | 4.3.2 | - | 添加 GPT-5.x 系列模型支持：1) 内置 fallback 列表新增 gpt-5.4/gpt-5.4-mini/gpt-5.3-codex/gpt-5.2-codex/gpt-5.2/gpt-5.1-codex-max/gpt-5.1-codex-mini 2) guessContextWindow 细化 codex 系列上下文窗口 3) 排序逻辑排除 codex-mini 被错误归类为 mini 优先排序 4) 添加 GPT-5.x 过滤和参数推测测试用例 |
+| 2026-04-06 | 4.3.3 | - | 修复启动时缓存覆盖导致新内置模型不显示的问题：useAppBootstrap 恢复缓存模型时改为合并策略——缓存中已有的模型保留，内置列表中缓存缺失的新模型自动补充到末尾，确保版本更新后新增的内置模型能立即展示 |
+| 2026-04-07 | 4.3.4 | - | 1) 修复 `gpt-5.1-codex-mini` 模型上下文被错误推断为 1M 的问题；2) 升级启动缓存合并策略，使用内置模型的最新元数据更新已有缓存模型，解决新版本模型属性更新无法即时生效的问题 |

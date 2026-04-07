@@ -32,6 +32,14 @@ use mcp::protocol::{
 };
 use once_cell::sync::Lazy;
 
+/// 全局 ChatGPT Web 客户端
+static CHATGPT_WEB_CLIENT: Lazy<services::chatgpt_web::client::ChatGptWebClient> =
+    Lazy::new(|| {
+        log::info!("[ChatGPT Web] 初始化全局订阅代理客户端");
+        services::chatgpt_web::client::ChatGptWebClient::new()
+            .expect("ChatGPT Web 客户端初始化失败")
+    });
+
 /// 全局 MCP 客户端管理器
 ///
 /// 使用 Lazy 延迟初始化，确保线程安全
@@ -202,6 +210,8 @@ async fn test_model(request: TestModelRequest) -> Result<TestModelResponse, Stri
 /// v3.4.2: 支持 API Key 和 OAuth Token 两种认证方式
 /// - API Key: 使用 /v1/models 端点测试
 /// - OAuth Token: 使用 /v1/chat/completions 端点测试（OAuth Token 没有 api.model.read 权限）
+///   v4.3.1: OAuth 测试时优先使用安全模型（gpt-4o-mini），避免因模型不存在/无权限导致误判
+///   优化 429 错误提示，区分配额不足和模型无权限
 async fn test_openai(
     client: &reqwest::Client,
     request: &TestModelRequest,
@@ -215,66 +225,43 @@ async fn test_openai(
 
     // 检测是否是 OAuth Token（ChatGPT Plus/Pro）
     // OAuth Token 通常以 "eyJ" 开头（JWT 格式）或者很长
-    let is_oauth_token = request.api_key.starts_with("eyJ") || request.api_key.len() > 100;
+    let is_oauth_token = !request.api_key.starts_with("sk-") && !request.api_key.is_empty();
 
     if is_oauth_token {
-        // OAuth Token: 使用 chat/completions 端点测试
-        let url = format!("{}/chat/completions", endpoint);
-        let model_name = request.model_name.as_deref().unwrap_or("gpt-4o-mini");
+        // v4.3.2: OAuth Token 必须使用 ChatGPT Web 订阅代理测试
+        // 不能发给 api.openai.com 否则会报 429 insufficient_quota
+        debug!("[test_openai] OAuth Token 检测，使用 ChatGPT Web 订阅代理测试连接");
 
-        debug!("[test_openai] OAuth Token 检测，使用 chat/completions 端点");
-        debug!("[test_openai] 请求 URL: {}", url);
-        debug!("[test_openai] 使用模型: {}", model_name);
+        let test_result = CHATGPT_WEB_CLIENT.test_connection().await;
 
-        let response = client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", request.api_key))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model_name,
-                "messages": [{"role": "user", "content": "Hi"}],
-                "max_tokens": 1
-            }))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("[test_openai] 网络请求失败: {}", e);
-                format!("请求失败: {}", e)
-            })?;
-
-        let status = response.status();
-        debug!("[test_openai] 响应状态码: {}", status.as_u16());
-
-        if status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            debug!("[test_openai] 响应体: {}", body);
-            Ok(TestModelResponse {
-                success: true,
-                message: "OpenAI API 连接成功 (OAuth Token)".to_string(),
-                status_code: Some(status.as_u16()),
-                details: Some(format!("模型: {}, 端点: {}", model_name, url)),
-            })
-        } else if status.as_u16() == 401 {
-            warn!("[test_openai] OAuth Token 验证失败");
-            Ok(TestModelResponse {
-                success: false,
-                message: "OAuth Token 无效或已过期".to_string(),
-                status_code: Some(status.as_u16()),
-                details: Some("认证失败，请重新登录".to_string()),
-            })
-        } else {
-            let error_text = response.text().await.unwrap_or_default();
-            warn!(
-                "[test_openai] API 返回错误: {} - {}",
-                status.as_u16(),
-                error_text
-            );
-            Ok(TestModelResponse {
-                success: false,
-                message: format!("API 返回错误: {} - {}", status.as_u16(), error_text),
-                status_code: Some(status.as_u16()),
-                details: Some(format!("模型: {}, 错误响应: {}", model_name, error_text)),
-            })
+        match test_result {
+            Ok(true) => {
+                debug!("[test_openai] 订阅代理连接测试成功");
+                Ok(TestModelResponse {
+                    success: true,
+                    message: "OpenAI ChatGPT Plus 连接成功 (订阅代理)".to_string(),
+                    status_code: Some(200),
+                    details: Some("通过 chatgpt.com API 测试成功".to_string()),
+                })
+            }
+            Ok(false) => {
+                warn!("[test_openai] 订阅代理连接测试失败：返回 4xx/5xx");
+                Ok(TestModelResponse {
+                    success: false,
+                    message: "ChatGPT 账户认证失败，Token 可能已失效，请重新登录".to_string(),
+                    status_code: Some(401),
+                    details: Some("订阅代理端点返回错误状态码".to_string()),
+                })
+            }
+            Err(e) => {
+                error!("[test_openai] 订阅代理连接抛出异常: {}", e);
+                Ok(TestModelResponse {
+                    success: false,
+                    message: format!("订阅代理网络请求异常: {}", e),
+                    status_code: Some(500),
+                    details: Some(e),
+                })
+            }
         }
     } else {
         // API Key: 使用 /v1/models 端点测试
@@ -4524,12 +4511,19 @@ fn extract_openai_user_info(token_data: &serde_json::Value) -> (Option<String>, 
 fn parse_jwt_user_info(token: &str) -> Option<(Option<String>, Option<String>)> {
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 3 {
+        warn!("[parse_jwt_user_info] JWT 格式无效，段数: {}", parts.len());
         return None;
     }
 
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
     let payload = URL_SAFE_NO_PAD.decode(parts[1]).ok()?;
     let claims: serde_json::Value = serde_json::from_slice(&payload).ok()?;
+
+    // 调试：记录 JWT claims 的顶级字段名（不记录值，保护隐私）
+    if let Some(obj) = claims.as_object() {
+        let keys: Vec<&String> = obj.keys().collect();
+        debug!("[parse_jwt_user_info] JWT claims 字段: {:?}", keys);
+    }
 
     let mut account_id = None;
     let mut email = None;
@@ -4539,19 +4533,44 @@ fn parse_jwt_user_info(token: &str) -> Option<(Option<String>, Option<String>)> 
         email = Some(e.to_string());
     }
 
-    // 提取 account_id
+    // 提取 account_id（按优先级尝试多个路径）
     if let Some(id) = claims["chatgpt_account_id"].as_str() {
+        info!("[parse_jwt_user_info] 从顶级 chatgpt_account_id 提取成功");
         account_id = Some(id.to_string());
     } else if let Some(auth) = claims["https://api.openai.com/auth"].as_object() {
+        // 调试：记录 auth 命名空间下的字段
+        let auth_keys: Vec<&String> = auth.keys().collect();
+        debug!("[parse_jwt_user_info] auth 命名空间字段: {:?}", auth_keys);
+
         if let Some(id) = auth.get("chatgpt_account_id").and_then(|v| v.as_str()) {
+            info!("[parse_jwt_user_info] 从 auth 命名空间 chatgpt_account_id 提取成功");
+            account_id = Some(id.to_string());
+        } else if let Some(id) = auth.get("user_id").and_then(|v| v.as_str()) {
+            // 某些 JWT 使用 user_id 而非 chatgpt_account_id
+            info!("[parse_jwt_user_info] 从 auth 命名空间 user_id 提取作为 account_id");
             account_id = Some(id.to_string());
         }
     } else if let Some(orgs) = claims["organizations"].as_array() {
         if let Some(first) = orgs.first() {
             if let Some(id) = first["id"].as_str() {
+                info!("[parse_jwt_user_info] 从 organizations[0].id 提取成功");
                 account_id = Some(id.to_string());
             }
         }
+    }
+
+    // 最终兜底：使用 sub（用户唯一标识）作为 account_id
+    if account_id.is_none() {
+        if let Some(sub) = claims["sub"].as_str() {
+            info!("[parse_jwt_user_info] 使用 sub 作为兜底 account_id");
+            account_id = Some(sub.to_string());
+        }
+    }
+
+    if account_id.is_some() {
+        info!("[parse_jwt_user_info] 成功提取 account_id");
+    } else {
+        warn!("[parse_jwt_user_info] 未能从 JWT 中提取任何 account_id");
     }
 
     Some((account_id, email))
@@ -7063,16 +7082,16 @@ async fn chat_send_message(request: ChatSendRequest) -> Result<ChatSendResponse,
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
-    let result = match request.provider.as_str() {
-        "OpenAI" => {
+    let result = match request.provider.to_lowercase().as_str() {
+        "openai" => {
             info!("[chat_send_message] 使用 OpenAI API");
             chat_openai(&client, &request).await
         }
-        "Anthropic" => {
+        "anthropic" => {
             info!("[chat_send_message] 使用 Anthropic API");
             chat_anthropic(&client, &request).await
         }
-        "Google" => {
+        "google" => {
             info!("[chat_send_message] 使用 Google AI API");
             chat_google(&client, &request).await
         }
@@ -11591,6 +11610,7 @@ async fn chat_stream_kiro(
 ///
 /// v3.3.5: 支持 ChatGPT Plus/Pro 用户通过 OAuth 登录后使用
 /// 使用 chatgpt.com/backend-api/codex/responses 端点
+#[allow(dead_code)]
 async fn chat_stream_codex_api(
     window: Window,
     request: &ChatSendRequest,
@@ -12181,9 +12201,18 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
 
     // v3.3.5: 判断是否使用 ChatGPT Codex API（OAuth 用户）
     // 如果有 account_id，说明是通过 OAuth 登录的 ChatGPT Plus/Pro 用户
-    if request.account_id.is_some() && request.provider == "OpenAI" {
-        info!("[chat_stream_message] 使用 ChatGPT Codex API（OAuth 用户）");
-        return chat_stream_codex_api(window, &request, &client).await;
+    if request.provider.eq_ignore_ascii_case("openai") {
+        let has_account_id = request.account_id.is_some();
+        let is_oauth_token = !request.api_key.starts_with("sk-") && !request.api_key.is_empty();
+        let has_rquest_credentials = CHATGPT_WEB_CLIENT.get_access_token().await.is_ok();
+
+        if has_account_id || (is_oauth_token && has_rquest_credentials) {
+            info!(
+                "[chat_stream_message] 使用 ChatGPT Web 订阅代理（rquest 浏览器指纹），account_id={}, is_oauth={}, rquest_cred={}",
+                has_account_id, is_oauth_token, has_rquest_credentials
+            );
+            return chatgpt_web_stream_message(window, request).await;
+        }
     }
 
     // v4.1.46: 优先使用 protocol 字段（用于自定义供应商）
@@ -12640,6 +12669,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            chatgpt_web_set_credentials,
+            chatgpt_web_generate_pkce,
+            chatgpt_web_build_authorize_url,
+            chatgpt_web_exchange_code,
+            chatgpt_web_test_connection,
+            chatgpt_web_stream_message,
             test_model,
             save_models,
             load_models,
@@ -13014,3 +13049,264 @@ mod tests {
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod lib_test;
+
+/// 设置 ChatGPT Web 凭证
+#[tauri::command]
+async fn chatgpt_web_set_credentials(
+    access_token: String,
+    refresh_token: String,
+    expires_at: u64,
+    client_id: Option<String>,
+    id_token: Option<String>,
+    account_id: Option<String>,
+) -> Result<(), String> {
+    log::info!("[chatgpt_web_set_credentials] 设置 ChatGPT Web 凭证");
+
+    let chatgpt_account_id = if account_id.is_some() {
+        log::info!("[chatgpt_web_set_credentials] 使用传入的 account_id");
+        account_id
+    } else if let Some(ref token) = id_token {
+        if let Some(aid) = parse_chatgpt_account_id_from_jwt(token) {
+            log::info!("[chatgpt_web_set_credentials] 从 ID Token 解析到 account_id");
+            Some(aid)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let cred = services::chatgpt_web::types::ChatGptCredentials {
+        access_token,
+        refresh_token,
+        client_id: client_id.unwrap_or_default(),
+        expires_at,
+        id_token,
+        chatgpt_account_id,
+    };
+
+    CHATGPT_WEB_CLIENT.set_credentials(cred).await;
+    Ok(())
+}
+
+fn parse_chatgpt_account_id_from_jwt(id_token: &str) -> Option<String> {
+    let parts: Vec<&str> = id_token.split('.').collect();
+    if parts.len() < 2 {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(parts[1])
+        .ok()?;
+    let claims: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
+    claims
+        .get("https://api.openai.com/auth")
+        .and_then(|a| a.get("chatgpt_account_id"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+#[tauri::command]
+fn chatgpt_web_generate_pkce() -> Result<serde_json::Value, String> {
+    let (verifier, challenge) = services::chatgpt_web::oauth::generate_pkce_pair();
+    Ok(serde_json::json!({
+        "verifier": verifier,
+        "challenge": challenge
+    }))
+}
+
+#[tauri::command]
+fn chatgpt_web_build_authorize_url(
+    code_challenge: String,
+    state: String,
+) -> Result<String, String> {
+    Ok(services::chatgpt_web::oauth::build_authorize_url(
+        &code_challenge,
+        &state,
+    ))
+}
+
+#[tauri::command]
+async fn chatgpt_web_exchange_code(
+    code: String,
+    code_verifier: String,
+) -> Result<serde_json::Value, String> {
+    let token = services::chatgpt_web::oauth::exchange_code(
+        CHATGPT_WEB_CLIENT.get_client(),
+        &code,
+        &code_verifier,
+    )
+    .await?;
+    Ok(serde_json::to_value(token).unwrap())
+}
+
+#[tauri::command]
+async fn chatgpt_web_test_connection() -> Result<serde_json::Value, String> {
+    let connected = CHATGPT_WEB_CLIENT.test_connection().await.unwrap_or(false);
+    Ok(serde_json::json!({ "connected": connected }))
+}
+
+#[tauri::command]
+async fn chatgpt_web_stream_message(
+    window: tauri::Window,
+    request: ChatSendRequest,
+) -> Result<(), String> {
+    log::info!("[chatgpt_web_stream_message] 开始 ChatGPT Web 订阅代理流式发送");
+
+    let msg_id = request
+        .message_id
+        .clone()
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+    let mut messages = Vec::new();
+    if let Some(ref system_prompt) = request.system_prompt {
+        if !system_prompt.is_empty() {
+            messages.push(serde_json::json!({"role": "system", "content": system_prompt}));
+        }
+    }
+    for msg in &request.messages {
+        messages.push(serde_json::to_value(msg).unwrap_or_default());
+    }
+
+    let chat_messages: Vec<services::chatgpt_web::types::ChatMessage> = messages
+        .iter()
+        .filter_map(|m| serde_json::from_value(m.clone()).ok())
+        .collect();
+
+    let chat_req = services::chatgpt_web::types::ChatCompletionsRequest {
+        model: request.model_name.clone(),
+        messages: chat_messages,
+        max_tokens: request.max_tokens.map(|v| v as u64),
+        max_completion_tokens: None,
+        temperature: request.temperature,
+        top_p: None,
+        stream: Some(true),
+        stream_options: Some(services::chatgpt_web::types::StreamOptions {
+            include_usage: Some(true),
+        }),
+        tools: request.tools.as_ref().map(|tools| {
+            tools
+                .iter()
+                .filter_map(|t| serde_json::from_value(t.clone()).ok())
+                .collect()
+        }),
+        tool_choice: None,
+        reasoning_effort: None,
+        service_tier: None,
+    };
+
+    let codex_model = services::chatgpt_web::types::normalize_codex_model(&request.model_name);
+    let responses_req =
+        services::chatgpt_web::transform::chat_completions_to_responses(&chat_req, codex_model);
+
+    let response = CHATGPT_WEB_CLIENT
+        .send_responses_request(&responses_req)
+        .await
+        .map_err(|e| {
+            let _ = window.emit(
+                "chat-event",
+                serde_json::json!({ "id": msg_id, "event": "error", "error": e }),
+            );
+            e
+        })?;
+
+    let window_clone = window.clone();
+    let msg_id_clone = msg_id.clone();
+    let mut final_usage = None;
+    let mut tool_calls_accumulator: std::collections::HashMap<usize, serde_json::Value> = std::collections::HashMap::new();
+
+    services::chatgpt_web::stream::process_sse_stream(
+        response,
+        &request.model_name,
+        true,
+        |event| {
+            match event {
+                services::chatgpt_web::stream::StreamEvent::Chunk(json_str) => {
+                    if let Ok(chunk) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                        let choice = chunk.get("choices").and_then(|c| c.get(0));
+
+                        if let Some(content) = choice.and_then(|c| c.get("delta")).and_then(|d| d.get("content")).and_then(|c| c.as_str()) {
+                            if !content.is_empty() {
+                                let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "chunk", "content": content }));
+                            }
+                        }
+
+                        if let Some(reasoning) = choice.and_then(|c| c.get("delta")).and_then(|d| d.get("reasoning_content")).and_then(|c| c.as_str()) {
+                            if !reasoning.is_empty() {
+                                let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "reasoning_chunk", "content": reasoning }));
+                            }
+                        }
+
+                        if let Some(tool_calls) = choice.and_then(|c| c.get("delta")).and_then(|d| d.get("tool_calls")).and_then(|tc| tc.as_array()) {
+                            for tool_call in tool_calls {
+                                if let Some(idx) = tool_call.get("index").and_then(|i| i.as_u64()).map(|i| i as usize) {
+                                    let accumulated = tool_calls_accumulator.entry(idx).or_insert_with(|| {
+                                        serde_json::json!({
+                                            "id": "",
+                                            "type": "function",
+                                            "function": {
+                                                "name": "",
+                                                "arguments": ""
+                                            }
+                                        })
+                                    });
+
+                                    if let Some(id) = tool_call.get("id").and_then(|v| v.as_str()) {
+                                        accumulated["id"] = serde_json::json!(id);
+                                    }
+
+                                    if let Some(name) = tool_call.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()) {
+                                        accumulated["function"]["name"] = serde_json::json!(name);
+                                    }
+
+                                    if let Some(args) = tool_call.get("function").and_then(|f| f.get("arguments")).and_then(|v| v.as_str()) {
+                                        let current_args = accumulated["function"]["arguments"].as_str().unwrap_or("");
+                                        accumulated["function"]["arguments"] = serde_json::json!(format!("{}{}", current_args, args));
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(finish_reason) = choice.and_then(|c| c.get("finish_reason")).and_then(|v| v.as_str()) {
+                            if finish_reason == "tool_calls" || finish_reason == "stop" {
+                                if !tool_calls_accumulator.is_empty() {
+                                    let tool_calls_vec: Vec<serde_json::Value> = tool_calls_accumulator.values().cloned().collect();
+
+                                    let valid_calls: Vec<_> = tool_calls_vec.iter().filter(|tc| {
+                                        let id = tc.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                                        let name = tc.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()).unwrap_or("");
+                                        !id.is_empty() && !name.is_empty()
+                                    }).cloned().collect();
+
+                                    if !valid_calls.is_empty() {
+                                        log::info!("[chatgpt_web_stream_message] AI 请求工具调用 (finish_reason={})", finish_reason);
+                                        let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "tool_calls", "tool_calls": valid_calls }));
+                                        tool_calls_accumulator.clear();
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(usage) = chunk.get("usage") {
+                            if !usage.is_null() {
+                                final_usage = Some(usage.clone());
+                            }
+                        }
+                    }
+                }
+                services::chatgpt_web::stream::StreamEvent::Done => {
+                    let mut done_payload = serde_json::json!({ "id": msg_id_clone, "event": "done" });
+                    if let Some(usage) = &final_usage {
+                        done_payload.as_object_mut().unwrap().insert("usage".to_string(), usage.clone());
+                    }
+                    let _ = window_clone.emit("chat-event", done_payload);
+                }
+                services::chatgpt_web::stream::StreamEvent::Error(err_msg) => {
+                    let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "error", "error": err_msg }));
+                }
+            }
+            Ok(())
+        }
+    ).await?;
+
+    Ok(())
+}

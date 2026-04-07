@@ -12,14 +12,19 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ExpandableSearch } from '../../../components/common/ExpandableSearch';
+import { I18nProvider } from '../../../i18n';
 
 describe('ExpandableSearch 可展开搜索框', () => {
+    const renderWithProvider = (ui: React.ReactElement) => {
+        return render(<I18nProvider>{ui}</I18nProvider>);
+    };
+
     /**
      * TC-SEARCH-001: 初始折叠状态
      * 测试场景: 默认渲染时输入框应不可交互
      */
     it('TC-SEARCH-001: 初始状态输入框 tabIndex 为 -1', () => {
-        render(
+        renderWithProvider(
             <ExpandableSearch value="" onChange={vi.fn()} />
         );
 
@@ -33,7 +38,7 @@ describe('ExpandableSearch 可展开搜索框', () => {
      */
     it('TC-SEARCH-002: 输入文本调用 onChange', () => {
         const onChange = vi.fn();
-        render(
+        renderWithProvider(
             <ExpandableSearch value="" onChange={onChange} />
         );
 
@@ -49,7 +54,7 @@ describe('ExpandableSearch 可展开搜索框', () => {
      */
     it('TC-SEARCH-003: ESC 键清空输入', () => {
         const onChange = vi.fn();
-        render(
+        renderWithProvider(
             <ExpandableSearch value="test" onChange={onChange} />
         );
 
@@ -64,7 +69,7 @@ describe('ExpandableSearch 可展开搜索框', () => {
      * 测试场景: value 不为空时应保持展开状态
      */
     it('TC-SEARCH-004: 有值时输入框 tabIndex 为 0', () => {
-        render(
+        renderWithProvider(
             <ExpandableSearch value="search text" onChange={vi.fn()} />
         );
 

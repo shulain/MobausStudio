@@ -12,7 +12,8 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import { renderWithI18n as render } from '../../../testUtils';
 import { CodeBlock } from '../../../../components/common/markdown';
 
 // 保存原始的 IntersectionObserver

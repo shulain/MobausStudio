@@ -13,6 +13,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Brain, Clipboard } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 /**
  * ThinkingBlock 组件 Props
@@ -78,6 +79,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
 }) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
     const contentRef = useRef<HTMLDivElement>(null);
+    const { t } = useI18n();
 
     // 确定要显示的思考内容
     // 优先使用直接传入的 content，否则从 rawContent 解析
@@ -128,9 +130,9 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
                         <ChevronRight size={14} className="flex-shrink-0" />
                     )}
                     <Brain size={14} className="flex-shrink-0" />
-                    <span className="font-medium">思考过程</span>
+                    <span className="font-medium">{t.common.thinkingProcess || '思考过程'}</span>
                     <span className="opacity-70 ml-auto font-mono italic truncate max-w-[200px]">
-                        {isExpanded ? '收起' : previewText}
+                        {isExpanded ? (t.common.collapse || '收起') : previewText}
                     </span>
                 </button>
 
@@ -138,7 +140,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
                 <button
                     onClick={handleCopy}
                     className="px-2 py-2 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition"
-                    title="复制思考过程"
+                    title={t.common.copyThinkingProcess || '复制思考过程'}
                 >
                     <Clipboard size={14} />
                 </button>

@@ -412,17 +412,13 @@ export const ModelModal: React.FC<ModelModalProps> = ({
                             if (protocol === effectiveProtocol) {
                                 const protocolInfo = PROTOCOLS.find(p => p.id === protocol);
                                 const useCases = protocolInfo ? getLocalizedText(protocolInfo.useCases, language) : '';
-                                return language === 'zh'
-                                    ? `✓ 使用自定义协议：${useCases}`
-                                    : `✓ Custom protocol: ${useCases}`;
+                                return (t.models.useCustomProtocol || '✓ 使用自定义协议：{useCases}').replace('{useCases}', useCases);
                             }
 
                             // 否则显示将使用的默认协议
                             const defaultProtocolInfo = PROTOCOLS.find(p => p.id === effectiveProtocol);
                             const defaultLabel = defaultProtocolInfo ? getLocalizedText(defaultProtocolInfo.label, language) : '';
-                            return language === 'zh'
-                                ? `💡 将使用提供商默认协议 (${defaultLabel})`
-                                : `💡 Will use provider default protocol (${defaultLabel})`;
+                            return (t.models.useDefaultProtocol || '💡 将使用提供商默认协议 ({label})').replace('{label}', defaultLabel);
                         })()}
                     </p>
                 </div>

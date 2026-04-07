@@ -199,7 +199,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
      */
     const handleFetchRegistry = async () => {
         if (!url.trim()) {
-            setError('请输入有效的 URL 或安装命令');
+            setError(t.skills.invalidInputFormat || '请输入有效的 URL 或安装命令');
             return;
         }
 
@@ -225,7 +225,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
             } else {
                 // 无法解析，检查是否是有效 URL
                 if (!url.trim().startsWith('http')) {
-                    setError('无效的输入格式。请输入 URL 或安装命令（如：npx skills add <url>）');
+                    setError(t.skills.invalidInputFormat || '无效的输入格式。请输入 URL 或安装命令（如：npx skills add <url>）');
                     setIsLoading(false);
                     return;
                 }
@@ -262,7 +262,10 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
 
                 // 如果没有匹配到任何技能，显示警告但仍然显示所有可用技能
                 if (matchedSkillIds.size === 0) {
-                    setError(`命令中指定的技能 (${filterSkillIds.join(', ')}) 在仓库中未找到。已显示所有可用技能。`);
+                    const availableSkillsStr = result.skills.map(s => s.name || s.id).join(', ');
+                    setError((t.skills.specifiedSkillsNotFound || '未找到技能 "{skills}"。已切换到仓库技能列表，请勾选后安装。可选技能：{availableSkills}')
+                        .replace('{skills}', filterSkillIds.join(', '))
+                        .replace('{availableSkills}', availableSkillsStr));
                     setSelectedSkills(new Set(result.skills.map((s) => s.id)));
                 } else {
                     setSelectedSkills(matchedSkillIds);
@@ -273,7 +276,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
             }
         } catch (err) {
             logger.error(LogTags.SKILL, '获取仓库失败', err);
-            setError(err instanceof Error ? err.message : '获取失败，请检查 URL 是否正确');
+            setError(err instanceof Error ? err.message : (t.skills.noSkillDefinitions || '获取失败，请检查 URL 是否正确'));
         } finally {
             setIsLoading(false);
         }
@@ -323,7 +326,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
             setSelectedSkills(new Set(fakeRegistry.skills.map((s) => s.id)));
         } catch (err) {
             logger.error(LogTags.SKILL, '解析文件失败', err);
-            setError('文件解析失败，请确保是有效的 JSON 格式');
+            setError(t.skills.fileParseError || '文件解析失败，请确保是有效的 JSON 格式');
         } finally {
             setIsLoading(false);
         }
@@ -389,7 +392,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
             logger.debug(LogTags.SKILL, `hasMore 更新`, { hasMore: response.hasMore });
         } catch (err) {
             logger.error(LogTags.SKILL, '加载 skills.sh 列表失败', err);
-            setSkillsShError(err instanceof Error ? err.message : '加载失败');
+            setSkillsShError(err instanceof Error ? err.message : (t.common.error || '加载失败'));
         } finally {
             setSkillsShLoading(false);
             logger.debug(LogTags.SKILL, 'loadSkillsShList 结束');
@@ -520,19 +523,19 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
 
                     const missingSkill = item.skillId || item.name;
                     if (availableSkills.length > 0) {
-                        setError(`未找到技能 "${missingSkill}"。已切换到仓库技能列表，请勾选后安装。可选技能：${availableSkills.join(', ')}`);
+                        setError((t.skills.specifiedSkillsNotFound || `未找到技能 "{skills}"。已切换到仓库技能列表，请勾选后安装。可选技能：{availableSkills}`).replace('{skills}', missingSkill).replace('{availableSkills}', availableSkills.join(', ')));
                     } else {
-                        setError(`未找到技能 "${missingSkill}"。已加载仓库中的全部技能，请选择后安装。`);
+                        setError((t.skills.specifiedSkillsNotFoundFallback || `未找到技能 "{skills}"。已加载仓库中的全部技能，请选择后安装。`).replace('{skills}', missingSkill));
                     }
                 } catch (fallbackErr) {
                     logger.error(LogTags.SKILL, '回退到 URL 多选流程失败', fallbackErr);
-                    setError(errorMessage || '安装失败');
+                    setError(errorMessage || t.skills.failed || '安装失败');
                 }
             } else {
                 if (isGitHubRateLimitError(err)) {
                     logger.warn(LogTags.SKILL, '官方仓库安装因 GitHub 限流终止，不触发多选回退');
                 }
-                setError(errorMessage || '安装失败');
+                setError(errorMessage || t.skills.failed || '安装失败');
             }
         } finally {
             setIsLoading(false);

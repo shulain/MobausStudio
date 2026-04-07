@@ -12,6 +12,7 @@
 
 import React, { useEffect } from 'react';
 import { X, Download } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 /**
  * ImagePreview 组件 Props
@@ -41,6 +42,8 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
     alt,
     onDownload,
 }) => {
+    const { t } = useI18n();
+
     // ESC 键关闭
     useEffect(() => {
         if (!isOpen) return;
@@ -113,7 +116,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                 <button
                     onClick={handleDownload}
                     className="p-2 bg-white/10 hover:bg-white/20 rounded-[10px] transition-colors backdrop-blur-sm"
-                    title="下载图片"
+                    title={t.common.downloadImage || "下载图片"}
                 >
                     <Download className="w-5 h-5 text-white" />
                 </button>
@@ -122,7 +125,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
                 <button
                     onClick={onClose}
                     className="p-2 bg-white/10 hover:bg-white/20 rounded-[10px] transition-colors backdrop-blur-sm"
-                    title="关闭 (ESC)"
+                    title={`${t.common.close || '关闭'} (ESC)`}
                 >
                     <X className="w-5 h-5 text-white" />
                 </button>
@@ -135,7 +138,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
             >
                 <img
                     src={src}
-                    alt={alt || '图片预览'}
+                    alt={alt || t.common.imagePreview || '图片预览'}
                     className="max-w-full max-h-[95vh] object-contain rounded-[10px] shadow-2xl"
                 />
 

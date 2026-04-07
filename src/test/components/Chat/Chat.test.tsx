@@ -1025,7 +1025,7 @@ describe('MessageBubble - 思考模式测试', () => {
             createdAt: new Date(),
         };
 
-        const { container } = render(<MessageBubble message={message} />);
+        const { container } = renderWithI18n(<MessageBubble message={message} />);
 
         // 查找思考内容容器，验证有 maxHeight 样式
         const reasoningContainer = container.querySelector('[style*="max-height"]');
@@ -1045,7 +1045,7 @@ describe('MessageBubble - 思考模式测试', () => {
             createdAt: new Date(),
         };
 
-        const { container } = render(<MessageBubble message={message} />);
+        const { container } = renderWithI18n(<MessageBubble message={message} />);
 
         // 验证 amber 背景色类名
         const reasoningSection = container.querySelector('.bg-amber-50');
@@ -1127,7 +1127,7 @@ describe('MessageBubble - 多模态消息测试', () => {
             createdAt: new Date(),
         };
 
-        const { container } = render(<MessageBubble message={message} />);
+        const { container } = renderWithI18n(<MessageBubble message={message} />);
 
         // 应该显示视频元素
         const video = container.querySelector('video');

@@ -21,6 +21,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 interface ExpandableSearchProps {
     /** 搜索值 */
@@ -40,11 +41,14 @@ interface ExpandableSearchProps {
 export const ExpandableSearch: React.FC<ExpandableSearchProps> = ({
     value,
     onChange,
-    placeholder = '搜索...',
+    placeholder,
     className = '',
     expandedWidth = '280px',
     autoCollapse = true,
 }) => {
+    const { t } = useI18n();
+    const finalPlaceholder = placeholder || t.common.search || '搜索...';
+
     // 展开状态
     const [isExpanded, setIsExpanded] = useState(false);
     // 输入框引用，用于自动聚焦
@@ -137,7 +141,7 @@ export const ExpandableSearch: React.FC<ExpandableSearchProps> = ({
                     cursor: isExpanded ? 'text' : 'pointer',
                 }}
                 onClick={!isExpanded ? handleExpand : undefined}
-                title={!isExpanded ? placeholder : undefined}
+                title={!isExpanded ? finalPlaceholder : undefined}
             >
                 {/* 搜索图标 */}
                 <div
@@ -166,7 +170,7 @@ export const ExpandableSearch: React.FC<ExpandableSearchProps> = ({
                     onChange={(e) => onChange(e.target.value)}
                     onBlur={handleCollapse}
                     onKeyDown={handleKeyDown}
-                    placeholder={placeholder}
+                    placeholder={finalPlaceholder}
                     tabIndex={isExpanded ? 0 : -1}
                     className={`
                         flex-1 h-full py-2 pr-2 min-w-0

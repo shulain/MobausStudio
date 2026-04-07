@@ -49,6 +49,17 @@ export const en: Translations = {
         info: 'Info',
         required: 'Required',
         optional: 'Optional',
+        downloadImage: 'Download Image',
+        imagePreview: 'Image Preview',
+        imageLoadFailed: 'Image load failed',
+        copyCode: 'Copy Code',
+        copied: 'Copied',
+        collapse: 'Collapse',
+        expand: 'Expand',
+        thinkingProcess: 'Thinking Process',
+        copyThinkingProcess: 'Copy Thinking Process',
+        pleaseSelect: 'Please select...',
+        connectedHint: 'Connected',
     },
 
     // Navigation
@@ -404,7 +415,8 @@ export const en: Translations = {
         installing: 'Installing...',
         installCount: 'Install {count} Skills',
         invalidInputFormat: 'Invalid input format. Please enter URL or install command (e.g., npx skills add <url>)',
-        specifiedSkillsNotFound: 'Skills specified in command ({skills}) not found in repository. Showing all available skills.',
+        specifiedSkillsNotFound: 'Skill "{skills}" not found. Switched to repository skill list, please select and install. Available skills: {availableSkills}',
+        specifiedSkillsNotFoundFallback: 'Skill "{skills}" not found. All skills from the repository have been loaded, please select and install.',
         fileParseError: 'File parse failed, please ensure valid JSON format',
         invalidFileFormat: 'Invalid file format',
         noSkillDefinitions: 'Failed to get any skill definitions',
@@ -557,6 +569,8 @@ export const en: Translations = {
         // v0.9.0: Protocol selection
         protocol: 'Protocol',
         protocolDesc: 'Select the protocol type for API communication',
+        useCustomProtocol: '✓ Custom protocol: {useCases}',
+        useDefaultProtocol: '💡 Will use provider default protocol ({label})',
         // ModelCard
         statusOnline: 'Online',
         statusOffline: 'Offline',
@@ -826,6 +840,10 @@ export const en: Translations = {
         advancedOptions: 'Advanced Options',
         summarizerAgent: 'Summarizer Agent',
         useFirstParticipant: 'Use first participant',
+        thinking: 'Thinking...',
+        unknownRole: 'Unknown Role',
+        summary: 'Summary',
+        roundN: 'Round {round}',
         status: {
             setup: 'Setup',
             discussing: 'Discussing',

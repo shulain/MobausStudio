@@ -20,6 +20,7 @@ import { providerCredentialsStorage } from '../storage';
 import { modelFetcher } from '../modelFetcher';
 import { logger, LogTags } from '../../utils/logger';
 import type { ProviderConnectResult } from './providerState';
+import { invoke } from '@tauri-apps/api/core';
 
 // ==================== 类型定义 ====================
 
@@ -189,6 +190,25 @@ export async function handleOAuthConnect(
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    // ChatGPT Web 订阅代理：将 OAuth 凭证同步到 rquest 浏览器指纹客户端
+    // 这样后续通过 chat_stream_message 发送消息时，rquest 客户端已有凭证可用
+    if (providerId === 'openai') {
+      try {
+        await invoke('chatgpt_web_set_credentials', {
+          accessToken: oauthResult.accessToken,
+          refreshToken: oauthResult.refreshToken || '',
+          expiresAt: oauthResult.expiresAt ? Math.floor(oauthResult.expiresAt / 1000) : 0,
+          clientId: null,
+          idToken: null,
+          accountId: oauthResult.accountId || null,
+        });
+        logger.info(LogTags.APP, 'ChatGPT Web 订阅代理凭证已同步');
+      } catch (e) {
+        // 非致命错误，不影响主流程
+        logger.warn(LogTags.APP, 'ChatGPT Web 订阅代理凭证同步失败', { error: e });
+      }
+    }
 
     // 尝试动态获取模型列表
     const models = await fetchModelsIfSupported(

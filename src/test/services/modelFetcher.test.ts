@@ -426,4 +426,163 @@ describe('modelFetcher 服务测试', () => {
             expect(models[0].id).toBe('gpt-4o');
         });
     });
+
+    // v4.3.2: GPT-5.x 系列模型测试
+    describe('TC-MODEL-FETCH-006: GPT-5.x 模型过滤和参数推测', () => {
+        it('应该正确保留 GPT-5.x 系列所有模型（包括 codex 变体）', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.4', owned_by: 'openai' },
+                        { id: 'gpt-5.4-mini', owned_by: 'openai' },
+                        { id: 'gpt-5.3-codex', owned_by: 'openai' },
+                        { id: 'gpt-5.2-codex', owned_by: 'openai' },
+                        { id: 'gpt-5.2', owned_by: 'openai' },
+                        { id: 'gpt-5.1-codex-max', owned_by: 'openai' },
+                        { id: 'gpt-5.1-codex-mini', owned_by: 'openai' },
+                        { id: 'text-embedding-ada-002', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // 应该包含所有 7 个 GPT-5 模型，过滤掉 embedding
+            expect(result.models.length).toBe(7);
+            const modelIds = result.models.map(m => m.id);
+            expect(modelIds).toContain('gpt-5.4');
+            expect(modelIds).toContain('gpt-5.4-mini');
+            expect(modelIds).toContain('gpt-5.3-codex');
+            expect(modelIds).toContain('gpt-5.2-codex');
+            expect(modelIds).toContain('gpt-5.2');
+            expect(modelIds).toContain('gpt-5.1-codex-max');
+            expect(modelIds).toContain('gpt-5.1-codex-mini');
+        });
+
+        it('GPT-5 codex 模型的 contextWindow 应该为 1M', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.3-codex', owned_by: 'openai' },
+                        { id: 'gpt-5.2', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // codex 模型上下文窗口为 1M
+            const codexModel = result.models.find(m => m.id === 'gpt-5.3-codex');
+            expect(codexModel?.contextWindow).toBe(1047576);
+
+            // 标准 GPT-5 上下文窗口为 400K
+            const standardModel = result.models.find(m => m.id === 'gpt-5.2');
+            expect(standardModel?.contextWindow).toBe(400000);
+        });
+
+        it('GPT-5 所有模型的 maxTokens 应该为 128000', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.4', owned_by: 'openai' },
+                        { id: 'gpt-5.1-codex-mini', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // 所有 GPT-5 模型 maxTokens 统一为 128000
+            for (const model of result.models) {
+                expect(model.maxTokens).toBe(128000);
+            }
+        });
+
+        it('GPT-5 所有模型应该支持视觉和函数调用', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.4', owned_by: 'openai' },
+                        { id: 'gpt-5.3-codex', owned_by: 'openai' },
+                        { id: 'gpt-5.1-codex-mini', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // 所有 GPT-5 模型应支持视觉和函数调用
+            for (const model of result.models) {
+                expect(model.capabilities?.vision).toBe(true);
+                expect(model.capabilities?.functionCalling).toBe(true);
+                expect(model.capabilities?.streaming).toBe(true);
+            }
+        });
+
+        it('codex-mini 不应被错误归类为 mini 优先排序', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.1-codex-mini', owned_by: 'openai' },
+                        { id: 'gpt-4o-mini', owned_by: 'openai' },
+                        { id: 'gpt-5.4', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // gpt-4o-mini 应该排在前面（作为推荐的 mini），codex-mini 不应被提前
+            const modelIds = result.models.map(m => m.id);
+            const gpt4oMiniIndex = modelIds.indexOf('gpt-4o-mini');
+            const codexMiniIndex = modelIds.indexOf('gpt-5.1-codex-mini');
+            expect(gpt4oMiniIndex).toBeLessThan(codexMiniIndex);
+        });
+
+        // 对应文档 TC-MODEL-FETCH-001
+        it('guessContextWindow 应该正确识别 gpt-5.1-codex-mini 为 400000', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    data: [
+                        { id: 'gpt-5.1-codex-mini', owned_by: 'openai' },
+                        { id: 'gpt-5.2-codex', owned_by: 'openai' },
+                    ],
+                }),
+            });
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'test-api-key'
+            );
+
+            // codex-mini 应该回退到 400000，而不是 codex 的 1047576
+            const codexMiniModel = result.models.find(m => m.id === 'gpt-5.1-codex-mini');
+            expect(codexMiniModel?.contextWindow).toBe(400000);
+
+            // 标准 codex 应该是 1047576
+            const codexModel = result.models.find(m => m.id === 'gpt-5.2-codex');
+            expect(codexModel?.contextWindow).toBe(1047576);
+        });
+    });
 });

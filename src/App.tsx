@@ -2237,7 +2237,7 @@ const handleRoundtableSummarize = useCallback(async (chatId: string) => {
     // v4.1.5: 清除发言者状态
     setRoundtableSpeakerId(chatId, null);
   }
-}, [roundtableChats, agents, models, setRoundtableSpeakerId, setRoundtableChats]);
+}, [roundtableChats, agents, models, providers, setRoundtableSpeakerId, setRoundtableChats]);
 
 /**
  * 进入下一轮讨论
@@ -3530,7 +3530,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
     }
     pendingContentRef.current.delete(chatId);
   }
-}, [chats, models, skills, setGenerating, getAgentTools, setAgents, setChats, setMcpServers, setProviders]);
+}, [chats, models, skills, providers, setGenerating, getAgentTools, setAgents, setChats, setMcpServers, setProviders]);
 
 // 停止生成（接收 chatId 参数）
 const handleStopGenerating = useCallback((chatId: string) => {
@@ -4185,9 +4185,10 @@ const handleDisconnectProvider = useCallback(async (providerId: string): Promise
   }
 
   try {
-    // v0.9.3.1: 不删除凭证，只更新状态
-    // 这样重新连接时不需要再次输入 API Key
-    // await providerCredentialsStorage.remove(providerId);
+    // 恢复凭证删除：用户点击断开连接必须彻底清理本地存储的凭证
+    // 否则重启软件时，useAppBootstrap 会因为存在凭证而再次自动恢复为已连接状态
+    // 对于 API Key 可以由输入框自动记住历史记录，但认证凭证必须销毁
+    await providerCredentialsStorage.remove(providerId);
 
     // 埋点 - 断开提供商
     trackEvents.providerDisconnected({ providerId });

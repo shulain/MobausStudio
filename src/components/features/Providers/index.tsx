@@ -339,7 +339,7 @@ export const ProviderPage: React.FC<ProviderPageProps> = ({
             setDeletingProviderId(null);
         } catch (error) {
             logger.error(LogTags.PROVIDER, translate('logs.provider.deleteFailed', t), error);
-            alert(language === 'zh' ? '删除失败' : 'Delete failed');
+            alert(t.common.error || '删除失败');
         }
     };
 
@@ -391,7 +391,7 @@ export const ProviderPage: React.FC<ProviderPageProps> = ({
                                 icon={<Plus className="w-4 h-4" />}
                                 className="bg-gradient-to-bl from-[#A688F6] to-[#009BF3]"
                             >
-                                {language === 'zh' ? '添加自定义' : 'Add Custom'}
+                                {t.providers.addCustomProvider || '添加自定义'}
                             </Button>
                         </div>
                     }
@@ -559,12 +559,10 @@ export const ProviderPage: React.FC<ProviderPageProps> = ({
             {/* v0.9.3.5: 删除确认对话框 */}
             <ConfirmDialog
                 open={showDeleteConfirm}
-                title={language === 'zh' ? '确认删除' : 'Confirm Delete'}
-                message={language === 'zh'
-                    ? '确定要删除这个自定义提供商吗？删除后将无法恢复，包括所有相关配置和 API Key。'
-                    : 'Are you sure you want to delete this custom provider? This action cannot be undone and will remove all related configurations and API keys.'}
-                confirmText={language === 'zh' ? '删除' : 'Delete'}
-                cancelText={language === 'zh' ? '取消' : 'Cancel'}
+                title={t.common.confirm || '确认删除'}
+                message={t.providers.deleteCustomProviderConfirm || '确定要删除这个自定义提供商吗？删除后将无法恢复，包括所有相关配置和 API Key。'}
+                confirmText={t.common.delete || '删除'}
+                cancelText={t.common.cancel || '取消'}
                 confirmVariant="danger"
                 onConfirm={handleConfirmDelete}
                 onCancel={handleCancelDelete}

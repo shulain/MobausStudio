@@ -35,6 +35,14 @@ MobausStudio 支持多种 AI 模型，本文介绍如何配置和管理模型。
 - DeepSeek Chat
 - DeepSeek Reasoner（深度推理）
 
+### Qwen（通义千问）
+
+- Qwen Max、Qwen Plus 等系列模型
+
+### Amazon Kiro
+
+- Kiro AI 模型系列
+
 ### 其他兼容模型
 
 任何兼容 OpenAI API 格式的模型：

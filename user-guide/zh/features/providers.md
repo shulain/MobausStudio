@@ -20,6 +20,8 @@
 | 🧠 Anthropic         | Claude 3.5、Claude 3 系列          | OAuth 登录 / API Key |
 | ✨ Google AI         | Gemini 2.0、Gemini 1.5 系列        | OAuth 登录 / API Key |
 | 🔍 DeepSeek          | DeepSeek Chat、Reasoner            | API Key              |
+| 🐉 Qwen (通义千问)   | Qwen Max、Qwen Plus 等             | API Key              |
+| 🛒 Amazon Kiro       | Kiro AI 模型系列                    | OAuth 登录 / API Key |
 | 🐙 GitHub Copilot    | 使用 Copilot 订阅访问多种模型      | OAuth 登录           |
 | 🌐 OpenRouter        | 统一 API 访问多种模型              | API Key              |
 

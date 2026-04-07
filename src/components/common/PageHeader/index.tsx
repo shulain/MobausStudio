@@ -15,6 +15,7 @@
 import React from 'react';
 import { ExpandableSearch } from '../ExpandableSearch';
 import { CompactStats, type StatItem } from '../CompactStats';
+import { useI18n } from '../../../i18n';
 
 interface PageHeaderProps {
     /** 页面图标 */
@@ -56,6 +57,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     actions,
     className = '',
 }) => {
+    const { t } = useI18n();
+    const finalSearchPlaceholder = searchPlaceholder === '搜索...' ? t.common.search || '搜索...' : searchPlaceholder;
+
     // 判断是否显示搜索框
     const showSearch = searchValue !== undefined && onSearchChange !== undefined;
 
@@ -109,7 +113,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                         <ExpandableSearch
                             value={searchValue}
                             onChange={onSearchChange}
-                            placeholder={searchPlaceholder}
+                            placeholder={finalSearchPlaceholder}
                         />
                     )}
 

@@ -16,6 +16,7 @@ import React, { useState, useCallback } from 'react';
 import { ImageIcon, Download } from 'lucide-react';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu';
 import { ImagePreview } from '../ImagePreview';
+import { useI18n } from '../../../i18n';
 
 /**
  * ImageRenderer 组件 Props
@@ -48,6 +49,8 @@ export const ImageRenderer: React.FC<ImageRendererProps> = ({
     enableLazyLoad = true,
     className = '',
 }) => {
+    const { t } = useI18n();
+
     // 加载失败状态
     const [loadError, setLoadError] = useState(false);
     // 加载中状态
@@ -123,7 +126,7 @@ export const ImageRenderer: React.FC<ImageRendererProps> = ({
         return (
             <span className="inline-flex items-center gap-2 px-3 py-2 my-2 bg-gray-100 dark:bg-gray-700 rounded-[10px] text-sm text-gray-500 dark:text-gray-400">
                 <ImageIcon size={16} className="opacity-50" />
-                <span>图片加载失败</span>
+                <span>{t.common.imageLoadFailed || '图片加载失败'}</span>
             </span>
         );
     }
@@ -132,7 +135,7 @@ export const ImageRenderer: React.FC<ImageRendererProps> = ({
     const contextMenuItems: ContextMenuItem[] = [
         {
             id: 'download',
-            label: '下载图片',
+            label: t.common.downloadImage || '下载图片',
             icon: <Download size={14} />,
             onClick: handleDownload,
         },
@@ -146,14 +149,14 @@ export const ImageRenderer: React.FC<ImageRendererProps> = ({
                     {isLoading && (
                         <span className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-[10px] text-sm text-gray-500 dark:text-gray-400 animate-pulse">
                             <ImageIcon size={16} className="opacity-50" />
-                            <span>加载中...</span>
+                            <span>{t.common.loading || '加载中...'}</span>
                         </span>
                     )}
 
                     {/* 图片 - 点击事件直接绑定到 img 元素 */}
                     <img
                         src={src}
-                        alt={alt || '图片'}
+                        alt={alt || t.common.imagePreview || '图片'}
                         loading={enableLazyLoad ? 'lazy' : undefined}
                         className={`max-w-full h-auto rounded-[10px] shadow-sm transition-opacity ${
                             enableZoom ? 'cursor-pointer hover:opacity-90' : ''

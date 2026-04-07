@@ -50,24 +50,36 @@ export const builtinProviders: AIProvider[] = [
         models: [
             // ===== 免费/低成本模型（推荐）=====
             { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano ⭐最便宜', maxTokens: 32768, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            { id: 'gpt-5-nano', name: 'GPT-5 Nano ⭐超低成本', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
             { id: 'gpt-4o-mini', name: 'GPT-4o Mini ⭐推荐', maxTokens: 16384, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
             { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', maxTokens: 32768, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', maxTokens: 4096, contextWindow: 16385, capabilities: { functionCalling: true, streaming: true } },
             // ===== 标准模型 =====
+            { id: 'gpt-4.1', name: 'GPT-4.1', maxTokens: 32768, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            // ===== GPT-5 系列 =====
+            // v4.3.2: 从 OpenAI API 动态获取确认存在的模型
+            { id: 'gpt-5.4', name: 'GPT-5.4 ⭐最新', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.2', name: 'GPT-5.2', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.2-chat-latest', name: 'GPT-5.2 Chat Latest', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max', maxTokens: 128000, contextWindow: 1047576, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            // ===== GPT-4o / 旧版模型 =====
             { id: 'gpt-4o', name: 'GPT-4o', maxTokens: 16384, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            { id: 'gpt-4o-2024-11-20', name: 'GPT-4o (2024-11-20)', maxTokens: 16384, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'chatgpt-4o-latest', name: 'ChatGPT-4o Latest', maxTokens: 16384, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
             { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', maxTokens: 4096, contextWindow: 128000, capabilities: { vision: true, functionCalling: true, streaming: true } },
             { id: 'gpt-4', name: 'GPT-4', maxTokens: 8192, contextWindow: 8192, capabilities: { functionCalling: true, streaming: true } },
-            // ===== GPT-5 系列 =====
-            { id: 'gpt-5.1', name: 'GPT-5.1', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini', maxTokens: 128000, contextWindow: 400000, capabilities: { vision: true, functionCalling: true, streaming: true } },
-            // ===== o1/o3 推理模型 =====
+            { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', maxTokens: 4096, contextWindow: 16385, capabilities: { functionCalling: true, streaming: true } },
+            // ===== o 系列推理模型 =====
+            { id: 'o4-mini', name: 'o4 Mini', maxTokens: 100000, contextWindow: 200000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'o3', name: 'o3', maxTokens: 100000, contextWindow: 200000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'o3-pro', name: 'o3 Pro', maxTokens: 100000, contextWindow: 200000, capabilities: { vision: true, functionCalling: true, streaming: true } },
+            { id: 'o3-mini', name: 'o3 Mini', maxTokens: 100000, contextWindow: 200000, capabilities: { functionCalling: true, streaming: true } },
             { id: 'o1', name: 'o1', maxTokens: 100000, contextWindow: 200000, capabilities: { streaming: true } },
             { id: 'o1-mini', name: 'o1 Mini', maxTokens: 65536, contextWindow: 128000, capabilities: { streaming: true } },
             { id: 'o1-preview', name: 'o1 Preview', maxTokens: 32768, contextWindow: 128000, capabilities: { streaming: true } },
-            { id: 'o3-mini', name: 'o3 Mini', maxTokens: 100000, contextWindow: 200000, capabilities: { functionCalling: true, streaming: true } },
+            // ===== 注意：以下模型仅作为 fallback，实际使用时会从 API/models.dev 动态获取 =====
+            // 新模型（如 GPT-5 系列）发布后会通过动态获取自动更新，无需手动维护
         ],
         status: 'disconnected',
         popular: true,
