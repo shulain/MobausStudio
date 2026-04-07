@@ -6,6 +6,27 @@ All version update records.
 
 ---
 
+## [0.8.6] - 2026-04-08
+
+### Added
+
+- 🔐 ChatGPT Plus Subscription Proxy - Log in with your ChatGPT Plus/Pro subscription via OAuth to directly use GPT-5.x series models (GPT-5.4, GPT-5.3, GPT-5.2, GPT-5.1 and more) at no additional API cost
+- 🤖 GPT-5.x Model Support - Full support for GPT-5.4, GPT-5.3, GPT-5.2, GPT-5.1 and their variants (Mini, Nano, Codex)
+
+### Improved
+
+- 🔄 OAuth Token Refresh Stability - Fixed temporary network errors permanently invalidating credentials; now intelligently distinguishes between unrecoverable errors and temporary failures
+- 🔧 Custom Provider Protocol Fix - Fixed requests from custom providers with Anthropic protocol being incorrectly routed to the OpenAI path
+- 🛡️ MCP Tool Compatibility - No-parameter MCP tools now work correctly without failing due to missing parameter definitions
+
+### Fixed
+
+- 🔧 Fixed concurrent token refresh across multiple providers causing credential overwrites
+- 🔧 Fixed incorrect Anthropic token refresh endpoint URL
+- 🔧 Fixed newly issued Google refresh tokens not being saved properly
+
+---
+
 ## [0.8.5] - 2026-03-15
 
 ### Added

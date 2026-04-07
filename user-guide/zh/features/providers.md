@@ -69,6 +69,7 @@
 **支持 OAuth 的提供商：**
 
 - OpenAI（使用 ChatGPT Plus/Pro 订阅）
+- ChatGPT Web（使用 ChatGPT Plus/Pro 订阅，直接通过订阅代理使用 GPT-5.x 模型，无需 API 费用）
 - Anthropic（使用 Claude Pro/Max 订阅）
 - Google AI（使用 Google 账号）
 - GitHub Copilot（使用 GitHub 账号）

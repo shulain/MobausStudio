@@ -12,11 +12,15 @@ Before adding models, you need to connect the corresponding AI provider first. S
 
 ### OpenAI
 
+- GPT-5.4, GPT-5.4 Mini, GPT-5.4 Nano (Latest)
+- GPT-5.3, GPT-5.2, GPT-5.1 (Enhanced Reasoning)
 - GPT-4o, GPT-4o Mini (Recommended)
 - GPT-4.1 Nano, GPT-4.1 Mini (Ultra low cost)
 - GPT-4 Turbo, GPT-4
 - GPT-3.5 Turbo
 - o1, o1 Mini, o3 Mini (Reasoning models)
+
+> 💡 **Tip**: If you have a ChatGPT Plus/Pro subscription, you can use the "ChatGPT Web" provider to access GPT-5.x series models at no additional API cost.
 
 ### Anthropic
 

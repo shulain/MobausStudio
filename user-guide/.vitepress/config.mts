@@ -49,7 +49,8 @@ export default defineConfig({
                 { text: 'MCP 服务', link: '/zh/features/mcp' },
                 { text: '技能系统', link: '/zh/features/skills' },
                 { text: '设置', link: '/zh/features/settings' },
-                { text: '使用统计', link: '/zh/features/stats' }
+                { text: '使用统计', link: '/zh/features/stats' },
+                { text: '配置同步', link: '/zh/features/config-switcher' }
               ]
             },
             {
@@ -125,7 +126,8 @@ export default defineConfig({
                 { text: 'MCP Services', link: '/en/features/mcp' },
                 { text: 'Skills System', link: '/en/features/skills' },
                 { text: 'Settings', link: '/en/features/settings' },
-                { text: 'Statistics', link: '/en/features/stats' }
+                { text: 'Statistics', link: '/en/features/stats' },
+                { text: 'Config Sync', link: '/en/features/config-switcher' }
               ]
             },
             {

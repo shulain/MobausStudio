@@ -12,11 +12,15 @@ MobausStudio 支持多种 AI 模型，本文介绍如何配置和管理模型。
 
 ### OpenAI
 
+- GPT-5.4、GPT-5.4 Mini、GPT-5.4 Nano（最新）
+- GPT-5.3、GPT-5.2、GPT-5.1（推理增强）
 - GPT-4o、GPT-4o Mini（推荐）
 - GPT-4.1 Nano、GPT-4.1 Mini（超低成本）
 - GPT-4 Turbo、GPT-4
 - GPT-3.5 Turbo
 - o1、o1 Mini、o3 Mini（推理模型）
+
+> 💡 **提示**：如果你拥有 ChatGPT Plus/Pro 订阅，可以通过「ChatGPT Web」提供商直接使用 GPT-5.x 系列模型，无需额外 API 费用。
 
 ### Anthropic
 

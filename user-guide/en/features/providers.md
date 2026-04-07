@@ -67,6 +67,7 @@ Some providers support OAuth login, which is the easiest way to connect:
 **Providers supporting OAuth:**
 
 - OpenAI (using ChatGPT Plus/Pro subscription)
+- ChatGPT Web (using ChatGPT Plus/Pro subscription, directly access GPT-5.x models via subscription proxy at no additional API cost)
 - Anthropic (using Claude Pro/Max subscription)
 - Google AI (using Google account)
 - GitHub Copilot (using GitHub account)

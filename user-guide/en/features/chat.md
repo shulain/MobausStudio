@@ -10,6 +10,17 @@ Chat is the core feature of MobausStudio. This article introduces how to efficie
 2. Press `Enter` or click the send button
 3. Wait for AI response
 
+### Upload Attachments & Multimodal
+
+You can upload images or videos during a chat. MobausStudio fully supports multimodal image processing (requires a model that supports vision capabilities):
+
+1. Click the 📎 button next to the input box
+2. Select the image (common formats supported) or video file to upload
+3. The file will appear in the preview area above the input box
+4. Click the × on the top-right corner of the preview to remove it
+
+> 💡 **Tip**: Maximum file size is 10MB. Vision-capable models can "see" and analyze the content of your uploaded images.
+
 ### Multi-turn Conversation
 
 AI remembers the context of the current conversation, you can:
@@ -96,6 +107,14 @@ All chats are displayed in the left list:
 ---
 
 ## Message Operations
+
+### Stop Generation
+
+When AI is generating a long response, you can click the "⏹️ Stop" button in the input area at any time to interrupt the generation process.
+
+### View Thinking Process
+
+Some models that support deep reasoning (such as DeepSeek Reasoner, o1/o3 series, certain Google models) will think before giving a formal answer. The interface clearly shows this internal "thinking" content, and you can click to expand and view the AI's reasoning process.
 
 ### Copy Message
 
