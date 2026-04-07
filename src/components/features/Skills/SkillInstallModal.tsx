@@ -392,7 +392,7 @@ export const SkillInstallModal: React.FC<SkillInstallModalProps> = ({
             logger.debug(LogTags.SKILL, `hasMore 更新`, { hasMore: response.hasMore });
         } catch (err) {
             logger.error(LogTags.SKILL, '加载 skills.sh 列表失败', err);
-            setSkillsShError(err instanceof Error ? err.message : (t.common.error || '加载失败'));
+            setSkillsShError(err instanceof Error ? err.message : 'Error');
         } finally {
             setSkillsShLoading(false);
             logger.debug(LogTags.SKILL, 'loadSkillsShList 结束');

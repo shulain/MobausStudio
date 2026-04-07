@@ -218,7 +218,8 @@ pub fn responses_event_to_chunks(
             if let Some(ref item) = event.item {
                 if item.item_type.as_deref() == Some("function_call") {
                     // 记录 output_index 与 tool_call_index 的映射
-                    ctx.tool_call_map.insert(event.output_index, ctx.tool_call_index);
+                    ctx.tool_call_map
+                        .insert(event.output_index, ctx.tool_call_index);
 
                     let tc = ChunkToolCall {
                         index: ctx.tool_call_index,

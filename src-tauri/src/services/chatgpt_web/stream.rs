@@ -103,7 +103,10 @@ where
                             // response.failed: 上游失败，透传错误信息而非伪装成正常完成
                             if event.event_type == "response.failed" {
                                 let (error_type, error_msg) = extract_failed_error(&event);
-                                error!("[SSE Stream] response.failed: type={}, msg={}", error_type, error_msg);
+                                error!(
+                                    "[SSE Stream] response.failed: type={}, msg={}",
+                                    error_type, error_msg
+                                );
                                 callback(StreamEvent::Error(error_msg.clone()))?;
                                 return Err(error_msg);
                             }

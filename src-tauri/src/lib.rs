@@ -13212,7 +13212,8 @@ async fn chatgpt_web_stream_message(
     let window_clone = window.clone();
     let msg_id_clone = msg_id.clone();
     let mut final_usage = None;
-    let mut tool_calls_accumulator: std::collections::HashMap<usize, serde_json::Value> = std::collections::HashMap::new();
+    let mut tool_calls_accumulator: std::collections::HashMap<usize, serde_json::Value> =
+        std::collections::HashMap::new();
 
     services::chatgpt_web::stream::process_sse_stream(
         response,
@@ -13267,21 +13268,33 @@ async fn chatgpt_web_stream_message(
                         }
 
                         if let Some(finish_reason) = choice.and_then(|c| c.get("finish_reason")).and_then(|v| v.as_str()) {
-                            if finish_reason == "tool_calls" || finish_reason == "stop" {
-                                if !tool_calls_accumulator.is_empty() {
-                                    let tool_calls_vec: Vec<serde_json::Value> = tool_calls_accumulator.values().cloned().collect();
+                            if (finish_reason == "tool_calls" || finish_reason == "stop")
+                                && !tool_calls_accumulator.is_empty()
+                            {
+                                let tool_calls_vec: Vec<serde_json::Value> =
+                                    tool_calls_accumulator.values().cloned().collect();
 
-                                    let valid_calls: Vec<_> = tool_calls_vec.iter().filter(|tc| {
-                                        let id = tc.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                                        let name = tc.get("function").and_then(|f| f.get("name")).and_then(|v| v.as_str()).unwrap_or("");
+                                let valid_calls: Vec<_> = tool_calls_vec
+                                    .iter()
+                                    .filter(|tc| {
+                                        let id = tc
+                                            .get("id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("");
+                                        let name = tc
+                                            .get("function")
+                                            .and_then(|f| f.get("name"))
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("");
                                         !id.is_empty() && !name.is_empty()
-                                    }).cloned().collect();
+                                    })
+                                    .cloned()
+                                    .collect();
 
-                                    if !valid_calls.is_empty() {
-                                        log::info!("[chatgpt_web_stream_message] AI 请求工具调用 (finish_reason={})", finish_reason);
-                                        let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "tool_calls", "tool_calls": valid_calls }));
-                                        tool_calls_accumulator.clear();
-                                    }
+                                if !valid_calls.is_empty() {
+                                    log::info!("[chatgpt_web_stream_message] AI 请求工具调用 (finish_reason={})", finish_reason);
+                                    let _ = window_clone.emit("chat-event", serde_json::json!({ "id": msg_id_clone, "event": "tool_calls", "tool_calls": valid_calls }));
+                                    tool_calls_accumulator.clear();
                                 }
                             }
                         }

@@ -732,9 +732,7 @@ mod tests {
         // 情况2：嵌套的 address 子 schema 也应被补上 properties
         let params1 = &tools[1]["parameters"];
         assert!(
-            params1["properties"]["address"]
-                .get("properties")
-                .is_some(),
+            params1["properties"]["address"].get("properties").is_some(),
             "嵌套 object 子 schema 也应被补上 properties"
         );
 
@@ -744,10 +742,7 @@ mod tests {
             params2["properties"]["city"]["type"], "string",
             "已有 properties 的 schema 不应被修改"
         );
-        assert_eq!(
-            params2["required"][0], "city",
-            "required 字段应保持不变"
-        );
+        assert_eq!(params2["required"][0], "city", "required 字段应保持不变");
 
         // 情况4：items 中的 object 也应被补上
         let params3 = &tools[3]["parameters"];
@@ -1009,10 +1004,7 @@ mod tests {
 
         let (error_type, error_msg) = extract_failed_error(&event);
 
-        assert_eq!(
-            error_type, "invalid_request_error",
-            "error_type 应正确提取"
-        );
+        assert_eq!(error_type, "invalid_request_error", "error_type 应正确提取");
         assert!(
             error_msg.contains("object schema missing properties"),
             "error_msg 应包含原始错误描述，实际: {}",
@@ -1165,7 +1157,10 @@ mod tests {
         );
 
         // 此时 ctx 状态：tool_call_index=2, tool_call_map={0→0, 1→1}
-        assert_eq!(ctx.tool_call_index, 2, "两个 added 后 tool_call_index 应为 2");
+        assert_eq!(
+            ctx.tool_call_index, 2,
+            "两个 added 后 tool_call_index 应为 2"
+        );
 
         // ---- 步骤 3：argument delta → output_index=0（应路由到 tool_call index=0）----
         let delta_a1 = ResponsesStreamEvent {
@@ -1179,7 +1174,10 @@ mod tests {
         let chunks = responses_event_to_chunks(&delta_a1, &mut ctx);
         assert_eq!(chunks.len(), 1, "delta A1 应生成 1 个 chunk");
         let tc = &chunks[0].choices[0].delta.tool_calls.as_ref().unwrap()[0];
-        assert_eq!(tc.index, 0, "output_index=0 的 delta 应路由到 tool_call index=0");
+        assert_eq!(
+            tc.index, 0,
+            "output_index=0 的 delta 应路由到 tool_call index=0"
+        );
         assert_eq!(
             tc.function.as_ref().unwrap().arguments.as_deref(),
             Some("{\"ci"),
@@ -1198,7 +1196,10 @@ mod tests {
         let chunks = responses_event_to_chunks(&delta_b1, &mut ctx);
         assert_eq!(chunks.len(), 1, "delta B1 应生成 1 个 chunk");
         let tc = &chunks[0].choices[0].delta.tool_calls.as_ref().unwrap()[0];
-        assert_eq!(tc.index, 1, "output_index=1 的 delta 应路由到 tool_call index=1");
+        assert_eq!(
+            tc.index, 1,
+            "output_index=1 的 delta 应路由到 tool_call index=1"
+        );
         assert_eq!(
             tc.function.as_ref().unwrap().arguments.as_deref(),
             Some("{\"lo"),
