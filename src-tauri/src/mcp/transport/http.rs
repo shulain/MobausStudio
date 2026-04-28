@@ -8,7 +8,7 @@ use crate::mcp::error::MCPError;
 use crate::mcp::protocol::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use crate::mcp::transport::MCPTransport;
 use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, Response, StatusCode};
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -172,16 +172,13 @@ impl HttpTransport {
     ///
     /// # 返回
     /// 提取出的 JSON 字符串
+    #[cfg(test)]
     fn extract_json_from_sse(sse_body: &str) -> Result<String, MCPError> {
         let mut last_data: Option<String> = None;
 
-        for line in sse_body.lines() {
-            let trimmed = line.trim();
-            if let Some(data) = trimmed.strip_prefix("data:") {
-                let data = data.trim();
-                if !data.is_empty() {
-                    last_data = Some(data.to_string());
-                }
+        for block in sse_body.replace("\r\n", "\n").split("\n\n") {
+            if let Some(data) = Self::extract_data_from_sse_block(block) {
+                last_data = Some(data);
             }
         }
 
@@ -190,8 +187,80 @@ impl HttpTransport {
         })
     }
 
+    /// 从一个 SSE 事件块中提取 data 内容。
+    fn extract_data_from_sse_block(block: &str) -> Option<String> {
+        let data_lines: Vec<&str> = block
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("data:").map(str::trim))
+            .filter(|data| !data.is_empty())
+            .collect();
+
+        if data_lines.is_empty() {
+            None
+        } else {
+            Some(data_lines.join("\n"))
+        }
+    }
+
+    /// 判断 SSE data 是否为当前请求的 JSON-RPC 响应。
+    fn json_rpc_response_matches_id(data: &str, expected_id: u64) -> bool {
+        serde_json::from_str::<JsonRpcResponse>(data)
+            .map(|response| response.id == expected_id)
+            .unwrap_or(false)
+    }
+
+    /// 读取 SSE 响应流，拿到匹配请求 ID 的 JSON-RPC 响应后立即返回。
+    async fn read_sse_response(
+        mut response: Response,
+        expected_id: u64,
+    ) -> Result<String, MCPError> {
+        let mut buffer = String::new();
+
+        loop {
+            match response.chunk().await {
+                Ok(Some(chunk)) => {
+                    buffer.push_str(&String::from_utf8_lossy(&chunk));
+                    if buffer.contains('\r') {
+                        buffer = buffer.replace("\r\n", "\n");
+                    }
+
+                    while let Some(pos) = buffer.find("\n\n") {
+                        let block: String = buffer.drain(..pos + 2).collect();
+                        if let Some(data) = Self::extract_data_from_sse_block(&block) {
+                            if Self::json_rpc_response_matches_id(&data, expected_id) {
+                                log::debug!("[MCP HTTP] 收到 SSE JSON-RPC 响应: {}", data);
+                                return Ok(data);
+                            }
+                            log::debug!("[MCP HTTP] 忽略非当前请求的 SSE 消息: {}", data);
+                        }
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    return if e.is_timeout() {
+                        Err(MCPError::Timeout)
+                    } else {
+                        Err(MCPError::ReadFailed(format!("读取 SSE 响应失败: {}", e)))
+                    };
+                }
+            }
+        }
+
+        if let Some(data) = Self::extract_data_from_sse_block(&buffer) {
+            if Self::json_rpc_response_matches_id(&data, expected_id) {
+                log::debug!("[MCP HTTP] 收到 SSE JSON-RPC 响应: {}", data);
+                return Ok(data);
+            }
+        }
+
+        Err(MCPError::ParseError(format!(
+            "SSE 响应流结束但未找到请求 {} 的 JSON-RPC 响应",
+            expected_id
+        )))
+    }
+
     /// 发送 HTTP POST 请求
-    async fn send_post(&self, body: &str) -> Result<String, MCPError> {
+    async fn send_post(&self, body: &str, expected_id: Option<u64>) -> Result<String, MCPError> {
         log::debug!("[MCP HTTP] 发送请求: {}", body);
 
         // 构建请求
@@ -250,18 +319,24 @@ impl HttpTransport {
                     .unwrap_or("")
                     .to_string();
 
-                // 读取响应体
-                let body = response
-                    .text()
-                    .await
-                    .map_err(|e| MCPError::ReadFailed(format!("读取响应失败: {}", e)))?;
-
                 // 如果是 SSE 格式，从事件流中提取 JSON 数据
                 let result = if content_type.contains("text/event-stream") {
                     log::debug!("[MCP HTTP] 收到 SSE 响应，解析事件流");
-                    Self::extract_json_from_sse(&body)?
+                    if let Some(id) = expected_id {
+                        tokio::time::timeout(
+                            Duration::from_secs(DEFAULT_REQUEST_TIMEOUT),
+                            Self::read_sse_response(response, id),
+                        )
+                        .await
+                        .map_err(|_| MCPError::Timeout)??
+                    } else {
+                        return Ok(String::new());
+                    }
                 } else {
-                    body
+                    response
+                        .text()
+                        .await
+                        .map_err(|e| MCPError::ReadFailed(format!("读取响应失败: {}", e)))?
                 };
 
                 log::debug!("[MCP HTTP] 收到响应: {}", result);
@@ -318,7 +393,7 @@ impl MCPTransport for HttpTransport {
         let request_str = serde_json::to_string(&request)?;
 
         // 发送 HTTP 请求
-        let response_str = self.send_post(&request_str).await?;
+        let response_str = self.send_post(&request_str, Some(id)).await?;
 
         // 空响应（不应该发生在请求中）
         if response_str.is_empty() {
@@ -367,7 +442,7 @@ impl MCPTransport for HttpTransport {
         let notification_str = serde_json::to_string(&notification)?;
 
         // 发送 HTTP 请求 (通知可能返回 202 或空响应)
-        let _ = self.send_post(&notification_str).await?;
+        let _ = self.send_post(&notification_str, None).await?;
 
         Ok(())
     }
@@ -478,6 +553,26 @@ mod tests {
         let sse = "event: message\ndata: {\"partial\":true}\n\nevent: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"final\":true}}\n\n";
         let result = HttpTransport::extract_json_from_sse(sse).unwrap();
         assert!(result.contains("\"final\""));
+    }
+
+    /// 测试 SSE CRLF 换行解析
+    #[test]
+    fn test_extract_json_from_sse_crlf() {
+        let sse = "event: message\r\ndata: {\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{}}\r\n\r\n";
+        let result = HttpTransport::extract_json_from_sse(sse).unwrap();
+        assert!(result.contains("\"id\":7"));
+    }
+
+    /// 测试 JSON-RPC 响应 ID 匹配
+    #[test]
+    fn test_json_rpc_response_matches_id() {
+        let data = "{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{}}";
+        assert!(HttpTransport::json_rpc_response_matches_id(data, 42));
+        assert!(!HttpTransport::json_rpc_response_matches_id(data, 43));
+        assert!(!HttpTransport::json_rpc_response_matches_id(
+            "{\"method\":\"ping\"}",
+            42
+        ));
     }
 
     /// 测试 SSE 事件流解析 - 空内容报错
