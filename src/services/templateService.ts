@@ -22,9 +22,11 @@ import type {
     MCPServer,
     Skill,
     Agent,
+    SkillCategory,
 } from '../types';
 import { TemplateParseError } from '../types';
 import { logger, LogTags } from '../utils/logger';
+import { fetchSkillFromRegistry, fetchSkillRegistry, parseSkillMd } from '../utils/skillUtils';
 
 // ==================== 常量定义 ====================
 
@@ -1065,11 +1067,80 @@ async function convertSkillTemplate(
 
     if (template.url) {
         // 从 URL 安装
-        // 这里简化处理，实际应该调用 skillUtils 中的函数
         logDebug('从 URL 安装技能', { url: template.url });
-        // NOTE: URL 安装功能暂未实现，计划在 v1.2.0 版本集成 skillUtils.fetchSkillFromUrl
-        // 当前版本仅支持 inline 模式的技能安装
-        return null;
+        const url = template.url.trim();
+        if (!url) {
+            throw new Error('技能 URL 不能为空');
+        }
+
+        // 1. 优先尝试按仓库索引解析
+        try {
+            const registry = await fetchSkillRegistry(url);
+            const firstItem = registry.skills?.[0];
+
+            if (!firstItem) {
+                throw new Error(`技能仓库 ${url} 不包含任何技能`);
+            }
+
+            const skillFromRegistry = await fetchSkillFromRegistry(firstItem, url);
+            return {
+                ...skillFromRegistry,
+                source: {
+                    ...skillFromRegistry.source,
+                    type: 'url',
+                    repoUrl: url,
+                },
+            };
+        } catch (error) {
+            logDebug('解析技能仓库 URL 失败，回退到直接解析 URL 内容', {
+                url,
+                reason: error instanceof Error ? error.message : String(error),
+            });
+        }
+
+        // 2. 回退：直接抓取 URL 内容（JSON 或 SKILL.md）
+        const rawContent = await fetchUrlContent(url);
+        if (!rawContent) {
+            throw new Error('从技能 URL 读取到空内容');
+        }
+
+        try {
+            const jsonData = JSON.parse(rawContent) as Partial<SkillCreateInput>;
+            const name = typeof jsonData.name === 'string' ? jsonData.name.trim() : '';
+            const promptTemplate =
+                typeof jsonData.promptTemplate === 'string' ? jsonData.promptTemplate : '';
+
+            if (name && promptTemplate) {
+                return {
+                    name,
+                    description: typeof jsonData.description === 'string' ? jsonData.description : '',
+                    category: (jsonData.category as SkillCategory) || 'custom',
+                    promptTemplate,
+                    source: {
+                        type: 'url',
+                        repoUrl: url,
+                    },
+                };
+            }
+        } catch {
+            // JSON 解析失败，继续尝试解析 SKILL.md
+        }
+
+        const parsedMarkdown = parseSkillMd(rawContent);
+        if (!parsedMarkdown) {
+            throw new Error(`URL 技能解析失败: ${url}`);
+        }
+
+        return {
+            name: parsedMarkdown.name,
+            description: parsedMarkdown.description,
+            category: 'custom',
+            promptTemplate: parsedMarkdown.promptTemplate,
+            source: {
+                type: 'url',
+                repoUrl: url,
+            },
+        };
     }
 
     return null;

@@ -69,6 +69,8 @@ mod streaming_api_tests {
 
 #[cfg(test)]
 mod oauth_tests {
+    use crate::parse_oauth_callback_request;
+
 
     /// TC-OAUTH-001: 测试 OAuth 错误响应格式
     #[test]
@@ -116,6 +118,34 @@ mod oauth_tests {
         assert!(expires_at > now);
         // 验证过期时间大约是 1 小时后
         assert!((expires_at - now) <= 3600);
+    }
+
+    /// TC-OAUTH-004: 测试 OAuth 回调请求解析（支持编码参数）
+    #[test]
+    fn test_oauth_callback_request_parse_success() {
+        let request_line = "GET /callback?code=abc%201&state=%22xyz%22&error=none HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let parsed = parse_oauth_callback_request(request_line, &["/callback"])
+            .expect("should parse valid oauth callback");
+        assert_eq!(parsed.code.as_deref(), Some("abc 1"));
+        assert_eq!(parsed.state.as_deref(), Some("\"xyz\""));
+        assert_eq!(parsed.error.as_deref(), Some("none"));
+    }
+
+    /// TC-OAUTH-005: 测试不匹配回调路径时返回 None
+    #[test]
+    fn test_oauth_callback_request_rejects_unknown_path() {
+        let request_line = "GET /other/path?code=abc HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        assert!(parse_oauth_callback_request(request_line, &["/callback"]).is_none());
+    }
+
+    /// TC-OAUTH-006: 测试非 GET 或 malformed 请求不 panic 且返回 None
+    #[test]
+    fn test_oauth_callback_request_rejects_invalid_method_and_no_panic() {
+        let method_not_get = "POST /callback?code=abc HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        assert!(parse_oauth_callback_request(method_not_get, &["/callback"]).is_none());
+
+        let malformed = "INVALID REQUEST";
+        assert!(parse_oauth_callback_request(malformed, &["/callback"]).is_none());
     }
 }
 

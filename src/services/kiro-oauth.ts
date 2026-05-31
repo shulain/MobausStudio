@@ -15,6 +15,13 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { logger, LogTags } from '../utils/logger';
+import {
+    buildRedirectUri,
+    checkPortAvailable,
+    getAvailablePort,
+    getProviderPortConfig,
+    startOAuthCallbackServer,
+} from './oauth-callback';
 
 /**
  * Kiro 认证方式
@@ -180,6 +187,14 @@ interface TauriOAuthResponse {
     error?: string;
 }
 
+interface TauriOAuthCallbackResult {
+    success: boolean;
+    code?: string;
+    state?: string;
+    error?: string;
+    actualPort: number;
+}
+
 /**
  * Tauri 后端 Token 轮询响应
  */
@@ -206,6 +221,21 @@ interface TauriPollTokenResponse {
     /** v0.9.1: Kiro IDC Start URL（IDC 认证时使用，需要持久化） */
     kiro_start_url?: string;
 }
+
+interface TauriSocialExchangeResponse {
+    success: boolean;
+    access_token?: string;
+    refresh_token?: string;
+    status?: string;
+    error?: string;
+    profile_arn?: string;
+    expires_in?: number;
+    kiro_client_id?: string;
+    kiro_client_secret?: string;
+    kiro_sso_region?: string;
+}
+
+const PORT_CONFIG = getProviderPortConfig('kiro');
 
 /**
  * 轮询安全边际（毫秒）
@@ -292,15 +322,19 @@ export const kiroOAuth = {
      * @param authMethod - 认证方式 ('google' | 'github')
      * @returns Social Auth 响应
      */
-    async requestSocialAuth(authMethod: 'google' | 'github'): Promise<KiroSocialAuthResponse> {
+    async requestSocialAuth(
+        authMethod: 'google' | 'github',
+        redirectUri: string
+    ): Promise<KiroSocialAuthResponse> {
         logger.info(LogTags.APP, '请求 Kiro Social Auth URL', { authMethod });
 
         try {
             const response = await invoke<TauriOAuthResponse>('oauth_request_device_code', {
                 request: {
                     provider_id: 'kiro',
-                    auth_method: authMethod
-                }
+                    auth_method: authMethod,
+                    redirect_uri: redirectUri,
+                },
             });
 
             if (!response.success) {
@@ -509,31 +543,147 @@ export const kiroOAuth = {
      */
     async authorizeSocial(
         authMethod: 'google' | 'github',
-        _abortSignal?: AbortSignal
+        abortSignal?: AbortSignal
     ): Promise<KiroOAuthResult> {
         try {
             logger.info(LogTags.APP, '开始 Kiro Social Auth 流程', { authMethod });
 
-            // 1. 获取认证 URL
-            const authData = await this.requestSocialAuth(authMethod);
+            if (abortSignal?.aborted) {
+                return { success: false, error: 'cancelled' };
+            }
 
-            // 2. 打开浏览器
+            const candidatePorts = [
+                PORT_CONFIG.preferredPort,
+                ...PORT_CONFIG.fallbackPorts,
+            ];
+
+            const resolvePort = async (): Promise<number> => {
+                for (const port of candidatePorts) {
+                    try {
+                        if (await checkPortAvailable(port)) {
+                            return port;
+                        }
+                    } catch {
+                        // 忽略端口检测失败，继续尝试下一个候选端口
+                    }
+                }
+
+                try {
+                    return await getAvailablePort();
+                } catch {
+                    return PORT_CONFIG.preferredPort;
+                }
+            };
+
+            const callbackPort = await resolvePort();
+            const redirectUri = buildRedirectUri(callbackPort, PORT_CONFIG.callbackPath);
+
+            // 1. 获取认证 URL（使用已确认可用端口，避免回调端口与授权参数错位）
+            const authData = await this.requestSocialAuth(authMethod, redirectUri);
+            const callbackRedirectUri = authData.redirect_uri || redirectUri;
+
+            // 2. 启动并等待回调
+            const callbackPromise = startOAuthCallbackServer({
+                preferredPort: callbackPort,
+                fallbackPorts: [],
+                callbackPaths: [PORT_CONFIG.callbackPath],
+                timeout: 300,
+            });
+
+            const callbackResultPromise = callbackPromise
+                .then(result => result as TauriOAuthCallbackResult)
+                .catch((error: unknown) => ({
+                    success: false,
+                    error: error instanceof Error ? error.message : 'oauth callback server failed',
+                    actualPort: callbackPort,
+                } as TauriOAuthCallbackResult));
+
+            // 3. 打开浏览器
             const { openUrl } = await import('@tauri-apps/plugin-opener');
-            await openUrl(authData.auth_url);
+            try {
+                await openUrl(authData.auth_url);
+            } catch (error) {
+                logger.warn(LogTags.APP, '无法自动打开浏览器', { error });
+            }
 
-            // 3. 等待回调（需要前端实现回调监听）
-            // 注意：Social Auth 需要启动本地 HTTP 服务器来接收回调
-            // 这部分逻辑需要在 Rust 后端实现，或者使用 Tauri 的 deep link 功能
+            const callbackResult = await (abortSignal
+                ? Promise.race([
+                    callbackResultPromise,
+                    new Promise<TauriOAuthCallbackResult>((resolve) => {
+                        abortSignal.addEventListener(
+                            'abort',
+                            () => {
+                                resolve({
+                                    success: false,
+                                    error: 'cancelled',
+                                    actualPort: 0,
+                                });
+                            },
+                            { once: true }
+                        );
+                    }),
+                ])
+                : callbackResultPromise);
 
-            // 目前返回一个提示，让用户知道需要完成浏览器中的授权
-            logger.info(LogTags.APP, 'Kiro Social Auth: 等待用户在浏览器中完成授权');
+            if (callbackResult.error === 'cancelled' || abortSignal?.aborted) {
+                logger.info(LogTags.APP, 'Kiro Social Auth 被取消');
+                return { success: false, error: 'cancelled' };
+            }
 
-            // NOTE: Social Auth 回调监听功能暂未实现，计划在 v1.3.0 版本支持
-            // 当前版本请使用 AWS Builder ID 登录方式
-            // 暂时返回错误，提示用户使用 AWS Builder ID
+            if (!callbackResult.success || !callbackResult.code) {
+                return {
+                    success: false,
+                    error: callbackResult.error || 'Social Auth 未返回授权码',
+                };
+            }
+
+            if (!callbackResult.state) {
+                logger.error(LogTags.APP, 'Kiro Social Auth 缺少 state', {
+                    expected: authData.state,
+                });
+                return { success: false, error: '授权回调未返回 state' };
+            }
+
+            if (callbackResult.state !== authData.state) {
+                logger.error(LogTags.APP, 'Kiro Social Auth state 校验失败', {
+                    expected: authData.state,
+                    actual: callbackResult.state,
+                });
+                return { success: false, error: '授权回调 state 校验失败' };
+            }
+
+            // 4. 交换授权码
+            const exchangeResponse = await invoke<TauriSocialExchangeResponse>('kiro_exchange_code', {
+                code: callbackResult.code,
+                verifier: authData.code_verifier,
+                redirectUri: callbackRedirectUri,
+            });
+
+            if (!exchangeResponse.success || !exchangeResponse.access_token) {
+                return {
+                    success: false,
+                    error: exchangeResponse.error || '授权码交换失败',
+                };
+            }
+
+            const expiresAt = exchangeResponse.expires_in
+                ? Date.now() + exchangeResponse.expires_in * 1000
+                : undefined;
+
+            // 尝试获取 Profile ARN（可选）
+            // NOTE: 若后端未返回，前端将回退到无该字段的流程
+
             return {
-                success: false,
-                error: 'Social Auth 回调监听尚未实现，请使用 AWS Builder ID 登录',
+                success: true,
+                accessToken: exchangeResponse.access_token,
+                refreshToken: exchangeResponse.refresh_token,
+                profileArn: exchangeResponse.profile_arn,
+                expiresAt,
+                // v0.9.1：社交登录也记录认证信息，用于后续刷新
+                authMethod,
+                kiroClientId: exchangeResponse.kiro_client_id,
+                kiroClientSecret: exchangeResponse.kiro_client_secret,
+                kiroSsoRegion: exchangeResponse.kiro_sso_region || 'us-east-1',
             };
 
         } catch (error) {

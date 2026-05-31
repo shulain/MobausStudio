@@ -11,7 +11,12 @@ import {
     refreshAnthropicToken,
     cancelAnthropicAuth,
     type AnthropicAuthMode,
+    anthropicOAuth,
 } from '../../services/anthropic-oauth';
+
+const mockStartOAuthCallbackServer = vi.fn();
+const mockCheckPortAvailable = vi.fn();
+const mockGetAvailablePort = vi.fn();
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -38,7 +43,9 @@ vi.mock('../../utils/logger', () => ({
 
 // Mock OAuth callback service
 vi.mock('../../services/oauth-callback', () => ({
-    startOAuthCallbackServer: vi.fn(),
+    startOAuthCallbackServer: (...args: unknown[]) => mockStartOAuthCallbackServer(...args),
+    checkPortAvailable: (...args: unknown[]) => mockCheckPortAvailable(...args),
+    getAvailablePort: (...args: unknown[]) => mockGetAvailablePort(...args),
     buildRedirectUri: (port: number, path: string) => `http://localhost:${port}${path}`,
     getProviderPortConfig: () => ({
         preferredPort: 8764,
@@ -49,6 +56,10 @@ vi.mock('../../services/oauth-callback', () => ({
 
 describe('Anthropic OAuth 服务测试', () => {
     let mockInvoke: ReturnType<typeof vi.fn>;
+    let mockOpenUrl: ReturnType<typeof vi.fn>;
+    let mockStart: ReturnType<typeof vi.fn>;
+    let mockCheck: ReturnType<typeof vi.fn>;
+    let mockGetPort: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -56,6 +67,16 @@ describe('Anthropic OAuth 服务测试', () => {
         // 获取 mock 的 invoke 函数
         const { invoke } = await import('@tauri-apps/api/core');
         mockInvoke = invoke as ReturnType<typeof vi.fn>;
+
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        mockOpenUrl = openUrl as ReturnType<typeof vi.fn>;
+
+        mockStart = mockStartOAuthCallbackServer as ReturnType<typeof vi.fn>;
+        mockCheck = mockCheckPortAvailable as ReturnType<typeof vi.fn>;
+        mockGetPort = mockGetAvailablePort as ReturnType<typeof vi.fn>;
+        mockStart.mockReset();
+        mockCheck.mockReset();
+        mockGetPort.mockReset();
     });
 
     afterEach(() => {
@@ -257,6 +278,66 @@ describe('Anthropic OAuth 服务测试', () => {
             const result = await exchangeAnthropicCode('test-code#test-state');
 
             expect(result.type).toBe('failed');
+        });
+    });
+
+    describe('authorize', () => {
+        it('应按可用端口启动回调服务并生成匹配端口的授权地址', async () => {
+            mockCheck
+                .mockResolvedValueOnce(false)
+                .mockResolvedValueOnce(true);
+
+            mockGetPort.mockResolvedValue(9988);
+            mockStart.mockResolvedValue({
+                success: true,
+                code: 'anthropic-auth-code',
+                state: undefined,
+                actualPort: 8765,
+            });
+
+            mockInvoke.mockResolvedValue({
+                access_token: 'sk-ant-oat-test-token',
+                refresh_token: 'test-refresh-token',
+                expires_in: 3600,
+            });
+
+            const onAuthUrl = vi.fn();
+            const onStatusChange = vi.fn();
+            const result = await anthropicOAuth.authorize('max', onAuthUrl, onStatusChange);
+
+            expect(mockCheck).toHaveBeenNthCalledWith(1, 8764);
+            expect(mockCheck).toHaveBeenNthCalledWith(2, 8765);
+            expect(mockStart).toHaveBeenCalledWith({
+                preferredPort: 8765,
+                fallbackPorts: [],
+                callbackPaths: ['/anthropic-callback', '/callback', '/auth/callback'],
+                timeout: 300,
+            });
+            expect(onAuthUrl).toHaveBeenCalled();
+            expect(mockOpenUrl).toHaveBeenCalledWith(
+                expect.stringContaining('redirect_uri=http%3A%2F%2Flocalhost%3A8765%2Fanthropic-callback')
+            );
+            expect(result.type).toBe('success');
+            expect(result.accessToken).toBe('sk-ant-oat-test-token');
+        });
+    });
+
+    describe('authorize（端口错位）', () => {
+        it('当回调端口与授权端口不一致时应失败', async () => {
+            mockCheck.mockResolvedValue(true);
+            mockStart.mockResolvedValue({
+                success: true,
+                code: 'anthropic-auth-code',
+                state: 'state',
+                actualPort: 9988,
+            });
+
+            const onAuthUrl = vi.fn();
+            const onStatusChange = vi.fn();
+            const result = await anthropicOAuth.authorize('max', onAuthUrl, onStatusChange);
+
+            expect(result.type).toBe('failed');
+            expect(onStatusChange).toHaveBeenCalledWith('error');
         });
     });
 });

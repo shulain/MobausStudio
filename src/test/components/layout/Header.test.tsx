@@ -18,8 +18,6 @@ const defaultProps = {
     onNotifications: vi.fn(),
     onExport: vi.fn(),
     onImport: vi.fn(),
-    showUserMenu: false,
-    setShowUserMenu: vi.fn(),
     notificationCount: 0,
 };
 
@@ -75,15 +73,15 @@ describe('Header 应用顶栏', () => {
     });
 
     /**
-     * TC-HEADER-004: 右侧按钮隐藏
-     * 测试场景: 右侧功能按钮（通知、帮助、导出、用户菜单）不应渲染
+     * TC-HEADER-004: 右侧按钮渲染
+     * 测试场景: 右侧功能按钮（消息、导出、导入）应渲染
      */
-    it('TC-HEADER-004: 右侧功能按钮不渲染', () => {
+    it('TC-HEADER-004: 右侧功能按钮已渲染', () => {
         render(<Header {...defaultProps} />);
 
-        expect(screen.queryByTitle('导出配置')).toBeNull();
-        expect(screen.queryByText('个人资料')).toBeNull();
-        expect(screen.queryByText('退出登录')).toBeNull();
+        expect(screen.getByTitle('消息')).toBeTruthy();
+        expect(screen.getByTitle('导出配置')).toBeTruthy();
+        expect(screen.getByTitle('导入配置')).toBeTruthy();
     });
 
     /**

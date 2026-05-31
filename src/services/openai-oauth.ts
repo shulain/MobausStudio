@@ -16,6 +16,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { generatePKCE, generateState } from '../utils/pkce';
 import { logger, LogTags } from '../utils/logger';
 import {
+    checkPortAvailable,
+    getAvailablePort,
     startOAuthCallbackServer,
     buildRedirectUri,
     getProviderPortConfig,
@@ -259,22 +261,42 @@ export class OpenAIOAuth {
                 fallbackPorts: PORT_CONFIG.fallbackPorts,
             });
 
+            const candidatePorts = [
+                PORT_CONFIG.preferredPort,
+                ...PORT_CONFIG.fallbackPorts,
+            ];
+
+            const resolvePort = async (): Promise<number> => {
+                for (const port of candidatePorts) {
+                    try {
+                        if (await checkPortAvailable(port)) {
+                            return port;
+                        }
+                    } catch {
+                        // 忽略端口检测失败，继续尝试下一端口
+                    }
+                }
+
+                try {
+                    return await getAvailablePort();
+                } catch {
+                    return PORT_CONFIG.preferredPort;
+                }
+            };
+
+            const callbackPort = await resolvePort();
+
             // 使用 Promise.race 同时启动回调服务器和生成授权 URL
-            // 先尝试绑定端口，获取实际端口后再生成 URL
+            // 先选择可用端口再生成 URL，避免回调端口错位
             const callbackPromise = startOAuthCallbackServer({
-                preferredPort: PORT_CONFIG.preferredPort,
-                fallbackPorts: PORT_CONFIG.fallbackPorts,
+                preferredPort: callbackPort,
+                fallbackPorts: [],
                 callbackPaths: [PORT_CONFIG.callbackPath, '/callback', '/auth/callback'],
                 timeout: 300, // 5 分钟超时
             });
 
-            // 等待一小段时间让服务器启动并获取实际端口
-            // 由于我们需要知道实际端口才能生成正确的 redirect_uri
-            // 这里使用一个技巧：先检查首选端口是否可用
-            const actualPort = PORT_CONFIG.preferredPort;
-
-            // 2. 生成授权 URL（使用首选端口，如果端口冲突会在回调时失败）
-            const authData = await startOpenAIAuth(actualPort);
+            // 2. 生成授权 URL（使用已确认可用端口）
+            const authData = await startOpenAIAuth(callbackPort);
 
             // 3. 回调 URL，让 UI 可以显示（供用户手动复制）
             onAuthUrl(authData.url, authData.instructions);
@@ -298,13 +320,17 @@ export class OpenAIOAuth {
             }
 
             // 检查实际使用的端口是否与预期一致
-            if (callbackResult.actualPort !== actualPort) {
-                logger.warn(LogTags.AUTH, 'OpenAI OAuth: 端口发生变化', {
-                    expected: actualPort,
+            if (callbackResult.actualPort !== callbackPort) {
+                logger.error(LogTags.AUTH, 'OpenAI OAuth: 回调端口不一致', {
+                    expected: callbackPort,
                     actual: callbackResult.actualPort,
                 });
-                // 注意：如果端口变化，redirect_uri 不匹配，OAuth 会失败
-                // 这种情况下需要重新生成 URL，但用户可能已经在授权页面了
+                cancelOpenAIAuth();
+                onStatusChange('error');
+                return {
+                    type: 'failed',
+                    error: 'OAuth 回调端口不一致，请重试授权流程',
+                };
             }
 
             if (!callbackResult.success || !callbackResult.code) {

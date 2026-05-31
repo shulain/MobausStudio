@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Toast, type ToastItem } from './components/common';
@@ -15,7 +17,17 @@ import { SkillsPage } from './components/features/Skills';
 import { StatsModal } from './components/features/Stats';
 import { Header } from './components/layout/Header';
 import { Sidebar, type PageType } from './components/layout/Sidebar';
-import { providerCredentialsStorage } from './services/storage';
+import {
+    agentsStorage,
+    chatsStorage,
+    providerCredentialsStorage,
+    mcpServersStorage,
+    modelsStorage,
+    type AppSettings,
+    roundtableChatsStorage,
+    settingsStorage,
+    skillsStorage,
+} from './services/storage';
 import { tokenRefresher } from './services/tokenRefresher';
 import { checkForUpdates, type UpdateInfo } from './services/updater';
 import { loadProviderCredentialsSafe } from './services/auth/providerCredentialAccess';
@@ -97,6 +109,7 @@ import type {
   MCPStats,
   MCPTool,
   Message,
+  AIModelConfig,
   ModelCreateInput,
   ModelProvider,
   OAuthResult,
@@ -104,11 +117,23 @@ import type {
   RoundtableChat,
   RoundtableCreateInput,
   RoundtableMessage,
+  Skill,
   SkillCreateInput,
 } from './types';
 import { useI18n, translate } from './i18n';
 import { logger, LogTags } from './utils/logger';
 import { calculateAllStats, calculateModelUsage, generateRecentActivity } from './utils/statsUtils';
+
+const APP_STORAGE_KEYS = {
+    MODELS: 'mobaus_models',
+    CHATS: 'mobaus_chats',
+    AGENTS: 'mobaus_agents',
+    SKILLS: 'mobaus_skills',
+    MCP: 'mobaus_mcp_servers',
+    SETTINGS: 'mobaus_settings',
+} as const;
+
+const APP_BACKUP_KEY = 'mobaus_backup';
 
 function App() {
   // i18n
@@ -116,7 +141,6 @@ function App() {
 
   // 状态管理
   const [currentPage, setCurrentPage] = useState<PageType>('chat');
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -142,6 +166,7 @@ function App() {
 
   // 引用监听取消函数，用于停止生成（每个对话独立管理）
   const unlistenMapRef = useRef<Map<string, UnlistenFn>>(new Map());
+  const importingRef = useRef(false);
 
   // v4.2.2: 流式输出优化：使用定时器批量更新减少卡顿
   // 使用 setTimeout 替代 RAF，固定 16ms 间隔，确保更稳定的更新频率
@@ -4563,13 +4588,319 @@ const handleMarkAllRead = useCallback(() => {
 }, []);
 
 // Export/Import handlers
-const handleExport = useCallback((config: ExportConfig) => {
-  logger.info(LogTags.APP, '导出配置', config);
-}, []);
+const handleExport = useCallback(async (config: ExportConfig) => {
+  try {
+    const exportData: Record<string, unknown> = {
+      exportedAt: new Date().toISOString(),
+    };
+
+    if (config.models) {
+      exportData.models = await modelsStorage.load();
+    }
+    if (config.chats) {
+      exportData.chats = await chatsStorage.load();
+    }
+    if (config.agents) {
+      exportData.agents = await agentsStorage.load();
+    }
+    if (config.skills) {
+      exportData.skills = await skillsStorage.load();
+    }
+    if (config.mcp) {
+      exportData.mcp = await mcpServersStorage.load();
+    }
+    if (config.roundtableChats) {
+      exportData.roundtableChats = await roundtableChatsStorage.load();
+    }
+    if (config.settings) {
+      exportData.settings = await settingsStorage.loadAsync();
+    }
+
+    const jsonContent = JSON.stringify(exportData, null, 2);
+    const defaultFileName = `mobaus-config-${new Date().toISOString().split('T')[0]}.json`;
+
+    if (isTauri()) {
+      const filePath = await save({
+        defaultPath: defaultFileName,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+
+      if (filePath) {
+        await writeTextFile(filePath, jsonContent);
+        addToast({
+          type: 'success',
+          title: t.messages.exportSuccess || '导出成功！',
+          message: t.messages.exportSuccess || '导出成功！',
+          duration: 5000,
+        });
+      }
+    } else {
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast({
+        type: 'success',
+        title: t.messages.exportSuccess || '导出成功！',
+        message: t.messages.exportSuccess || '导出成功！',
+        duration: 5000,
+      });
+    }
+  } catch (error) {
+    logger.error(LogTags.APP, '导出失败', error);
+    addToast({
+      type: 'error',
+      title: t.messages.exportError || '导出失败，请重试。',
+      message: t.messages.exportError || '导出失败，请重试。',
+      duration: 5000,
+    });
+  }
+}, [addToast, t]);
 
 const handleImport = useCallback((file: File, options: ImportOptions) => {
-  logger.info(LogTags.APP, '导入配置', { fileName: file.name, options });
-}, []);
+  if (importingRef.current) {
+    return;
+  }
+  importingRef.current = true;
+
+  const toList = <T,>(value: unknown): T[] => {
+    return Array.isArray(value) ? (value as T[]) : [];
+  };
+
+  const mergeById = <T extends { id: string }>(existing: T[], imported: T[]): T[] => {
+    const idMap = new Map<string, T>();
+    existing.forEach((item) => idMap.set(item.id, item));
+    imported.forEach((item) => idMap.set(item.id, item));
+    return Array.from(idMap.values());
+  };
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const raw = e.target?.result;
+      if (typeof raw !== 'string') {
+        throw new Error('导入文件内容无效');
+      }
+
+      const data = JSON.parse(raw) as Record<string, unknown>;
+      const hasImportPayload = [
+        'models',
+        'chats',
+        'agents',
+        'skills',
+        'mcp',
+        'mcpServers',
+        'roundtableChats',
+        'settings',
+      ].some((key) => Object.prototype.hasOwnProperty.call(data, key));
+
+      if (!hasImportPayload) {
+        throw new Error('导入文件中未检测到可识别的配置字段');
+      }
+
+      if (options.backup) {
+        const backup = {
+          models: localStorage.getItem(APP_STORAGE_KEYS.MODELS),
+          chats: localStorage.getItem(APP_STORAGE_KEYS.CHATS),
+          agents: localStorage.getItem(APP_STORAGE_KEYS.AGENTS),
+          skills: localStorage.getItem(APP_STORAGE_KEYS.SKILLS),
+          mcp: localStorage.getItem(APP_STORAGE_KEYS.MCP),
+          settings: localStorage.getItem(APP_STORAGE_KEYS.SETTINGS),
+        };
+        localStorage.setItem(APP_BACKUP_KEY, JSON.stringify(backup));
+      }
+
+      const models = Object.prototype.hasOwnProperty.call(data, 'models')
+        ? toList<AIModelConfig>(data.models)
+        : null;
+      const chats = Object.prototype.hasOwnProperty.call(data, 'chats')
+        ? toList<Chat>(data.chats)
+        : null;
+      const agentsData = Object.prototype.hasOwnProperty.call(data, 'agents')
+        ? toList<Agent>(data.agents)
+        : null;
+      const skills = Object.prototype.hasOwnProperty.call(data, 'skills')
+        ? toList<Skill>(data.skills)
+        : null;
+      const mcp = Object.prototype.hasOwnProperty.call(data, 'mcp')
+        ? toList<MCPServer>(data.mcp)
+        : null;
+      const legacyMcp = Object.prototype.hasOwnProperty.call(data, 'mcpServers')
+        ? toList<MCPServer>(data.mcpServers)
+        : null;
+      const roundtableChats = Object.prototype.hasOwnProperty.call(data, 'roundtableChats')
+        ? toList<RoundtableChat>(data.roundtableChats)
+        : null;
+
+      if (models) {
+        if (options.merge) {
+          const existing = await modelsStorage.load();
+          await modelsStorage.save(mergeById(existing, models));
+        } else {
+          await modelsStorage.save(models);
+        }
+      }
+
+      if (chats) {
+        if (options.merge) {
+          const existing = await chatsStorage.load();
+          await chatsStorage.save(mergeById(existing, chats));
+        } else {
+          await chatsStorage.save(chats);
+        }
+      }
+
+      if (agentsData) {
+        const existingSkills = await skillsStorage.load();
+        const existingMcp = await mcpServersStorage.load();
+        const existingModels = await modelsStorage.load();
+
+        const existingSkillIds = new Set(existingSkills.map((item) => item.id));
+        const existingMcpIds = new Set(existingMcp.map((item) => item.id));
+        const existingModelIds = new Set(existingModels.map((item) => item.id));
+        const importMcp = mcp ?? legacyMcp ?? [];
+        const importSkills = skills ?? [];
+        const skillsToCreate: typeof importSkills = [];
+        const mcpToCreate: typeof importMcp = [];
+        const missingModels: string[] = [];
+
+        for (const agent of agentsData) {
+          if (agent.skills && Array.isArray(agent.skills)) {
+            for (const skillId of agent.skills) {
+              if (!existingSkillIds.has(skillId)) {
+                const found = importSkills.find((skill) => skill.id === skillId);
+                if (found && !skillsToCreate.some((item) => item.id === skillId)) {
+                  skillsToCreate.push(found);
+                  existingSkillIds.add(skillId);
+                }
+              }
+            }
+          }
+
+          if (agent.mcpServers && Array.isArray(agent.mcpServers)) {
+            for (const config of agent.mcpServers) {
+              if (!existingMcpIds.has(config.serverId)) {
+                const found = importMcp.find((mcpItem) => mcpItem.id === config.serverId);
+                if (found && !mcpToCreate.some((item) => item.id === config.serverId)) {
+                  mcpToCreate.push(found);
+                  existingMcpIds.add(config.serverId);
+                }
+              }
+            }
+          }
+
+          if (agent.model && !existingModelIds.has(agent.model)) {
+            if (!missingModels.includes(agent.model)) {
+              missingModels.push(agent.model);
+            }
+          }
+        }
+
+        if (skillsToCreate.length > 0) {
+          const currentSkills = await skillsStorage.load();
+          const mergedSkills = options.merge
+            ? mergeById(currentSkills, skillsToCreate)
+            : [...currentSkills, ...skillsToCreate];
+          await skillsStorage.save(mergedSkills);
+        }
+
+        if (mcpToCreate.length > 0) {
+          const currentMcp = await mcpServersStorage.load();
+          const mergedMcp = options.merge
+            ? mergeById(currentMcp, mcpToCreate)
+            : [...currentMcp, ...mcpToCreate];
+          await mcpServersStorage.save(mergedMcp);
+        }
+
+        if (options.merge) {
+          const existing = await agentsStorage.load();
+          await agentsStorage.save(mergeById(existing, agentsData));
+        } else {
+          await agentsStorage.save(agentsData);
+        }
+
+        if (missingModels.length > 0) {
+          logger.warn(
+            LogTags.APP,
+            `导入 Agents 时发现缺失的模型: ${missingModels.join(', ')}`
+          );
+        }
+      }
+
+      if (skills && !agentsData) {
+        if (options.merge) {
+          const existing = await skillsStorage.load();
+          await skillsStorage.save(mergeById(existing, skills));
+        } else {
+          await skillsStorage.save(skills);
+        }
+      }
+
+      if (!agentsData) {
+        const importMcp = mcp ?? legacyMcp ?? [];
+        if (importMcp?.length || Object.prototype.hasOwnProperty.call(data, 'mcp') || Object.prototype.hasOwnProperty.call(data, 'mcpServers')) {
+          const mcpToImport = importMcp || [];
+          if (options.merge) {
+            const existing = await mcpServersStorage.load();
+            await mcpServersStorage.save(mergeById(existing, mcpToImport));
+          } else {
+            await mcpServersStorage.save(mcpToImport);
+          }
+        }
+      }
+
+      if (roundtableChats) {
+        if (options.merge) {
+          const existing = await roundtableChatsStorage.load();
+          await roundtableChatsStorage.save(mergeById(existing, roundtableChats));
+        } else {
+          await roundtableChatsStorage.save(roundtableChats);
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(data, 'settings')) {
+        await settingsStorage.save(data.settings as AppSettings);
+      }
+
+      addToast({
+        type: 'success',
+        title: t.messages.importSuccess || '导入成功！页面将刷新以应用更改。',
+        message: t.messages.importSuccess || '导入成功！页面将刷新以应用更改。',
+        duration: 3000,
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
+    } catch (error) {
+      logger.error(LogTags.APP, '导入失败', error);
+      addToast({
+        type: 'error',
+        title: t.messages.importError || '导入失败：文件格式无效',
+        message: t.messages.importError || '导入失败：文件格式无效',
+        duration: 5000,
+      });
+    } finally {
+      importingRef.current = false;
+    }
+  };
+
+  reader.onerror = () => {
+    importingRef.current = false;
+    addToast({
+      type: 'error',
+      title: t.messages.importError || '导入失败：文件格式无效',
+      message: t.messages.importError || '导入失败：文件格式无效',
+      duration: 5000,
+    });
+  };
+
+  reader.readAsText(file);
+}, [addToast, t]);
 
 const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -4579,8 +4910,6 @@ return (
       onNotifications={() => setShowNotifications(!showNotifications)}
       onExport={() => setShowExportModal(true)}
       onImport={() => setShowImportModal(true)}
-      showUserMenu={showUserMenu}
-      setShowUserMenu={setShowUserMenu}
       notificationCount={unreadCount}
     />
 

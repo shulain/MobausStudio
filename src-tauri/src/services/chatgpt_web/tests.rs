@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn test_tc_cgweb_001_generate_pkce_pair() {
-        let (verifier, challenge) = oauth::generate_pkce_pair();
+        let (verifier, challenge) = oauth::generate_pkce_pair().expect("generate_pkce_pair should succeed");
         // verifier 是 64 字节的 hex 编码 = 128 字符
         assert_eq!(verifier.len(), 128, "verifier 应为 128 字符（64 字节 hex）");
         // challenge 是 SHA256 (32 字节) 的 base64url 编码 = 43 字符

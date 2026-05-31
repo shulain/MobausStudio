@@ -176,6 +176,11 @@ export const PROVIDER_PORT_CONFIG = {
         fallbackPorts: [51126, 51127, 51128, 51129],
         callbackPath: '/callback',
     },
+    kiro: {
+        preferredPort: 9876,
+        fallbackPorts: [9877, 9878, 9879, 9880],
+        callbackPath: '/oauth/callback',
+    },
 } as const;
 
 /**

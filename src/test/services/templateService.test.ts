@@ -11,6 +11,11 @@ import {
     getRequiredVariables,
     installTemplate,
 } from '../../services/templateService';
+import {
+    fetchSkillFromRegistry,
+    fetchSkillRegistry,
+    parseSkillMd,
+} from '../../utils/skillUtils';
 import type {
     AgentTemplatePackage,
     MCPServer,
@@ -18,6 +23,16 @@ import type {
     Agent,
 } from '../../types';
 import { TemplateParseError } from '../../types';
+
+vi.mock('../../utils/skillUtils', async () => {
+    const actual = await vi.importActual<typeof import('../../utils/skillUtils')>('../../utils/skillUtils');
+    return {
+        ...actual,
+        fetchSkillRegistry: vi.fn(),
+        fetchSkillFromRegistry: vi.fn(),
+        parseSkillMd: vi.fn(),
+    };
+});
 
 // ==================== 测试数据 ====================
 
@@ -103,6 +118,25 @@ function createTemplateWithVariables(): AgentTemplatePackage {
         },
     };
 }
+
+function createTemplateWithRemoteSkill(skillTemplate: { inline?: unknown; url?: string } = {}): AgentTemplatePackage {
+    return {
+        id: 'remote-template',
+        name: '远程技能模板',
+        version: '1.0.0',
+        description: '包含远程技能 URL 的模板',
+        components: {
+            skills: [
+                {
+                    url: 'https://example.com/skills/remote-skill.json',
+                    ...skillTemplate,
+                },
+            ],
+        },
+    };
+}
+
+const mockFetch = vi.fn();
 
 // ==================== parseTemplate 测试 ====================
 
@@ -233,6 +267,133 @@ describe('installTemplate', () => {
         mockHandlers.getMCPServers.mockReturnValue([]);
         mockHandlers.getSkills.mockReturnValue([]);
         mockHandlers.getAgents.mockReturnValue([]);
+
+        (globalThis as { fetch: typeof fetch }).fetch = mockFetch as typeof fetch;
+        mockFetch.mockReset();
+
+        // 重置 skillUtils mock
+        vi.mocked(fetchSkillRegistry).mockReset();
+        vi.mocked(fetchSkillFromRegistry).mockReset();
+        vi.mocked(parseSkillMd).mockReset();
+    });
+
+    afterEach(() => {
+        // 测试结束后清空 fetch mock
+        mockFetch.mockReset();
+    });
+
+    // TC-TPL-URL-001: registry 成功时使用第一项技能安装
+    it('TC-TPL-URL-001: registry 成功时使用注册表技能', async () => {
+        const template = createTemplateWithRemoteSkill();
+
+        vi.mocked(fetchSkillRegistry).mockResolvedValue({
+            name: 'remote-repo',
+            version: '1.0.0',
+            skills: [
+                {
+                    id: 'remote-skill',
+                    name: 'Remote Skill',
+                    description: 'Remote Skill Desc',
+                    skill: {
+                        name: '远程技能',
+                        description: '来自 registry 的技能',
+                        category: 'coding',
+                        promptTemplate: '这是远程技能的提示词',
+                    },
+                },
+            ],
+        });
+
+        vi.mocked(fetchSkillFromRegistry).mockResolvedValue({
+            name: '远程技能',
+            description: '来自 registry 的技能',
+            category: 'coding',
+            promptTemplate: '这是远程技能的提示词',
+        });
+
+        await installTemplate(template, {}, mockHandlers);
+
+        expect(mockHandlers.createSkill).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: '远程技能',
+                promptTemplate: '这是远程技能的提示词',
+                source: expect.objectContaining({
+                    type: 'url',
+                    repoUrl: template.components.skills?.[0].url,
+                }),
+            })
+        );
+    });
+
+    // TC-TPL-URL-002: fallback 到直接 JSON 时安装成功
+    it('TC-TPL-URL-002: 远程技能 JSON 解析 fallback', async () => {
+        const template = createTemplateWithRemoteSkill();
+
+        vi.mocked(fetchSkillRegistry).mockRejectedValue(new Error('registry parse failed'));
+
+        mockFetch.mockResolvedValue({
+            text: async () =>
+                JSON.stringify({
+                    name: 'JSON 技能',
+                    description: '从 JSON 安装',
+                    category: 'analysis',
+                    promptTemplate: '这是 JSON 技能内容',
+                }),
+            ok: true,
+            json: async () => ({}),
+        } as Response);
+
+        await installTemplate(template, {}, mockHandlers);
+
+        expect(mockHandlers.createSkill).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: 'JSON 技能',
+                description: '从 JSON 安装',
+                category: 'analysis',
+                promptTemplate: '这是 JSON 技能内容',
+                source: expect.objectContaining({
+                    type: 'url',
+                    repoUrl: template.components.skills?.[0].url,
+                }),
+            })
+        );
+    });
+
+    // TC-TPL-URL-003: SKILL.md fallback 解析成功
+    it('TC-TPL-URL-003: 远程技能 SKILL.md fallback', async () => {
+        const template = createTemplateWithRemoteSkill();
+
+        vi.mocked(fetchSkillRegistry).mockRejectedValue(new Error('registry not found'));
+        vi.mocked(fetchSkillFromRegistry).mockRejectedValue(new Error('skip item fetch'));
+
+        mockFetch.mockResolvedValue({
+            text: async () => '# fallback skill',
+            ok: true,
+            json: async () => ({}),
+        } as Response);
+
+        vi.mocked(parseSkillMd).mockReturnValue({
+            name: 'SkillMd 技能',
+            description: '来自 SKILL.md',
+            promptTemplate: '这是 Markdown 技能内容',
+            frontmatter: {},
+        });
+
+        await installTemplate(template, {}, mockHandlers);
+
+        expect(parseSkillMd).toHaveBeenCalled();
+        expect(mockHandlers.createSkill).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: 'SkillMd 技能',
+                description: '来自 SKILL.md',
+                promptTemplate: '这是 Markdown 技能内容',
+                category: 'custom',
+                source: expect.objectContaining({
+                    type: 'url',
+                    repoUrl: template.components.skills?.[0].url,
+                }),
+            })
+        );
     });
 
     // TC-TPL-004: 安装 MCP 服务器

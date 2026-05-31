@@ -24,6 +24,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Rust/Tauri build artifacts
+src-tauri/target/
+
 # Go build artifacts
 bin/
 pkg/

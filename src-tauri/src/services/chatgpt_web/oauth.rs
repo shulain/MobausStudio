@@ -40,10 +40,10 @@ pub fn build_authorize_url(code_challenge: &str, state: &str) -> String {
 /// 生成 PKCE code_verifier 和 code_challenge
 ///
 /// @returns (code_verifier, code_challenge)
-pub fn generate_pkce_pair() -> (String, String) {
+pub fn generate_pkce_pair() -> Result<(String, String), String> {
     // 生成 64 字节随机数
     let mut bytes = [0u8; 64];
-    getrandom::getrandom(&mut bytes).expect("随机数生成失败");
+    getrandom::getrandom(&mut bytes).map_err(|e| format!("随机数生成失败: {}", e))?;
     let verifier = hex::encode(bytes);
 
     // SHA256 哈希后 Base64url 编码
@@ -54,7 +54,7 @@ pub fn generate_pkce_pair() -> (String, String) {
 
     info!("[OAuth] 生成 PKCE pair，verifier 长度: {}", verifier.len());
 
-    (verifier, challenge)
+    Ok((verifier, challenge))
 }
 
 /// 使用 authorization code 换取 token

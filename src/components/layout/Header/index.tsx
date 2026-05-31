@@ -1,5 +1,6 @@
 import React from 'react';
 import MobausLogoSvg from '../../../assets/Mobaus1.svg';
+import { Bell, Download, Upload } from 'lucide-react';
 
 /**
  * Header 组件
@@ -14,8 +15,6 @@ interface HeaderProps {
     onNotifications: () => void;
     onExport: () => void;
     onImport: () => void;
-    showUserMenu: boolean;
-    setShowUserMenu: (show: boolean) => void;
     notificationCount?: number;
 }
 
@@ -35,7 +34,12 @@ const MobausLogo: React.FC = () => (
     />
 );
 
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC<HeaderProps> = ({
+    onNotifications,
+    onExport,
+    onImport,
+    notificationCount = 0,
+}) => {
     return (
         <div className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60 flex items-center pl-20 pr-6" data-tauri-drag-region>
             {/* 品牌区域 - 支持拖动 */}
@@ -59,6 +63,42 @@ export const Header: React.FC<HeaderProps> = () => {
                         PRO
                     </span>
                 </div>
+            </div>
+
+            {/* 操作区 */}
+            <div className="ml-auto flex items-center gap-2">
+                <button
+                    onClick={onNotifications}
+                    className="h-8 px-2 rounded-md text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/80 flex items-center justify-center relative"
+                    title="消息"
+                    type="button"
+                >
+                    <Bell className="w-4 h-4" />
+                    {notificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                            {notificationCount > 9 ? '9+' : notificationCount}
+                        </span>
+                    )}
+                </button>
+
+                <button
+                    onClick={onExport}
+                    className="h-8 px-2 rounded-md text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/80 flex items-center justify-center"
+                    title="导出配置"
+                    type="button"
+                >
+                    <Download className="w-4 h-4" />
+                </button>
+
+                <button
+                    onClick={onImport}
+                    className="h-8 px-2 rounded-md text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/80 flex items-center justify-center"
+                    title="导入配置"
+                    type="button"
+                >
+                    <Upload className="w-4 h-4" />
+                </button>
+
             </div>
         </div>
     );

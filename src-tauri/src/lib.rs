@@ -1041,6 +1041,148 @@ async fn load_models(app_handle: tauri::AppHandle) -> Result<Vec<AIModelConfig>,
     Ok(models)
 }
 
+/// 加载模型动态获取缓存
+///
+/// # 参数
+/// - `app_handle`: Tauri 应用句柄
+///
+/// # 返回
+/// - 成功返回缓存 JSON 字符串，文件不存在或内容为空时返回空字符串
+#[tauri::command]
+async fn load_model_cache(app_handle: tauri::AppHandle) -> Result<String, String> {
+    info!("[load_model_cache] 开始加载模型动态缓存");
+
+    let data_dir = get_data_dir(&app_handle)?;
+    let file_path = data_dir.join("model_cache.json");
+
+    debug!("[load_model_cache] 读取路径: {:?}", file_path);
+
+    if !file_path.exists() {
+        info!("[load_model_cache] 文件不存在，返回空字符串");
+        return Ok(String::new());
+    }
+
+    let content =
+        fs::read_to_string(&file_path).map_err(|e| format!("读取模型动态缓存失败: {}", e))?;
+    Ok(content)
+}
+
+/// 保存模型动态获取缓存
+///
+/// # 参数
+/// - `app_handle`: Tauri 应用句柄
+/// - `cache`: 缓存 JSON 字符串
+#[tauri::command]
+async fn save_model_cache(app_handle: tauri::AppHandle, cache: String) -> Result<(), String> {
+    info!(
+        "[save_model_cache] 开始保存模型动态缓存，长度: {}",
+        cache.len()
+    );
+
+    let data_dir = get_data_dir(&app_handle)?;
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir).map_err(|e| format!("创建数据目录失败: {}", e))?;
+    }
+
+    let file_path = data_dir.join("model_cache.json");
+    fs::write(&file_path, &cache).map_err(|e| format!("写入模型动态缓存失败: {}", e))?;
+
+    info!(
+        "[save_model_cache] 保存成功，文件大小: {} bytes",
+        cache.len()
+    );
+    Ok(())
+}
+
+/// 清空模型动态获取缓存
+#[tauri::command]
+async fn clear_model_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("[clear_model_cache] 开始清空模型动态缓存");
+
+    let data_dir = get_data_dir(&app_handle)?;
+    let file_path = data_dir.join("model_cache.json");
+
+    if !file_path.exists() {
+        info!("[clear_model_cache] 文件不存在，无需清理");
+        return Ok(());
+    }
+
+    fs::remove_file(&file_path).map_err(|e| format!("清空模型动态缓存失败: {}", e))?;
+    info!("[clear_model_cache] 清理成功");
+    Ok(())
+}
+
+/// 加载 models.dev 缓存
+///
+/// # 参数
+/// - `app_handle`: Tauri 应用句柄
+///
+/// # 返回
+/// - 成功返回缓存 JSON 字符串，文件不存在或内容为空时返回空字符串
+#[tauri::command]
+async fn load_models_dev_cache(app_handle: tauri::AppHandle) -> Result<String, String> {
+    info!("[load_models_dev_cache] 开始加载 models.dev 缓存");
+
+    let data_dir = get_data_dir(&app_handle)?;
+    let file_path = data_dir.join("models_dev_cache.json");
+
+    debug!("[load_models_dev_cache] 读取路径: {:?}", file_path);
+
+    if !file_path.exists() {
+        info!("[load_models_dev_cache] 文件不存在，返回空字符串");
+        return Ok(String::new());
+    }
+
+    let content =
+        fs::read_to_string(&file_path).map_err(|e| format!("读取 models.dev 缓存失败: {}", e))?;
+    Ok(content)
+}
+
+/// 保存 models.dev 缓存
+///
+/// # 参数
+/// - `app_handle`: Tauri 应用句柄
+/// - `cache`: 缓存 JSON 字符串
+#[tauri::command]
+async fn save_models_dev_cache(app_handle: tauri::AppHandle, cache: String) -> Result<(), String> {
+    info!(
+        "[save_models_dev_cache] 开始保存 models.dev 缓存，长度: {}",
+        cache.len()
+    );
+
+    let data_dir = get_data_dir(&app_handle)?;
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir).map_err(|e| format!("创建数据目录失败: {}", e))?;
+    }
+
+    let file_path = data_dir.join("models_dev_cache.json");
+    fs::write(&file_path, &cache).map_err(|e| format!("写入 models.dev 缓存失败: {}", e))?;
+
+    info!(
+        "[save_models_dev_cache] 保存成功，文件大小: {} bytes",
+        cache.len()
+    );
+    Ok(())
+}
+
+/// 清空 models.dev 缓存
+#[tauri::command]
+async fn clear_models_dev_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("[clear_models_dev_cache] 开始清空 models.dev 缓存");
+
+    let data_dir = get_data_dir(&app_handle)?;
+    let file_path = data_dir.join("models_dev_cache.json");
+
+    if !file_path.exists() {
+        info!("[clear_models_dev_cache] 文件不存在，无需清理");
+        return Ok(());
+    }
+
+    fs::remove_file(&file_path).map_err(|e| format!("清空 models.dev 缓存失败: {}", e))?;
+    info!("[clear_models_dev_cache] 清理成功");
+    Ok(())
+}
+
 /// 保存对话到本地文件
 #[tauri::command]
 async fn save_chats(app_handle: tauri::AppHandle, chats: Vec<Chat>) -> Result<(), String> {
@@ -2478,6 +2620,8 @@ pub struct OAuthDeviceCodeRequest {
     pub provider_id: String,
     /// 认证方式 (可选，用于 Kiro: "google", "github", "aws", "idc")
     pub auth_method: Option<String>,
+    /// OAuth 授权重定向 URI（用于 Kiro Social Auth）
+    pub redirect_uri: Option<String>,
     /// IDC Start URL (仅用于 AWS Identity Center)
     pub start_url: Option<String>,
     /// IDC Region (仅用于 AWS Identity Center，默认 us-east-1)
@@ -2536,8 +2680,16 @@ async fn oauth_request_device_code(
             // Kiro 支持多种认证方式
             let auth_method = request.auth_method.as_deref().unwrap_or("aws");
             match auth_method.to_lowercase().as_str() {
-                "google" => request_kiro_social_auth("Google").await,
-                "github" => request_kiro_social_auth("Github").await,
+                "google" => request_kiro_social_auth(
+                    "Google",
+                    request.redirect_uri.clone(),
+                )
+                .await,
+                "github" => request_kiro_social_auth(
+                    "Github",
+                    request.redirect_uri.clone(),
+                )
+                .await,
                 "idc" | "aws identity center" | "aws identity center (idc)" => {
                     // IDC 需要 start_url 和 region 参数
                     let start_url = request
@@ -2978,7 +3130,7 @@ async fn request_kiro_idc_device_code(
 
 /// Kiro Social Auth 状态存储（用于存储 PKCE 和 state）
 static KIRO_SOCIAL_AUTH_STATE: once_cell::sync::Lazy<
-    std::sync::Mutex<Option<(String, String, String)>>,
+    std::sync::Mutex<Option<(String, String, String, String, String)>>,
 > = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
 
 /// 生成 PKCE code_verifier 和 code_challenge
@@ -3026,7 +3178,10 @@ fn generate_state() -> String {
 ///
 /// 使用 Authorization Code Flow + PKCE
 /// 返回 auth_url 供前端打开浏览器
-async fn request_kiro_social_auth(provider: &str) -> Result<OAuthDeviceCodeResponse, String> {
+async fn request_kiro_social_auth(
+    provider: &str,
+    redirect_uri_override: Option<String>,
+) -> Result<OAuthDeviceCodeResponse, String> {
     info!(
         "[request_kiro_social_auth] 开始 Kiro {} OAuth 流程",
         provider
@@ -3037,17 +3192,91 @@ async fn request_kiro_social_auth(provider: &str) -> Result<OAuthDeviceCodeRespo
 
     // 生成 state
     let state = generate_state();
+    // 生成 redirect_uri；如未提供则使用默认回调地址
+    let redirect_uri = redirect_uri_override.unwrap_or_else(|| {
+        format!(
+            "http://localhost:{}/oauth/callback",
+            KIRO_SOCIAL_CALLBACK_PORT
+        )
+    });
 
-    // 构建 redirect_uri (本地回调服务器)
-    let redirect_uri = format!(
-        "http://localhost:{}/oauth/callback",
-        KIRO_SOCIAL_CALLBACK_PORT
-    );
+    let endpoint = format!("https://oidc.{}.amazonaws.com", KIRO_SSO_REGION);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+    // 先注册临时客户端（public client），以便后续进行 token 交换
+    let register_response = client
+        .post(format!("{}/client/register", endpoint))
+        .header("Content-Type", "application/json")
+        .header("User-Agent", KIRO_USER_AGENT)
+        .json(&serde_json::json!({
+            "clientName": KIRO_CLIENT_NAME,
+            "clientType": "public",
+            "scopes": KIRO_SCOPES,
+            "grantTypes": [
+                "authorization_code",
+                "refresh_token"
+            ]
+        }))
+        .send()
+        .await
+        .map_err(|e| {
+            error!("[request_kiro_social_auth] 客户端注册请求失败: {}", e);
+            format!("客户端注册请求失败: {}", e)
+        })?;
+
+    if !register_response.status().is_success() {
+        let error_text = register_response.text().await.unwrap_or_default();
+        error!(
+            "[request_kiro_social_auth] 客户端注册失败: {}",
+            error_text
+        );
+        return Ok(OAuthDeviceCodeResponse {
+            success: false,
+            device_code: None,
+            user_code: None,
+            verification_uri: None,
+            expires_in: None,
+            interval: None,
+            error: Some(format!("Kiro 客户端注册失败: {}", error_text)),
+            auth_url: None,
+            code_verifier: None,
+            state: None,
+            redirect_uri: None,
+        });
+    }
+
+    let register_data: serde_json::Value = register_response
+        .json()
+        .await
+        .map_err(|e| format!("解析注册响应失败: {}", e))?;
+
+    let client_id = register_data["clientId"]
+        .as_str()
+        .ok_or("注册响应缺少 clientId")?;
+    let client_secret = register_data["clientSecret"]
+        .as_str()
+        .ok_or("注册响应缺少 clientSecret")?;
 
     // 保存状态供后续 token 交换使用
     {
         let mut auth_state = KIRO_SOCIAL_AUTH_STATE.lock().unwrap();
-        *auth_state = Some((code_verifier.clone(), state.clone(), redirect_uri.clone()));
+        *auth_state = Some((
+            code_verifier.clone(),
+            state.clone(),
+            redirect_uri.clone(),
+            client_id.to_string(),
+            client_secret.to_string(),
+        ));
+    }
+
+    // 同步普通客户端注册信息，便于后续 token 刷新
+    {
+        let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+        *registration = Some((client_id.to_string(), client_secret.to_string()));
     }
 
     // 构建 Kiro AuthService 登录 URL
@@ -3131,6 +3360,175 @@ pub struct OAuthPollTokenResponse {
 /// - 成功: Access Token
 /// - 待定: status = "pending"
 /// - 失败: 错误信息
+#[derive(Debug, Serialize)]
+pub struct KiroExchangeTokenResponse {
+    /// 是否成功
+    pub success: bool,
+    /// Access Token
+    pub access_token: Option<String>,
+    /// Refresh Token
+    pub refresh_token: Option<String>,
+    /// Profile ARN（可选）
+    pub profile_arn: Option<String>,
+    /// Token 有效期（秒）
+    pub expires_in: Option<u64>,
+    /// 状态: success / error
+    pub status: String,
+    /// 错误信息
+    pub error: Option<String>,
+    /// Kiro 客户端 ID（用于 token 刷新）
+    pub kiro_client_id: Option<String>,
+    /// Kiro 客户端密钥（用于 token 刷新）
+    pub kiro_client_secret: Option<String>,
+    /// Kiro SSO 区域（用于 token 刷新）
+    pub kiro_sso_region: Option<String>,
+}
+
+/// 交换 Kiro Social Auth 授权码获取 Token
+///
+/// # 参数
+/// - `code`: 授权码
+/// - `verifier`: PKCE code_verifier
+/// - `redirect_uri`: 回调 URI
+///
+/// # 返回
+/// - 成功: Token 信息
+/// - 失败: 错误信息
+#[tauri::command]
+async fn kiro_exchange_code(
+    code: String,
+    verifier: String,
+    redirect_uri: String,
+) -> Result<KiroExchangeTokenResponse, String> {
+    info!("[kiro_exchange_code] 开始交换 Kiro 授权码");
+
+    let state = {
+        let mut auth_state = KIRO_SOCIAL_AUTH_STATE.lock().unwrap();
+        auth_state
+            .take()
+            .ok_or_else(|| "未找到 Kiro Social Auth 状态，请先发起授权".to_string())?
+    };
+
+    let (saved_verifier, _saved_state, saved_redirect_uri, client_id, client_secret) = state;
+
+    if verifier != saved_verifier {
+        warn!("[kiro_exchange_code] code_verifier 与授权会话不匹配");
+        return Err("code_verifier 与授权会话不匹配".to_string());
+    }
+
+    if redirect_uri != saved_redirect_uri {
+        warn!(
+            "[kiro_exchange_code] 回调 URI 与授权会话不一致，使用前端传入值: {}",
+            redirect_uri
+        );
+        return Err(format!(
+            "回调 URI 与授权会话不一致: expected {}，received {}",
+            saved_redirect_uri, redirect_uri
+        ));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+    let endpoint = format!("https://oidc.{}.amazonaws.com", KIRO_SSO_REGION);
+
+    let response = client
+        .post(format!("{}/token", endpoint))
+        .header("Content-Type", "application/json")
+        .header("User-Agent", KIRO_USER_AGENT)
+        .json(&serde_json::json!({
+            "clientId": client_id,
+            "clientSecret": client_secret,
+            "grantType": "authorization_code",
+            "code": code,
+            "codeVerifier": verifier,
+            "redirectUri": redirect_uri
+        }))
+        .send()
+        .await
+        .map_err(|e| {
+            error!("[kiro_exchange_code] 网络请求失败: {}", e);
+            format!("网络请求失败: {}", e)
+        })?;
+
+    let status = response.status();
+    let response_text = response.text().await.unwrap_or_default();
+    let data: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("解析 Token 响应失败: {}", e))?;
+
+    if !status.is_success() {
+        let error_desc = data["errorDescription"]
+            .as_str()
+            .or(data["error_description"].as_str())
+            .or(data["message"].as_str())
+            .or(data["error"].as_str())
+            .unwrap_or("Token 交换失败");
+        error!(
+            "[kiro_exchange_code] API 错误: {} - {}",
+            status.as_u16(),
+            response_text
+        );
+        return Ok(KiroExchangeTokenResponse {
+            success: false,
+            access_token: None,
+            refresh_token: None,
+            profile_arn: None,
+            expires_in: None,
+            status: "error".to_string(),
+            error: Some(error_desc.to_string()),
+            kiro_client_id: Some(client_id),
+            kiro_client_secret: Some(client_secret),
+            kiro_sso_region: Some(KIRO_SSO_REGION.to_string()),
+        });
+    }
+
+    if let Some(token) = data["accessToken"].as_str() {
+        let refresh_token = data["refreshToken"].as_str().map(|s| s.to_string());
+        let expires_in = data["expiresIn"].as_u64();
+
+        // 记录已持久化客户端注册信息
+        {
+            let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+            *registration = Some((client_id.clone(), client_secret.clone()));
+        }
+
+        // 尝试获取 Profile ARN
+        let profile_arn = fetch_kiro_profile_arn(token).await;
+
+        info!("[kiro_exchange_code] Token 交换成功");
+
+        Ok(KiroExchangeTokenResponse {
+            success: true,
+            access_token: Some(token.to_string()),
+            refresh_token,
+            profile_arn,
+            expires_in,
+            status: "success".to_string(),
+            error: None,
+            kiro_client_id: Some(client_id),
+            kiro_client_secret: Some(client_secret),
+            kiro_sso_region: Some(KIRO_SSO_REGION.to_string()),
+        })
+    } else {
+        let error_msg = data["error_description"].as_str().unwrap_or("Token 交换失败");
+        warn!("[kiro_exchange_code] 响应中未包含 accessToken: {}", response_text);
+        Ok(KiroExchangeTokenResponse {
+            success: false,
+            access_token: None,
+            refresh_token: None,
+            profile_arn: None,
+            expires_in: None,
+            status: "error".to_string(),
+            error: Some(error_msg.to_string()),
+            kiro_client_id: Some(client_id),
+            kiro_client_secret: Some(client_secret),
+            kiro_sso_region: Some(KIRO_SSO_REGION.to_string()),
+        })
+    }
+}
+
 #[tauri::command]
 async fn oauth_poll_token(
     request: OAuthPollTokenRequest,
@@ -4653,6 +5051,63 @@ pub struct OpenAIOAuthCallbackResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Default)]
+struct ParsedOAuthCallbackParams {
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
+}
+
+fn is_oauth_callback_path(path: &str, callback_paths: &[&str]) -> bool {
+    callback_paths.iter().any(|cb| {
+        path == *cb || (path.len() > cb.len() && path.starts_with(cb) && path[cb.len()..].starts_with('/'))
+    })
+}
+
+fn parse_oauth_callback_request(
+    request: &str,
+    callback_paths: &[&str],
+) -> Option<ParsedOAuthCallbackParams> {
+    let mut lines = request.lines();
+    let request_line = lines.next()?;
+    let mut parts = request_line.split_whitespace();
+    if parts.next()? != "GET" {
+        return None;
+    }
+
+    let target = parts.next()?;
+    let (request_path, query) = match target.find('?') {
+        Some(q_pos) => (&target[..q_pos], &target[q_pos + 1..]),
+        None => (target, ""),
+    };
+
+    if !is_oauth_callback_path(request_path, callback_paths) {
+        return None;
+    }
+
+    let mut result = ParsedOAuthCallbackParams::default();
+    for param in query.split('&') {
+        if param.is_empty() {
+            continue;
+        }
+
+        let (key, value) = match param.split_once('=') {
+            Some(p) => p,
+            None => continue,
+        };
+
+        let decoded = urlencoding::decode(value).unwrap_or_default().into_owned();
+        match key {
+            "code" => result.code = Some(decoded),
+            "state" => result.state = Some(decoded),
+            "error" => result.error = Some(decoded),
+            _ => {}
+        }
+    }
+
+    Some(result)
+}
+
 /// 启动 OpenAI OAuth 回调服务器
 ///
 /// 启动本地 HTTP 服务器等待 OAuth 回调
@@ -4707,49 +5162,11 @@ async fn openai_start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    // 支持多种回调路径
-                    if request.starts_with("GET /auth/callback")
-                        || request.starts_with("GET /callback")
+                    if let Some(parsed) =
+                        parse_oauth_callback_request(&request, &["/auth/callback", "/callback"])
                     {
-                        let query_start = request.find('?').unwrap_or(0);
-                        let query_end = request.find(" HTTP").unwrap_or(request.len());
-                        let query = &request[query_start + 1..query_end];
 
-                        let mut code = None;
-                        let mut state = None;
-                        let mut error = None;
-
-                        for param in query.split('&') {
-                            let parts: Vec<&str> = param.splitn(2, '=').collect();
-                            if parts.len() == 2 {
-                                match parts[0] {
-                                    "code" => {
-                                        code = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "state" => {
-                                        state = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "error" => {
-                                        error = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-
-                        let html = if code.is_some() {
+                        let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
                             <body style="font-family: system-ui; text-align: center; padding: 50px;">
                             <h1 style="color: #22c55e;">✓ OpenAI 授权成功</h1>
@@ -4772,7 +5189,7 @@ async fn openai_start_oauth_callback_server(
                         stream.write_all(response.as_bytes()).ok();
                         stream.flush().ok();
 
-                        if let Some(err) = error {
+                        if let Some(err) = parsed.error {
                             return Ok(OpenAIOAuthCallbackResponse {
                                 success: false,
                                 code: None,
@@ -4781,12 +5198,12 @@ async fn openai_start_oauth_callback_server(
                             });
                         }
 
-                        if code.is_some() {
+                        if parsed.code.is_some() {
                             info!("[openai_oauth_callback] 收到授权码");
                             return Ok(OpenAIOAuthCallbackResponse {
                                 success: true,
-                                code,
-                                state,
+                                code: parsed.code,
+                                state: parsed.state,
                                 error: None,
                             });
                         }
@@ -4876,47 +5293,9 @@ async fn anthropic_start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    // 支持回调路径
-                    if request.starts_with("GET /callback") {
-                        let query_start = request.find('?').unwrap_or(0);
-                        let query_end = request.find(" HTTP").unwrap_or(request.len());
-                        let query = &request[query_start + 1..query_end];
+                    if let Some(parsed) = parse_oauth_callback_request(&request, &["/callback"]) {
 
-                        let mut code = None;
-                        let mut state = None;
-                        let mut error = None;
-
-                        for param in query.split('&') {
-                            let parts: Vec<&str> = param.splitn(2, '=').collect();
-                            if parts.len() == 2 {
-                                match parts[0] {
-                                    "code" => {
-                                        code = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "state" => {
-                                        state = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "error" => {
-                                        error = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-
-                        let html = if code.is_some() {
+                        let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
                             <body style="font-family: system-ui; text-align: center; padding: 50px;">
                             <h1 style="color: #22c55e;">✓ Anthropic 授权成功</h1>
@@ -4939,7 +5318,7 @@ async fn anthropic_start_oauth_callback_server(
                         stream.write_all(response.as_bytes()).ok();
                         stream.flush().ok();
 
-                        if let Some(err) = error {
+                        if let Some(err) = parsed.error {
                             return Ok(AnthropicOAuthCallbackResponse {
                                 success: false,
                                 code: None,
@@ -4948,12 +5327,12 @@ async fn anthropic_start_oauth_callback_server(
                             });
                         }
 
-                        if code.is_some() {
+                        if parsed.code.is_some() {
                             info!("[anthropic_oauth_callback] 收到授权码");
                             return Ok(AnthropicOAuthCallbackResponse {
                                 success: true,
-                                code,
-                                state,
+                                code: parsed.code,
+                                state: parsed.state,
                                 error: None,
                             });
                         }
@@ -5269,51 +5648,12 @@ async fn google_start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    // 解析请求 - 支持两种回调路径
-                    if request.starts_with("GET /oauth2callback")
-                        || request.starts_with("GET /oauth-callback")
+                    if let Some(parsed) =
+                        parse_oauth_callback_request(&request, &["/oauth2callback", "/oauth-callback"])
                     {
-                        // 提取查询参数
-                        let query_start = request.find('?').unwrap_or(0);
-                        let query_end = request.find(" HTTP").unwrap_or(request.len());
-                        let query = &request[query_start + 1..query_end];
-
-                        let mut code = None;
-                        let mut state = None;
-                        let mut error = None;
-
-                        for param in query.split('&') {
-                            let parts: Vec<&str> = param.splitn(2, '=').collect();
-                            if parts.len() == 2 {
-                                match parts[0] {
-                                    "code" => {
-                                        code = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "state" => {
-                                        state = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "error" => {
-                                        error = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
 
                         // 发送响应
-                        let html = if code.is_some() {
+                        let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
                             <body style="font-family: system-ui; text-align: center; padding: 50px;">
                             <h1 style="color: #22c55e;">✓ 授权成功</h1>
@@ -5336,7 +5676,7 @@ async fn google_start_oauth_callback_server(
                         stream.write_all(response.as_bytes()).ok();
                         stream.flush().ok();
 
-                        if let Some(err) = error {
+                        if let Some(err) = parsed.error {
                             return Ok(GoogleOAuthCallbackResponse {
                                 success: false,
                                 code: None,
@@ -5345,12 +5685,12 @@ async fn google_start_oauth_callback_server(
                             });
                         }
 
-                        if code.is_some() {
+                        if parsed.code.is_some() {
                             info!("[google_oauth_callback] 收到授权码");
                             return Ok(GoogleOAuthCallbackResponse {
                                 success: true,
-                                code,
-                                state,
+                                code: parsed.code,
+                                state: parsed.state,
                                 error: None,
                             });
                         }
@@ -5504,54 +5844,11 @@ async fn start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    // 检查是否匹配任一回调路径
-                    let is_callback = paths.iter().any(|path| {
-                        request.starts_with(&format!("GET {}", path))
-                            || request.starts_with(&format!("GET {}?", path))
-                    });
-
-                    if is_callback {
-                        // 提取查询参数
-                        let query_start = request.find('?').unwrap_or(0);
-                        let query_end = request.find(" HTTP").unwrap_or(request.len());
-                        let query = &request[query_start + 1..query_end];
-
-                        let mut code = None;
-                        let mut state = None;
-                        let mut error = None;
-
-                        for param in query.split('&') {
-                            let parts: Vec<&str> = param.splitn(2, '=').collect();
-                            if parts.len() == 2 {
-                                match parts[0] {
-                                    "code" => {
-                                        code = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "state" => {
-                                        state = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    "error" => {
-                                        error = Some(
-                                            urlencoding::decode(parts[1])
-                                                .unwrap_or_default()
-                                                .to_string(),
-                                        )
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
+                    let callback_paths: Vec<&str> = paths.iter().map(|path| path.as_str()).collect();
+                    if let Some(parsed) = parse_oauth_callback_request(&request, &callback_paths) {
 
                         // 发送响应
-                        let html = if code.is_some() {
+                        let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title>
                             <style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
                             .card{background:white;padding:3rem;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;max-width:400px;}
@@ -5574,7 +5871,7 @@ async fn start_oauth_callback_server(
                         stream.write_all(response.as_bytes()).ok();
                         stream.flush().ok();
 
-                        if let Some(err) = error {
+                        if let Some(err) = parsed.error {
                             return Ok(GenericOAuthCallbackResponse {
                                 success: false,
                                 code: None,
@@ -5584,12 +5881,12 @@ async fn start_oauth_callback_server(
                             });
                         }
 
-                        if code.is_some() {
+                        if parsed.code.is_some() {
                             info!("[oauth_callback] 收到授权码");
                             return Ok(GenericOAuthCallbackResponse {
                                 success: true,
-                                code,
-                                state,
+                                code: parsed.code,
+                                state: parsed.state,
                                 error: None,
                                 actual_port,
                             });
@@ -12678,6 +12975,12 @@ pub fn run() {
             test_model,
             save_models,
             load_models,
+            load_model_cache,
+            save_model_cache,
+            clear_model_cache,
+            load_models_dev_cache,
+            save_models_dev_cache,
+            clear_models_dev_cache,
             save_chats,
             load_chats,
             // 圆桌对话存储命令 (v4.0.0)
@@ -12766,6 +13069,8 @@ pub fn run() {
             kiro_get_quota,
             // v0.9.0: Kiro Token 刷新
             kiro_refresh_token,
+            // v0.9.1: Kiro Social Auth 授权码交换
+            kiro_exchange_code,
             // 配置导出命令 (config-switcher)
             export_provider_to_tool,
             batch_export_providers,
@@ -13107,7 +13412,7 @@ fn parse_chatgpt_account_id_from_jwt(id_token: &str) -> Option<String> {
 
 #[tauri::command]
 fn chatgpt_web_generate_pkce() -> Result<serde_json::Value, String> {
-    let (verifier, challenge) = services::chatgpt_web::oauth::generate_pkce_pair();
+    let (verifier, challenge) = services::chatgpt_web::oauth::generate_pkce_pair()?;
     Ok(serde_json::json!({
         "verifier": verifier,
         "challenge": challenge
