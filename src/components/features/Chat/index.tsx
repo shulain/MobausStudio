@@ -7,6 +7,7 @@ import type { Chat, AIModel, Attachment, Agent, MCPServer, RoundtableChat, Round
 import { logger, LogTags } from '../../../utils/logger';
 import { OrchestrationModeSelector, RoundtableSetupModal, RoundtableView } from '../AgentOrchestration';
 import { settingsStorage } from '../../../services/storage';
+import { getChatModelDisplayName, getDefaultChatModelId, normalizeChatModelId } from '../../../services/models/chatModelCompatibility';
 
 /**
  * v2.7.0: 对话选中状态持久化存储键名
@@ -222,10 +223,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     // v2.8.0: 从 Chat 对象中读取模型选择（持久化）
     // 如果对话没有设置模型或模型已被删除，使用第一个可用模型
     const selectedModel = useMemo(() => {
-        if (selectedChat?.model && models.find(m => m.id === selectedChat.model)) {
-            return selectedChat.model;
+        const normalizedModelId = normalizeChatModelId(selectedChat?.model, models);
+        if (normalizedModelId && models.find(m => m.id === normalizedModelId)) {
+            return normalizedModelId;
         }
-        return models[0]?.id || '';
+        return getDefaultChatModelId(models);
     }, [selectedChat?.model, models]);
 
     // v2.3.0: 从 Chat 对象中读取 Agent 选择（持久化）
@@ -258,7 +260,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         if (!selectedChatId) return;
 
         // 获取实际使用的模型：Agent 优先，否则用户选择
-        const effectiveModelId = selectedAgent?.model || selectedModel;
+        const effectiveModelId = selectedAgent?.model
+            ? normalizeChatModelId(selectedAgent.model, models)
+            : selectedModel;
 
         if (!effectiveModelId) {
             logger.warn(LogTags.CHAT, '无可用模型');
@@ -612,7 +616,7 @@ const ChatListItem = React.memo<ChatListItemProps>(({
         : (chat.agentId ? agentMap.get(chat.agentId) : undefined);
     const modelId = agent?.model || (!isRoundtable ? chat.model : undefined);
     const model = modelId ? modelMap.get(modelId) : undefined;
-    const modelName = model?.name || modelId || '';
+    const modelName = getChatModelDisplayName(model, modelId || '');
 
     // v2.5.0: 使用 useCallback 包装事件处理函数
     const handleClick = useCallback(() => {

@@ -42,9 +42,9 @@ Most AI clients lock you into a single provider. MobausStudio gives you **one in
 
 ### Platform
 
-- **Cross-Platform Desktop** -- macOS, Windows, Linux native apps via Tauri 2
-- **Web Version** -- Self-hostable static web build
-- **Docker Deployment** -- One-command containerized deployment
+- **Cross-Platform Desktop** -- macOS, Windows, Linux native apps via Tauri 2; this is the full production AI client
+- **Web Static Preview** -- Self-hostable static build for UI exploration and local configuration preview
+- **Docker Static Preview** -- One-command containerized static preview
 - **Auto Update** -- Built-in updater with signed releases
 - **i18n** -- English and Chinese UI
 
@@ -80,6 +80,8 @@ Download from the [Releases](https://github.com/shulain/MobausStudio/releases/la
 
 ### Docker
 
+> **Important:** The Docker image serves the static Web preview only. It does not include the Tauri/Rust backend, so AI chat requests, OAuth magic login callbacks, MCP execution, filesystem-backed secure storage, and auto-updates require the desktop app.
+
 ```bash
 docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:latest
 # Visit http://localhost:8080
@@ -99,7 +101,9 @@ services:
 
 </details>
 
-### Web Version (Self-Hosted)
+### Web Static Preview (Self-Hosted)
+
+> The self-hosted Web build is a static preview. Use a desktop release for the complete production AI-client experience.
 
 Download `MobausStudio-web.zip` from Releases, extract and serve:
 
@@ -134,7 +138,7 @@ npm run tauri dev
 ### Build
 
 ```bash
-# Web build
+# Web/static preview build
 npm run build
 
 # Desktop build

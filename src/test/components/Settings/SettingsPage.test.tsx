@@ -197,6 +197,99 @@ describe('SettingsPage', () => {
         expect(mockReload).toHaveBeenCalled();
     });
 
+    it('creates a full storage-service backup before importing', async () => {
+        vi.mocked(modelsStorage.load).mockResolvedValueOnce([{ id: 'model-1', name: 'Model 1' } as any]);
+        vi.mocked(chatsStorage.load).mockResolvedValueOnce([{ id: 'chat-1', title: 'Chat 1' } as any]);
+        vi.mocked(agentsStorage.load).mockResolvedValueOnce([{ id: 'agent-1', name: 'Agent 1' } as any]);
+        vi.mocked(skillsStorage.load).mockResolvedValueOnce([{ id: 'skill-1', name: 'Skill 1' } as any]);
+        vi.mocked(mcpServersStorage.load).mockResolvedValueOnce([{ id: 'mcp-1', name: 'MCP 1' } as any]);
+        vi.mocked(roundtableChatsStorage.load).mockResolvedValueOnce([{ id: 'roundtable-1', title: 'Roundtable 1' } as any]);
+
+        renderWithProviders(<SettingsPage />);
+        fireEvent.click(screen.getByText('数据管理'));
+        fireEvent.click(screen.getByText('导入配置'));
+
+        const file = new File(['{}'], 'config.json', { type: 'application/json' });
+        const input = screen.getByLabelText(/选择文件/i);
+        fireEvent.change(input, { target: { files: [file] } });
+        fireEvent.click(screen.getByText('开始导入'));
+
+        await waitFor(() => {
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('mobaus_backup', expect.any(String));
+        });
+
+        const backupCall = vi.mocked(localStorageMock.setItem).mock.calls.find(([key]) => key === 'mobaus_backup');
+        expect(backupCall).toBeDefined();
+
+        const backup = JSON.parse(backupCall![1]);
+        expect(backup).toMatchObject({
+            version: '1.0.0',
+            backupType: 'pre-import',
+            models: [{ id: 'model-1', name: 'Model 1' }],
+            chats: [{ id: 'chat-1', title: 'Chat 1' }],
+            agents: [{ id: 'agent-1', name: 'Agent 1' }],
+            skills: [{ id: 'skill-1', name: 'Skill 1' }],
+            mcp: [{ id: 'mcp-1', name: 'MCP 1' }],
+            roundtableChats: [{ id: 'roundtable-1', title: 'Roundtable 1' }],
+            settings: { theme: 'system', language: 'zh' },
+        });
+        expect(window.URL.createObjectURL).toHaveBeenCalled();
+    });
+
+    it('imports standalone skills and MCP servers when the package also contains agents', async () => {
+        class FullConfigFileReader {
+            onload: ((e: any) => void) | null = null;
+            readAsText(_file: Blob) {
+                setTimeout(() => {
+                    this.onload?.({
+                        target: {
+                            result: JSON.stringify({
+                                agents: [
+                                    {
+                                        id: 'agent-1',
+                                        name: 'Agent 1',
+                                        model: 'model-1',
+                                        skills: ['skill-agent'],
+                                        mcpServers: [{ serverId: 'mcp-agent' }],
+                                    },
+                                ],
+                                skills: [
+                                    { id: 'skill-agent', name: 'Agent Skill', enabled: true },
+                                    { id: 'skill-standalone', name: 'Standalone Skill', enabled: true },
+                                ],
+                                mcp: [
+                                    { id: 'mcp-agent', name: 'Agent MCP', transportType: 'stdio', command: 'node', args: [] },
+                                    { id: 'mcp-standalone', name: 'Standalone MCP', transportType: 'stdio', command: 'node', args: [] },
+                                ],
+                            }),
+                        },
+                    });
+                }, 0);
+            }
+        }
+        window.FileReader = FullConfigFileReader as any;
+
+        renderWithProviders(<SettingsPage />);
+        fireEvent.click(screen.getByText('数据管理'));
+        fireEvent.click(screen.getByText('导入配置'));
+
+        const file = new File(['{}'], 'full-config.json', { type: 'application/json' });
+        const input = screen.getByLabelText(/选择文件/i);
+        fireEvent.change(input, { target: { files: [file] } });
+        fireEvent.click(screen.getByText('开始导入'));
+
+        await waitFor(() => {
+            expect(skillsStorage.save).toHaveBeenCalledWith([
+                { id: 'skill-agent', name: 'Agent Skill', enabled: true },
+                { id: 'skill-standalone', name: 'Standalone Skill', enabled: true },
+            ]);
+            expect(mcpServersStorage.save).toHaveBeenCalledWith([
+                { id: 'mcp-agent', name: 'Agent MCP', transportType: 'stdio', command: 'node', args: [] },
+                { id: 'mcp-standalone', name: 'Standalone MCP', transportType: 'stdio', command: 'node', args: [] },
+            ]);
+        });
+    });
+
     /**
      * v2.6.5: 清除数据使用 storage services 异步清理
      * 验证 storage services 的 save 方法被调用保存空数组
@@ -244,4 +337,3 @@ describe('SettingsPage', () => {
         });
     });
 });
-

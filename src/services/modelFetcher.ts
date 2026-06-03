@@ -724,6 +724,26 @@ function isGoogleOAuthToken(apiKey: string): boolean {
            (!apiKey.startsWith('AIza') && apiKey.length > 100);
 }
 
+const OPENAI_CHATGPT_WEB_SUPPORTED_MODEL_IDS = new Set(['gpt-5.4-mini']);
+
+const OPENAI_CHATGPT_WEB_FALLBACK_MODELS: ProviderModel[] = [
+    {
+        id: 'gpt-5.4-mini',
+        name: 'GPT-5.4 Mini',
+        maxTokens: 128000,
+        contextWindow: 1047576,
+        capabilities: { vision: true, functionCalling: true, streaming: true },
+    },
+];
+
+function getOpenAIChatGPTWebModels(builtinModels?: ProviderModel[]): ProviderModel[] {
+    const filtered = (builtinModels || []).filter((model) =>
+        OPENAI_CHATGPT_WEB_SUPPORTED_MODEL_IDS.has(model.id)
+    );
+
+    return filtered.length > 0 ? filtered : OPENAI_CHATGPT_WEB_FALLBACK_MODELS;
+}
+
 /**
  * 模型获取服务
  */
@@ -776,10 +796,11 @@ export const modelFetcher = {
         // v4.3.2: 如果是 OpenAI 的 OAuth Web 凭证，由于没有 api.model.read 权限，跳过动态获取和缓存
         // 强制使用内置的 Web 可用模型列表（在 providers.ts 中定义的 GPT-5 系列）
         if (providerId === 'openai' && apiKey && !apiKey.startsWith('sk-') && apiKey.length > 50) {
-            logger.info(LogTags.MODEL, '检测到 ChatGPT Plus/Pro OAuth 凭证，跳过 API 模型拉取，使用内置 Web 模型列表');
-            if (builtinModels && builtinModels.length > 0) {
-                return { models: builtinModels, source: 'builtin' };
-            }
+            const webModels = getOpenAIChatGPTWebModels(builtinModels);
+            logger.info(LogTags.MODEL, '检测到 ChatGPT Plus/Pro OAuth 凭证，跳过 API 模型拉取，使用实测可用的 ChatGPT Web 模型列表', {
+                modelCount: webModels.length,
+            });
+            return { models: webModels, source: 'builtin' };
         }
 
         if (DYNAMIC_FETCH_PROVIDERS.includes(providerId) && apiKey) {

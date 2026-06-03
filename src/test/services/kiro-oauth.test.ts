@@ -8,8 +8,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { kiroOAuth } from '../../services/kiro-oauth';
 
 const mockStartOAuthCallbackServer = vi.fn();
+const mockStopOAuthCallbackServer = vi.fn();
 const mockCheckPortAvailable = vi.fn();
 const mockGetAvailablePort = vi.fn();
+
+function waitForMockOAuthCallback(
+    callbackPromise: Promise<{ success: boolean; error?: string; actualPort: number }>,
+    signal?: AbortSignal,
+    actualPort = 0
+) {
+    if (!signal) return callbackPromise;
+    if (signal.aborted) {
+        mockStopOAuthCallbackServer();
+        return Promise.resolve({ success: false, error: 'cancelled', actualPort });
+    }
+    return Promise.race([
+        callbackPromise,
+        new Promise<{ success: boolean; error?: string; actualPort: number }>((resolve) => {
+            signal.addEventListener('abort', () => {
+                mockStopOAuthCallbackServer();
+                resolve({ success: false, error: 'cancelled', actualPort });
+            }, { once: true });
+        }),
+    ]);
+}
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -38,6 +60,8 @@ vi.mock('../../utils/logger', () => ({
 // Mock OAuth 回调服务
 vi.mock('../../services/oauth-callback', () => ({
     startOAuthCallbackServer: (...args: unknown[]) => mockStartOAuthCallbackServer(...args),
+    stopOAuthCallbackServer: (...args: unknown[]) => mockStopOAuthCallbackServer(...args),
+    waitForOAuthCallback: waitForMockOAuthCallback,
     checkPortAvailable: (...args: unknown[]) => mockCheckPortAvailable(...args),
     getAvailablePort: (...args: unknown[]) => mockGetAvailablePort(...args),
     buildRedirectUri: (port: number, path: string) => `http://localhost:${port}${path}`,
@@ -64,6 +88,7 @@ describe('Kiro OAuth', () => {
         mockCheckPortAvailable.mockReset();
         mockGetAvailablePort.mockReset();
         mockStartOAuthCallbackServer.mockReset();
+        mockStopOAuthCallbackServer.mockReset();
     });
 
     it('应在端口回退后使用可用端口构造 redirect_uri', async () => {
@@ -205,6 +230,33 @@ describe('Kiro OAuth', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('授权回调未返回 state');
+        expect(mockInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    it('取消 Social Auth 时应停止回调监听且不交换 token', async () => {
+        mockCheckPortAvailable.mockResolvedValue(true);
+        mockStartOAuthCallbackServer.mockReturnValue(new Promise(() => undefined));
+
+        mockInvoke.mockResolvedValueOnce({
+            success: true,
+            auth_url: 'https://auth.kiro.test/login',
+            code_verifier: 'code-verifier-cancel',
+            state: 'state-cancel',
+            redirect_uri: 'http://localhost:9876/oauth/callback',
+            expires_in: 600,
+        });
+
+        const controller = new AbortController();
+        const resultPromise = kiroOAuth.authorizeSocial('google', controller.signal);
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(mockOpenUrl).toHaveBeenCalledWith('https://auth.kiro.test/login');
+        controller.abort();
+
+        const result = await resultPromise;
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('cancelled');
+        expect(mockStopOAuthCallbackServer).toHaveBeenCalled();
         expect(mockInvoke).toHaveBeenCalledTimes(1);
     });
 });

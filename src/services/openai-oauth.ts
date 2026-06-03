@@ -19,6 +19,8 @@ import {
     checkPortAvailable,
     getAvailablePort,
     startOAuthCallbackServer,
+    stopOAuthCallbackServer,
+    waitForOAuthCallback,
     buildRedirectUri,
     getProviderPortConfig,
 } from './oauth-callback';
@@ -311,10 +313,10 @@ export class OpenAIOAuth {
             }
 
             // 5. 等待回调服务器返回结果
-            const callbackResult = await callbackPromise;
+            const callbackResult = await waitForOAuthCallback(callbackPromise, signal, callbackPort);
 
             // 检查是否被取消
-            if (signal?.aborted) {
+            if (callbackResult.error === 'cancelled' || signal?.aborted) {
                 cancelOpenAIAuth();
                 return { type: 'cancelled' };
             }
@@ -364,8 +366,7 @@ export class OpenAIOAuth {
             this.abortController.abort();
         }
         cancelOpenAIAuth();
-        // 停止回调服务器（旧接口，保持兼容）
-        invoke('openai_stop_oauth_callback_server').catch(err => {
+        stopOAuthCallbackServer().catch(err => {
             logger.warn(LogTags.AUTH, '停止 OpenAI OAuth 回调服务器失败', { error: err });
         });
     }

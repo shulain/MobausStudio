@@ -14,8 +14,37 @@ import {
 } from '../../services/openai-oauth';
 
 const mockStartOAuthCallbackServer = vi.fn();
+const mockStopOAuthCallbackServer = vi.fn();
 const mockCheckPortAvailable = vi.fn();
 const mockGetAvailablePort = vi.fn();
+
+function waitForMockOAuthCallback(
+    callbackPromise: Promise<{ success: boolean; error?: string; actualPort: number }>,
+    signal?: AbortSignal,
+    actualPort = 0
+) {
+    if (!signal) return callbackPromise;
+    if (signal.aborted) {
+        mockStopOAuthCallbackServer();
+        return Promise.resolve({ success: false, error: 'cancelled', actualPort });
+    }
+    return Promise.race([
+        callbackPromise,
+        new Promise<{ success: boolean; error?: string; actualPort: number }>((resolve) => {
+            signal.addEventListener('abort', () => {
+                mockStopOAuthCallbackServer();
+                resolve({ success: false, error: 'cancelled', actualPort });
+            }, { once: true });
+        }),
+    ]);
+}
+
+async function waitForMockCall(mockFn: ReturnType<typeof vi.fn>) {
+    for (let i = 0; i < 20; i += 1) {
+        if (mockFn.mock.calls.length > 0) return;
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+}
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -43,6 +72,8 @@ vi.mock('../../utils/logger', () => ({
 // Mock OAuth callback service
 vi.mock('../../services/oauth-callback', () => ({
     startOAuthCallbackServer: (...args: unknown[]) => mockStartOAuthCallbackServer(...args),
+    stopOAuthCallbackServer: (...args: unknown[]) => mockStopOAuthCallbackServer(...args),
+    waitForOAuthCallback: waitForMockOAuthCallback,
     checkPortAvailable: (...args: unknown[]) => mockCheckPortAvailable(...args),
     getAvailablePort: (...args: unknown[]) => mockGetAvailablePort(...args),
     buildRedirectUri: (port: number, path: string) => `http://localhost:${port}${path}`,
@@ -74,6 +105,7 @@ describe('OpenAI OAuth 服务测试', () => {
         mockCheck = mockCheckPortAvailable as ReturnType<typeof vi.fn>;
         mockGetPort = mockGetAvailablePort as ReturnType<typeof vi.fn>;
         mockStart.mockReset();
+        mockStopOAuthCallbackServer.mockReset();
         mockCheck.mockReset();
         mockGetPort.mockReset();
     });
@@ -110,6 +142,24 @@ describe('OpenAI OAuth 服务测试', () => {
             expect(result.accountId).toBe('acc-123');
             expect(result.email).toBe('test@openai.com');
             expect(result.expiresAt).toBeGreaterThan(Date.now());
+        });
+
+        it('取消授权时应立即返回 cancelled 并停止回调监听', async () => {
+            mockCheck.mockResolvedValue(true);
+            mockStart.mockReturnValue(new Promise(() => undefined));
+
+            const onAuthUrl = vi.fn();
+            const onStatusChange = vi.fn();
+            const controller = new AbortController();
+            const resultPromise = openaiOAuth.authorize(onAuthUrl, onStatusChange, controller.signal);
+
+            await waitForMockCall(onAuthUrl);
+            expect(onAuthUrl).toHaveBeenCalled();
+            controller.abort();
+
+            const result = await resultPromise;
+            expect(result.type).toBe('cancelled');
+            expect(mockStopOAuthCallbackServer).toHaveBeenCalled();
         });
     });
 

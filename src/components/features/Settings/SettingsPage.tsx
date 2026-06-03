@@ -46,6 +46,9 @@ const STORAGE_KEYS = {
     MCP: 'mobaus_mcp_servers',    // v2.6.1: 修正键名，与 storage.ts 保持一致
 };
 
+const BACKUP_STORAGE_KEY = 'mobaus_backup';
+const BACKUP_CANCELLED_MESSAGE = '导入前备份已取消，导入未执行。';
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface SettingsPageProps {
     // Props can be extended as needed
@@ -182,6 +185,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }, [t]);
 
     /**
+     * 导入前备份
+     * 使用 storage services 读取真实持久化数据，并生成用户可恢复的 JSON 备份文件。
+     */
+    const createPreImportBackup = useCallback(async () => {
+        const backupData = {
+            version: '1.0.0',
+            backupType: 'pre-import',
+            exportedAt: new Date().toISOString(),
+            models: await modelsStorage.load(),
+            chats: await chatsStorage.load(),
+            agents: await agentsStorage.load(),
+            skills: await skillsStorage.load(),
+            mcp: await mcpServersStorage.load(),
+            roundtableChats: await roundtableChatsStorage.load(),
+            settings: await settingsStorage.loadAsync(),
+        };
+
+        const jsonContent = JSON.stringify(backupData, null, 2);
+        const defaultFileName = `mobaus-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+        try {
+            localStorage.setItem(BACKUP_STORAGE_KEY, jsonContent);
+        } catch (error) {
+            logger.warn(LogTags.SETTINGS, '导入前本地应急备份写入失败，继续创建备份文件', error);
+        }
+
+        if (isTauriEnvironment()) {
+            const filePath = await save({
+                defaultPath: defaultFileName,
+                filters: [{
+                    name: 'JSON',
+                    extensions: ['json']
+                }]
+            });
+
+            if (!filePath) {
+                throw new Error(BACKUP_CANCELLED_MESSAGE);
+            }
+
+            await writeTextFile(filePath, jsonContent);
+            return;
+        }
+
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, []);
+
+    /**
      * 导入配置
      * v2.6.1: 添加 models 导入，修正 MCP 键名
      * v2.6.2: 添加防重复调用机制，使用 Tauri message dialog
@@ -201,15 +259,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 const data = JSON.parse(e.target?.result as string);
 
                 if (options.backup) {
-                    // 创建备份 (v2.6.1: 添加 models)
-                    const backup = {
-                        models: localStorage.getItem(STORAGE_KEYS.MODELS),
-                        chats: localStorage.getItem(STORAGE_KEYS.CHATS),
-                        agents: localStorage.getItem(STORAGE_KEYS.AGENTS),
-                        skills: localStorage.getItem(STORAGE_KEYS.SKILLS),
-                        mcp: localStorage.getItem(STORAGE_KEYS.MCP),
-                    };
-                    localStorage.setItem('mobaus_backup', JSON.stringify(backup));
+                    await createPreImportBackup();
                 }
 
                 // v2.6.3: 使用 storage services 保存数据，确保 Tauri 环境正确持久化
@@ -222,6 +272,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     imported.forEach(item => idMap.set(item.id, item));
                     return Array.from(idMap.values());
                 };
+                const importMcp = Array.isArray(data.mcp)
+                    ? data.mcp
+                    : (Array.isArray(data.mcpServers) ? data.mcpServers : undefined);
 
                 if (data.models) {
                     if (options.merge) {
@@ -286,8 +339,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                                 const mcpId = mcpConfig.serverId;
                                 if (!existingMcpIds.has(mcpId)) {
                                     // 从导入数据中查找
-                                    if (data.mcp && Array.isArray(data.mcp)) {
-                                        const mcpData = data.mcp.find((m: { id: string }) => m.id === mcpId);
+                                    if (importMcp) {
+                                        const mcpData = importMcp.find((m: { id: string }) => m.id === mcpId);
                                         if (mcpData && !mcpToCreate.some((m: { id: string }) => m.id === mcpId)) {
                                             mcpToCreate.push(mcpData);
                                             existingMcpIds.add(mcpId);  // 标记为已处理
@@ -351,10 +404,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                     }
                 }
 
-                // v3.0.25: Skills 和 MCP 的独立导入（不依赖 Agent 的情况）
-                // 如果用户单独勾选了 Skills 或 MCP 导出，这里仍然需要处理
-                if (data.skills && !data.agents) {
-                    // 只有在没有 agents 时才单独处理 skills（有 agents 时已在上面处理）
+                // v3.0.25: Skills 和 MCP 的独立导入
+                // 即使导入包同时包含 Agents，也必须导入所有独立 Skills/MCP，避免完整配置迁移时丢失未被 Agent 引用的资源。
+                if (data.skills) {
                     if (options.merge) {
                         const existing = await skillsStorage.load();
                         const merged = mergeById(existing, data.skills);
@@ -363,14 +415,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         await skillsStorage.save(data.skills);
                     }
                 }
-                if (data.mcp && !data.agents) {
-                    // 只有在没有 agents 时才单独处理 mcp（有 agents 时已在上面处理）
+                if (importMcp) {
                     if (options.merge) {
                         const existing = await mcpServersStorage.load();
-                        const merged = mergeById(existing, data.mcp);
+                        const merged = mergeById(existing, importMcp);
                         await mcpServersStorage.save(merged);
                     } else {
-                        await mcpServersStorage.save(data.mcp);
+                        await mcpServersStorage.save(importMcp);
                     }
                 }
                 // v2.6.5: 添加圆桌对话导入
@@ -401,7 +452,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             } catch (error) {
                 logger.error(LogTags.SETTINGS, '导入失败', error);
                 // v2.6.2: 错误提示也使用 Tauri message dialog
-                const errorMessage = t.messages.importError || '导入失败：文件格式无效';
+                const errorMessage = error instanceof Error && error.message === BACKUP_CANCELLED_MESSAGE
+                    ? BACKUP_CANCELLED_MESSAGE
+                    : (t.messages.importError || '导入失败：文件格式无效');
                 if (isTauriEnvironment()) {
                     await message(errorMessage, { title: 'Mobaus Studio', kind: 'error' });
                 } else {
@@ -412,7 +465,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         };
         reader.readAsText(file);
         // v2.6.2: 不需要在这里关闭 modal，ImportModal 内部已经调用 onClose()
-    }, [t]);
+    }, [createPreImportBackup, t]);
 
     /**
      * 清除数据
@@ -557,4 +610,3 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 };
 
 export default SettingsPage;
-

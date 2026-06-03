@@ -721,7 +721,7 @@ export const zh = {
         mergeExisting: '合并现有配置',
         mergeExistingDesc: '保留现有配置，仅添加新内容',
         backupBefore: '导入前备份',
-        backupBeforeDesc: '在导入前自动创建当前配置的备份',
+        backupBeforeDesc: '导入前保存当前配置备份文件，取消保存将不会执行导入',
         startImport: '开始导入',
     },
 

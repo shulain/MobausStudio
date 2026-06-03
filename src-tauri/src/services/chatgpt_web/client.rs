@@ -9,7 +9,7 @@
 use super::types::*;
 use log::{debug, error, info};
 use rquest_util::Emulation;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 
 /// ChatGPT Web 客户端
@@ -40,6 +40,7 @@ impl ChatGptWebClient {
     pub fn new() -> Result<Self, String> {
         let client = rquest::Client::builder()
             .emulation(Emulation::Chrome136)
+            .timeout(Duration::from_secs(60))
             .build()
             .map_err(|e| format!("创建 rquest 客户端失败: {}", e))?;
 
@@ -155,6 +156,90 @@ impl ChatGptWebClient {
         }
 
         Ok(response)
+    }
+
+    /// 使用真实 Codex Responses 流式请求测试指定模型是否可用。
+    ///
+    /// 账户检查只能证明 OAuth 凭证可访问 chatgpt.com，不能证明某个模型可用于
+    /// Codex Responses。这里发送一条极短请求，确保模型名、账号权限和流式链路
+    /// 都能真实闭环。
+    pub async fn test_model_generation(&self, model: &str) -> Result<(), String> {
+        let request = ResponsesRequest {
+            model: model.to_string(),
+            input: vec![serde_json::json!({
+                "role": "user",
+                "content": [{
+                    "type": "input_text",
+                    "text": "Reply exactly: OK"
+                }]
+            })],
+            instructions: Some("You are a concise production smoke-test assistant.".to_string()),
+            max_output_tokens: None,
+            temperature: None,
+            top_p: None,
+            stream: true,
+            store: false,
+            tools: None,
+            tool_choice: None,
+            reasoning: None,
+            service_tier: None,
+            include: vec!["reasoning.encrypted_content".to_string()],
+        };
+
+        let response = self.send_responses_request(&request).await?;
+        let body = response
+            .text()
+            .await
+            .map_err(|e| format!("读取模型测试响应失败: {}", e))?;
+
+        let mut saw_output = false;
+        let mut completed = false;
+        let mut failed_message: Option<String> = None;
+
+        for line in body.lines() {
+            let Some(data) = line.strip_prefix("data: ") else {
+                continue;
+            };
+            let Ok(event) = serde_json::from_str::<serde_json::Value>(data) else {
+                continue;
+            };
+
+            match event
+                .get("type")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+            {
+                "response.output_text.delta" => {
+                    if event
+                        .get("delta")
+                        .and_then(|value| value.as_str())
+                        .is_some_and(|delta| !delta.trim().is_empty())
+                    {
+                        saw_output = true;
+                    }
+                }
+                "response.completed" => completed = true,
+                "response.failed" => {
+                    failed_message = event
+                        .get("response")
+                        .and_then(|response| response.get("error"))
+                        .and_then(|error| error.get("message"))
+                        .and_then(|message| message.as_str())
+                        .map(|message| message.to_string());
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(message) = failed_message {
+            return Err(format!("模型测试失败: {}", message));
+        }
+
+        if completed && saw_output {
+            Ok(())
+        } else {
+            Err("模型测试未收到完整的流式输出".to_string())
+        }
     }
 
     /// 内部 Token 刷新逻辑

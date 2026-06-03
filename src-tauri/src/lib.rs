@@ -5,6 +5,7 @@ use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Read;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 use tauri::{Emitter, Manager, Window}; // 导入 Manager 和 Emitter // v0.9.2.8: gzip 解压缩
 
@@ -52,6 +53,12 @@ static MCP_MANAGER: Lazy<MCPClientManager> = Lazy::new(|| {
 /// 避免每次请求都调用 loadCodeAssist API，节省配额
 static GOOGLE_PROJECT_CACHE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// 当前通用 OAuth 回调监听代次。
+///
+/// 每次启动或停止都会推进代次，旧的监听循环检测到代次变化后会退出，
+/// 避免用户取消 OAuth 后本地端口继续占用到超时。
+static OAUTH_CALLBACK_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// v3.4.5: Cloud Code API 模型名称映射
 /// v3.6.2: 修复映射错误，根据 fetchAvailableModels API 返回的实际模型 ID
@@ -232,33 +239,30 @@ async fn test_openai(
         // 不能发给 api.openai.com 否则会报 429 insufficient_quota
         debug!("[test_openai] OAuth Token 检测，使用 ChatGPT Web 订阅代理测试连接");
 
-        let test_result = CHATGPT_WEB_CLIENT.test_connection().await;
+        let requested_model = request.model_name.as_deref().unwrap_or("gpt-5.1-codex");
+        let codex_model = services::chatgpt_web::types::normalize_codex_model(requested_model);
+        let test_result = CHATGPT_WEB_CLIENT.test_model_generation(codex_model).await;
 
         match test_result {
-            Ok(true) => {
-                debug!("[test_openai] 订阅代理连接测试成功");
+            Ok(()) => {
+                debug!("[test_openai] 订阅代理模型测试成功，模型: {}", codex_model);
                 Ok(TestModelResponse {
                     success: true,
-                    message: "OpenAI ChatGPT Plus 连接成功 (订阅代理)".to_string(),
+                    message: "OpenAI ChatGPT Plus 模型测试成功 (订阅代理)".to_string(),
                     status_code: Some(200),
-                    details: Some("通过 chatgpt.com API 测试成功".to_string()),
-                })
-            }
-            Ok(false) => {
-                warn!("[test_openai] 订阅代理连接测试失败：返回 4xx/5xx");
-                Ok(TestModelResponse {
-                    success: false,
-                    message: "ChatGPT 账户认证失败，Token 可能已失效，请重新登录".to_string(),
-                    status_code: Some(401),
-                    details: Some("订阅代理端点返回错误状态码".to_string()),
+                    details: Some(format!(
+                        "通过 chatgpt.com Codex Responses API 完成真实生成测试，模型: {}",
+                        codex_model
+                    )),
                 })
             }
             Err(e) => {
-                error!("[test_openai] 订阅代理连接抛出异常: {}", e);
+                error!("[test_openai] 订阅代理模型测试失败: {}", e);
                 Ok(TestModelResponse {
                     success: false,
-                    message: format!("订阅代理网络请求异常: {}", e),
-                    status_code: Some(500),
+                    message: "ChatGPT 订阅代理模型不可用，请检查账号权限或选择支持的 Codex 模型"
+                        .to_string(),
+                    status_code: Some(400),
                     details: Some(e),
                 })
             }
@@ -286,6 +290,39 @@ async fn test_openai(
         if status.is_success() {
             let body = response.text().await.unwrap_or_default();
             debug!("[test_openai] 响应体长度: {} bytes", body.len());
+
+            if let Some(model_name) = request
+                .model_name
+                .as_deref()
+                .filter(|m| !m.trim().is_empty())
+            {
+                let models_response: serde_json::Value =
+                    serde_json::from_str(&body).map_err(|e| format!("模型列表解析失败: {}", e))?;
+                let model_available = models_response
+                    .get("data")
+                    .and_then(|data| data.as_array())
+                    .map(|models| {
+                        models
+                            .iter()
+                            .filter_map(|model| model.get("id").and_then(|id| id.as_str()))
+                            .any(|id| id == model_name)
+                    })
+                    .unwrap_or(false);
+
+                if !model_available {
+                    warn!("[test_openai] 模型不可用: {}", model_name);
+                    return Ok(TestModelResponse {
+                        success: false,
+                        message: format!("模型不可用: {}", model_name),
+                        status_code: Some(status.as_u16()),
+                        details: Some(format!(
+                            "API Key 有效，但 /v1/models 未返回该模型。请刷新模型列表或选择账号可用模型。端点: {}",
+                            url
+                        )),
+                    });
+                }
+            }
+
             Ok(TestModelResponse {
                 success: true,
                 message: "OpenAI API 连接成功".to_string(),
@@ -2680,16 +2717,8 @@ async fn oauth_request_device_code(
             // Kiro 支持多种认证方式
             let auth_method = request.auth_method.as_deref().unwrap_or("aws");
             match auth_method.to_lowercase().as_str() {
-                "google" => request_kiro_social_auth(
-                    "Google",
-                    request.redirect_uri.clone(),
-                )
-                .await,
-                "github" => request_kiro_social_auth(
-                    "Github",
-                    request.redirect_uri.clone(),
-                )
-                .await,
+                "google" => request_kiro_social_auth("Google", request.redirect_uri.clone()).await,
+                "github" => request_kiro_social_auth("Github", request.redirect_uri.clone()).await,
                 "idc" | "aws identity center" | "aws identity center (idc)" => {
                     // IDC 需要 start_url 和 region 参数
                     let start_url = request
@@ -3230,10 +3259,7 @@ async fn request_kiro_social_auth(
 
     if !register_response.status().is_success() {
         let error_text = register_response.text().await.unwrap_or_default();
-        error!(
-            "[request_kiro_social_auth] 客户端注册失败: {}",
-            error_text
-        );
+        error!("[request_kiro_social_auth] 客户端注册失败: {}", error_text);
         return Ok(OAuthDeviceCodeResponse {
             success: false,
             device_code: None,
@@ -3455,8 +3481,8 @@ async fn kiro_exchange_code(
 
     let status = response.status();
     let response_text = response.text().await.unwrap_or_default();
-    let data: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| format!("解析 Token 响应失败: {}", e))?;
+    let data: serde_json::Value =
+        serde_json::from_str(&response_text).map_err(|e| format!("解析 Token 响应失败: {}", e))?;
 
     if !status.is_success() {
         let error_desc = data["errorDescription"]
@@ -3512,8 +3538,13 @@ async fn kiro_exchange_code(
             kiro_sso_region: Some(KIRO_SSO_REGION.to_string()),
         })
     } else {
-        let error_msg = data["error_description"].as_str().unwrap_or("Token 交换失败");
-        warn!("[kiro_exchange_code] 响应中未包含 accessToken: {}", response_text);
+        let error_msg = data["error_description"]
+            .as_str()
+            .unwrap_or("Token 交换失败");
+        warn!(
+            "[kiro_exchange_code] 响应中未包含 accessToken: {}",
+            response_text
+        );
         Ok(KiroExchangeTokenResponse {
             success: false,
             access_token: None,
@@ -5060,7 +5091,8 @@ struct ParsedOAuthCallbackParams {
 
 fn is_oauth_callback_path(path: &str, callback_paths: &[&str]) -> bool {
     callback_paths.iter().any(|cb| {
-        path == *cb || (path.len() > cb.len() && path.starts_with(cb) && path[cb.len()..].starts_with('/'))
+        path == *cb
+            || (path.len() > cb.len() && path.starts_with(cb) && path[cb.len()..].starts_with('/'))
     })
 }
 
@@ -5165,7 +5197,6 @@ async fn openai_start_oauth_callback_server(
                     if let Some(parsed) =
                         parse_oauth_callback_request(&request, &["/auth/callback", "/callback"])
                     {
-
                         let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
                             <body style="font-family: system-ui; text-align: center; padding: 50px;">
@@ -5294,7 +5325,6 @@ async fn anthropic_start_oauth_callback_server(
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
                     if let Some(parsed) = parse_oauth_callback_request(&request, &["/callback"]) {
-
                         let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
                             <body style="font-family: system-ui; text-align: center; padding: 50px;">
@@ -5648,10 +5678,10 @@ async fn google_start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    if let Some(parsed) =
-                        parse_oauth_callback_request(&request, &["/oauth2callback", "/oauth-callback"])
-                    {
-
+                    if let Some(parsed) = parse_oauth_callback_request(
+                        &request,
+                        &["/oauth2callback", "/oauth-callback"],
+                    ) {
                         // 发送响应
                         let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title></head>
@@ -5757,6 +5787,7 @@ async fn start_oauth_callback_server(
     use std::time::{Duration, Instant};
 
     info!("[oauth_callback] 启动通用 OAuth 回调服务器");
+    let callback_generation = OAUTH_CALLBACK_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     debug!(
         "[oauth_callback] 首选端口: {}, 备选端口: {:?}",
         preferred_port, fallback_ports
@@ -5824,6 +5855,16 @@ async fn start_oauth_callback_server(
     };
 
     loop {
+        if OAUTH_CALLBACK_GENERATION.load(Ordering::SeqCst) != callback_generation {
+            return Ok(GenericOAuthCallbackResponse {
+                success: false,
+                code: None,
+                state: None,
+                error: Some("cancelled".to_string()),
+                actual_port,
+            });
+        }
+
         // 检查超时
         if start.elapsed() > timeout_duration {
             return Ok(GenericOAuthCallbackResponse {
@@ -5844,9 +5885,9 @@ async fn start_oauth_callback_server(
                 if let Ok(size) = stream.read(&mut buffer) {
                     let request = String::from_utf8_lossy(&buffer[..size]);
 
-                    let callback_paths: Vec<&str> = paths.iter().map(|path| path.as_str()).collect();
+                    let callback_paths: Vec<&str> =
+                        paths.iter().map(|path| path.as_str()).collect();
                     if let Some(parsed) = parse_oauth_callback_request(&request, &callback_paths) {
-
                         // 发送响应
                         let html = if parsed.code.is_some() {
                             r#"<!DOCTYPE html><html><head><meta charset="utf-8"><title>授权成功</title>
@@ -5902,6 +5943,16 @@ async fn start_oauth_callback_server(
             }
         }
     }
+}
+
+/// 停止当前通用 OAuth 回调服务器。
+///
+/// 监听循环是短轮询非阻塞 accept；推进代次后，当前监听最多在下一次轮询时退出。
+#[tauri::command]
+async fn stop_oauth_callback_server() -> Result<(), String> {
+    info!("[oauth_callback] 停止通用 OAuth 回调服务器");
+    OAUTH_CALLBACK_GENERATION.fetch_add(1, Ordering::SeqCst);
+    Ok(())
 }
 
 /// 检查端口是否可用
@@ -6080,6 +6131,36 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
                 })
         }
     }
+}
+
+/// 判断 URL endpoint 是否指向本机 loopback。
+///
+/// 用于本机模型服务（Ollama、LM Studio、自定义 localhost OpenAI-compatible）
+/// 的 HTTP client 构建。系统代理软件可能拦截 localhost 请求并返回代理错误页，
+/// 因此本机 endpoint 应绕过代理，远程 endpoint 仍保留系统代理能力。
+fn endpoint_uses_loopback_host(endpoint: &str) -> bool {
+    let Ok(parsed) = url::Url::parse(endpoint) else {
+        return false;
+    };
+
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    let normalized_host = host.trim_end_matches('.').to_ascii_lowercase();
+    if normalized_host == "localhost" || normalized_host.ends_with(".localhost") {
+        return true;
+    }
+
+    let ip_host = normalized_host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(&normalized_host);
+
+    ip_host
+        .parse::<std::net::IpAddr>()
+        .map(|ip| ip.is_loopback())
+        .unwrap_or(false)
 }
 
 /// 下载远程图片并转换为 base64
@@ -12487,12 +12568,27 @@ async fn chat_stream_message(window: Window, request: ChatSendRequest) -> Result
     info!("[chat_stream_message] 模型: {}", request.model_name);
     info!("[chat_stream_message] Provider: {}", request.provider);
 
+    let request_endpoint_for_proxy = request
+        .endpoint
+        .as_deref()
+        .unwrap_or("https://api.openai.com/v1");
+
     // 构建 HTTP 客户端
     // v4.1.50: 禁用连接池，避免多轮对话时连接复用导致的502错误
     // 特别是通过代理访问时，第一轮请求后连接可能被关闭，但客户端仍尝试复用
-    let client = reqwest::Client::builder()
+    let mut client_builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(600))
-        .pool_max_idle_per_host(0) // 禁用连接池
+        .pool_max_idle_per_host(0); // 禁用连接池
+
+    if endpoint_uses_loopback_host(request_endpoint_for_proxy) {
+        info!(
+            "[chat_stream_message] 检测到本机模型 endpoint，禁用系统代理: {}",
+            request_endpoint_for_proxy
+        );
+        client_builder = client_builder.no_proxy();
+    }
+
+    let client = client_builder
         .build()
         .map_err(|e| format!("Client error: {}", e))?;
 
@@ -13057,6 +13153,7 @@ pub fn run() {
             google_stop_oauth_callback_server,
             // 通用 OAuth 回调服务 (v3.4.9)
             start_oauth_callback_server,
+            stop_oauth_callback_server,
             check_port_available,
             get_available_port,
             // Antigravity Onboard 命令 (v3.3.1)
@@ -13231,6 +13328,30 @@ fn disable_provider_for_tool(
 mod tests {
     use super::*;
 
+    fn spawn_openai_models_server(body: &'static str) -> String {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buffer = [0; 1024];
+                let _ = stream.read(&mut buffer);
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+
+        format!("http://127.0.0.1:{}/v1", port)
+    }
+
     #[test]
     fn test_normalize_url_logic() {
         assert_eq!(
@@ -13347,6 +13468,60 @@ mod tests {
         // Public IPs
         assert!(!is_private_ip(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))));
         assert!(!is_private_ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+    }
+
+    #[test]
+    fn test_endpoint_uses_loopback_host_for_chat_proxy_bypass() {
+        assert!(endpoint_uses_loopback_host("http://localhost:11434/v1"));
+        assert!(endpoint_uses_loopback_host("http://localhost.:11434/v1"));
+        assert!(endpoint_uses_loopback_host("http://api.localhost:11434/v1"));
+        assert!(endpoint_uses_loopback_host("http://127.0.0.1:1234/v1"));
+        assert!(endpoint_uses_loopback_host("http://127.42.0.1:1234/v1"));
+        assert!(endpoint_uses_loopback_host("http://[::1]:1234/v1"));
+
+        assert!(!endpoint_uses_loopback_host("https://api.openai.com/v1"));
+        assert!(!endpoint_uses_loopback_host("http://192.168.1.50:1234/v1"));
+        assert!(!endpoint_uses_loopback_host("not-a-url"));
+    }
+
+    #[tokio::test]
+    async fn test_openai_api_key_requires_requested_model_in_models_response() {
+        let endpoint = spawn_openai_models_server(
+            r#"{"object":"list","data":[{"id":"gpt-4.1-mini","object":"model"}]}"#,
+        );
+        let client = reqwest::Client::new();
+        let request = TestModelRequest {
+            provider: "openai".to_string(),
+            api_key: "sk-test".to_string(),
+            endpoint: Some(endpoint),
+            model_name: Some("gpt-5.4".to_string()),
+            protocol: None,
+        };
+
+        let response = test_openai(&client, &request).await.unwrap();
+
+        assert!(!response.success);
+        assert_eq!(response.message, "模型不可用: gpt-5.4");
+    }
+
+    #[tokio::test]
+    async fn test_openai_api_key_accepts_requested_model_in_models_response() {
+        let endpoint = spawn_openai_models_server(
+            r#"{"object":"list","data":[{"id":"gpt-5.4-mini","object":"model"}]}"#,
+        );
+        let client = reqwest::Client::new();
+        let request = TestModelRequest {
+            provider: "openai".to_string(),
+            api_key: "sk-test".to_string(),
+            endpoint: Some(endpoint),
+            model_name: Some("gpt-5.4-mini".to_string()),
+            protocol: None,
+        };
+
+        let response = test_openai(&client, &request).await.unwrap();
+
+        assert!(response.success);
+        assert_eq!(response.message, "OpenAI API 连接成功");
     }
 }
 

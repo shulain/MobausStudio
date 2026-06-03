@@ -118,6 +118,57 @@ export async function startOAuthCallbackServer(
 }
 
 /**
+ * 停止当前通用 OAuth 回调服务器
+ */
+export async function stopOAuthCallbackServer(): Promise<void> {
+    try {
+        await invoke('stop_oauth_callback_server');
+    } catch (error) {
+        logger.warn(LogTags.AUTH, '停止 OAuth 回调服务器失败', error);
+    }
+}
+
+/**
+ * 等待 OAuth 回调，并在用户取消时尽快释放本地监听端口
+ */
+export function waitForOAuthCallback(
+    callbackPromise: Promise<OAuthCallbackResult>,
+    signal?: AbortSignal,
+    actualPort = 0
+): Promise<OAuthCallbackResult> {
+    if (!signal) {
+        return callbackPromise;
+    }
+
+    if (signal.aborted) {
+        void stopOAuthCallbackServer();
+        return Promise.resolve({
+            success: false,
+            error: 'cancelled',
+            actualPort,
+        });
+    }
+
+    return Promise.race([
+        callbackPromise,
+        new Promise<OAuthCallbackResult>((resolve) => {
+            signal.addEventListener(
+                'abort',
+                () => {
+                    void stopOAuthCallbackServer();
+                    resolve({
+                        success: false,
+                        error: 'cancelled',
+                        actualPort,
+                    });
+                },
+                { once: true }
+            );
+        }),
+    ]);
+}
+
+/**
  * 检查端口是否可用
  *
  * @param port - 要检查的端口
@@ -212,6 +263,8 @@ export function getProviderPortConfig(providerId: string): {
 
 export default {
     startOAuthCallbackServer,
+    stopOAuthCallbackServer,
+    waitForOAuthCallback,
     checkPortAvailable,
     getAvailablePort,
     buildRedirectUri,

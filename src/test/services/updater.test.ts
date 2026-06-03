@@ -106,4 +106,18 @@ describe('updater 软件更新服务', () => {
         expect(info.currentVersion).toBe('0.9.3');
         expect(info.latestVersion).toBeUndefined();
     });
+
+    /**
+     * TC-UPDATER-004: 开发版本跳过远端检查
+     * 测试场景: 0.0.0-dev 不应弹出正式版更新提示
+     */
+    it('TC-UPDATER-004: 开发版本跳过远端检查', async () => {
+        mockGetVersion.mockResolvedValue('0.0.0-dev');
+
+        const info = await checkForUpdates();
+
+        expect(info.available).toBe(false);
+        expect(info.currentVersion).toBe('0.0.0-dev');
+        expect(mockCheck).not.toHaveBeenCalled();
+    });
 });

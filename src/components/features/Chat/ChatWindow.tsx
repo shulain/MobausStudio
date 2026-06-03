@@ -19,6 +19,7 @@ import { AttachmentUpload } from './AttachmentUpload';
 import { logger, LogTags } from '../../../utils/logger';
 import { useI18n } from '../../../i18n';
 import { CHAT_MESSAGE_CONFIG } from '../../../config/constants';
+import { getAvailableChatModels, getChatModelDisplayName } from '../../../services/models/chatModelCompatibility';
 
 /**
  * v2.5.0: 消息懒加载配置
@@ -174,6 +175,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
                 deletedServers: 0,
                 hasIssues: false,
                 hasWarnings: false,
+                hasPartialAvailability: false,
                 isReady: false,
             };
         }
@@ -210,7 +212,8 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
         const totalServers = selectedAgent.mcpServers.length;
         const hasIssues = deletedServers > 0 || errorServers > 0;
         const hasWarnings = disconnectedServers > 0;
-        const isReady = connectedServers > 0 && !hasIssues;
+        const hasPartialAvailability = connectedServers > 0 && (hasIssues || hasWarnings);
+        const isReady = connectedServers > 0 && !hasIssues && !hasWarnings;
 
         return {
             totalTools,
@@ -221,6 +224,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
             deletedServers,
             hasIssues,
             hasWarnings,
+            hasPartialAvailability,
             isReady,
         };
     }, [selectedAgent?.enableToolUse, selectedAgent?.mcpServers, mcpServers]);
@@ -233,7 +237,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
      * Chat 模块的模型选择器仅显示已验证可用的模型
      */
     const availableModels = useMemo(() => {
-        return models.filter(m => m.status === 'online');
+        return getAvailableChatModels(models).filter(m => m.status === 'online');
     }, [models]);
 
     // 切换对话时清空输入框 (独立输入框)
@@ -479,8 +483,17 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
                             {/* v2.6.0: 选中 Agent 时显示 MCP 状态徽章 */}
                             {selectedAgent && selectedAgent.enableToolUse && mcpStatusSummary.totalServers > 0 && (
                                 <>
-                                    {/* 有严重问题（删除/错误） */}
-                                    {mcpStatusSummary.hasIssues ? (
+                                    {/* 部分可用：有服务器异常，但仍有已连接 MCP 可继续使用 */}
+                                    {mcpStatusSummary.hasPartialAvailability ? (
+                                        <div
+                                            className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 px-2 py-1 rounded-full cursor-help"
+                                            title={`${mcpStatusSummary.connectedServers}/${mcpStatusSummary.totalServers} 个 MCP 已连接，${mcpStatusSummary.errorServers} 个连接失败，${mcpStatusSummary.deletedServers} 个已删除，${mcpStatusSummary.disconnectedServers} 个未启动`}
+                                        >
+                                            <AlertTriangle size={12} />
+                                            <span>{mcpStatusSummary.connectedServers}/{mcpStatusSummary.totalServers} MCP</span>
+                                        </div>
+                                    ) : mcpStatusSummary.hasIssues ? (
+                                        /* 全部不可用且存在严重问题（删除/错误） */
                                         <div
                                             className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded-full cursor-help"
                                             title={`${mcpStatusSummary.deletedServers > 0 ? `${mcpStatusSummary.deletedServers} 个 MCP 已删除` : ''}${mcpStatusSummary.errorServers > 0 ? `${mcpStatusSummary.deletedServers > 0 ? ', ' : ''}${mcpStatusSummary.errorServers} 个 MCP 连接失败` : ''}`}
@@ -546,7 +559,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
                             >
                                 {availableModels.map((model) => (
                                     <option key={model.id} value={model.id}>
-                                        {model.name}
+                                        {getChatModelDisplayName(model)}
                                     </option>
                                 ))}
                             </select>
@@ -558,7 +571,7 @@ export const ChatWindow = React.memo<ChatWindowProps>(({
                         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-[10px]">
                             <span>{t.chat.model}:</span>
                             <span className="font-medium text-gray-700 dark:text-gray-300">
-                                {models.find(m => m.id === selectedAgent.model)?.name || selectedAgent.model}
+                                {getChatModelDisplayName(models.find(m => m.id === selectedAgent.model), selectedAgent.model)}
                             </span>
                         </div>
                     )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, Bot } from 'lucide-react';
 import type { Chat, AIModel, Agent } from '../../../types';
+import { getChatModelDisplayName, normalizeChatModelId } from '../../../services/models/chatModelCompatibility';
 
 interface ChatItemProps {
     chat: Chat;
@@ -29,9 +30,9 @@ export const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, onClick, m
 
     // v2.3.0: 获取 Agent 和模型的真实名称
     const agent = chat.agentId ? agents.find(a => a.id === chat.agentId) : null;
-    const modelId = agent?.model || chat.model;
+    const modelId = normalizeChatModelId(agent?.model || chat.model, models);
     const model = models.find(m => m.id === modelId);
-    const modelName = model?.name || modelId || '未知模型';
+    const modelName = getChatModelDisplayName(model, modelId) || '未知模型';
 
     return (
         <div

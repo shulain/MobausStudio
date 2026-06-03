@@ -16,7 +16,8 @@ mod tests {
 
     #[test]
     fn test_tc_cgweb_001_generate_pkce_pair() {
-        let (verifier, challenge) = oauth::generate_pkce_pair().expect("generate_pkce_pair should succeed");
+        let (verifier, challenge) =
+            oauth::generate_pkce_pair().expect("generate_pkce_pair should succeed");
         // verifier 是 64 字节的 hex 编码 = 128 字符
         assert_eq!(verifier.len(), 128, "verifier 应为 128 字符（64 字节 hex）");
         // challenge 是 SHA256 (32 字节) 的 base64url 编码 = 43 字符
@@ -66,62 +67,50 @@ mod tests {
 
     #[test]
     fn test_tc_cgweb_003_normalize_model_exact() {
-        assert_eq!(normalize_codex_model("gpt-5.4"), "gpt-5.4");
+        assert_eq!(normalize_codex_model("gpt-5.4"), "gpt-5.4-mini");
         assert_eq!(normalize_codex_model("gpt-5.4-mini"), "gpt-5.4-mini");
-        assert_eq!(normalize_codex_model("gpt-5.4-nano"), "gpt-5.4-nano");
-        assert_eq!(normalize_codex_model("gpt-5.3-codex"), "gpt-5.3-codex");
-        assert_eq!(normalize_codex_model("gpt-5.2"), "gpt-5.2");
-        assert_eq!(normalize_codex_model("gpt-5.2-codex"), "gpt-5.2-codex");
-        assert_eq!(normalize_codex_model("gpt-5.1"), "gpt-5.1");
-        assert_eq!(normalize_codex_model("gpt-5.1-codex"), "gpt-5.1-codex");
-        assert_eq!(
-            normalize_codex_model("gpt-5.1-codex-max"),
-            "gpt-5.1-codex-max"
-        );
-        assert_eq!(
-            normalize_codex_model("gpt-5.1-codex-mini"),
-            "gpt-5.1-codex-mini"
-        );
+        assert_eq!(normalize_codex_model("gpt-5.4-nano"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.3-codex"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.2"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.2-codex"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.1"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.1-codex"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.1-codex-max"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.1-codex-mini"), "gpt-5.4-mini");
     }
 
     // ==================== TC-CGWEB-004: 模型规范化 - 带后缀 ====================
 
     #[test]
     fn test_tc_cgweb_004_normalize_model_with_suffix() {
-        assert_eq!(normalize_codex_model("gpt-5.4-high"), "gpt-5.4");
-        assert_eq!(normalize_codex_model("gpt-5.4-low"), "gpt-5.4");
-        assert_eq!(normalize_codex_model("gpt-5.3-high"), "gpt-5.3-codex");
+        assert_eq!(normalize_codex_model("gpt-5.4-high"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.4-low"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.3-high"), "gpt-5.4-mini");
         assert_eq!(
             normalize_codex_model("gpt-5.3-codex-medium"),
-            "gpt-5.3-codex"
+            "gpt-5.4-mini"
         );
-        assert_eq!(normalize_codex_model("gpt-5.2-none"), "gpt-5.2");
-        assert_eq!(
-            normalize_codex_model("gpt-5.1-codex-xhigh"),
-            "gpt-5.1-codex"
-        );
+        assert_eq!(normalize_codex_model("gpt-5.2-none"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5.1-codex-xhigh"), "gpt-5.4-mini");
     }
 
     // ==================== TC-CGWEB-005: 模型规范化 - 通用别名 ====================
 
     #[test]
     fn test_tc_cgweb_005_normalize_model_alias() {
-        assert_eq!(normalize_codex_model("gpt-5"), "gpt-5.1");
-        assert_eq!(normalize_codex_model("gpt-5-mini"), "gpt-5.1");
-        assert_eq!(normalize_codex_model("gpt-5-nano"), "gpt-5.1");
-        assert_eq!(normalize_codex_model("gpt-5-codex"), "gpt-5.1-codex");
-        assert_eq!(
-            normalize_codex_model("codex-mini-latest"),
-            "gpt-5.1-codex-mini"
-        );
+        assert_eq!(normalize_codex_model("gpt-5"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5-mini"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5-nano"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("gpt-5-codex"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("codex-mini-latest"), "gpt-5.4-mini");
     }
 
     // ==================== TC-CGWEB-006: 模型规范化 - 默认 ====================
 
     #[test]
     fn test_tc_cgweb_006_normalize_model_default() {
-        assert_eq!(normalize_codex_model("unknown-model"), "gpt-5.1");
-        assert_eq!(normalize_codex_model("claude-3"), "gpt-5.1");
+        assert_eq!(normalize_codex_model("unknown-model"), "gpt-5.4-mini");
+        assert_eq!(normalize_codex_model("claude-3"), "gpt-5.4-mini");
     }
 
     // ==================== TC-CGWEB-007: 请求转换 - 系统消息提取 ====================

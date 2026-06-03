@@ -234,6 +234,41 @@ describe('modelFetcher 服务测试', () => {
             expect(result.source).toBe('builtin');
             expect(result.models).toEqual(builtinModels);
         });
+
+        it('OpenAI OAuth 应只返回实测可用的 ChatGPT Web 模型', async () => {
+            const builtinModels: ProviderModel[] = [
+                {
+                    id: 'gpt-5.4',
+                    name: 'GPT-5.4',
+                    maxTokens: 128000,
+                    contextWindow: 1047576,
+                },
+                {
+                    id: 'gpt-5.4-mini',
+                    name: 'GPT-5.4 Mini',
+                    maxTokens: 128000,
+                    contextWindow: 1047576,
+                },
+                {
+                    id: 'gpt-5.3-codex',
+                    name: 'GPT-5.3 Codex',
+                    maxTokens: 128000,
+                    contextWindow: 1047576,
+                },
+            ];
+            global.fetch = vi.fn();
+
+            const result = await modelFetcher.fetchModels(
+                'openai',
+                'eyJ'.padEnd(120, 'x'),
+                undefined,
+                builtinModels
+            );
+
+            expect(result.source).toBe('builtin');
+            expect(result.models.map((model) => model.id)).toEqual(['gpt-5.4-mini']);
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
     });
 
     describe('TC-MODEL-005: Google OAuth 添加 Claude 模型', () => {

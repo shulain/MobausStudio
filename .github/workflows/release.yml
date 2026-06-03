@@ -183,6 +183,16 @@ jobs:
         shell: bash
         run: npm ci --silent > /dev/null 2>&1
 
+      - name: 验证 Tauri 更新签名私钥
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::缺少 TAURI_SIGNING_PRIVATE_KEY。src-tauri/tauri.conf.json 已启用 createUpdaterArtifacts 并配置 updater pubkey，发布构建必须提供 Tauri 更新签名私钥。"
+            exit 1
+          fi
+
       - name: 导入签名证书 (macOS)
         if: matrix.platform == 'macos-latest'
         env:

@@ -1,5 +1,6 @@
-# MobausStudio Web 版本 Docker 镜像
+# MobausStudio Web 静态预览 Docker 镜像
 # 使用 nginx 作为静态文件服务器
+# 不包含 Tauri/Rust 后端；完整 AI 对话、OAuth、MCP 等功能请使用桌面版
 #
 # 构建: docker build -t mobaus-studio .
 # 运行: docker run -d -p 8080:80 mobaus-studio

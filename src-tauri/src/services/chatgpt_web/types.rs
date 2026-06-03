@@ -319,15 +319,24 @@ pub fn normalize_codex_model(model: &str) -> &'static str {
     static MODEL_MAP: once_cell::sync::Lazy<HashMap<&'static str, &'static str>> =
         once_cell::sync::Lazy::new(|| {
             let mut m = HashMap::new();
+            // ChatGPT Web/Codex 账号模式当前实测可闭环的模型。
+            // 注意：chatgpt.com/backend-api/models 会列出很多 ChatGPT 聊天模型，
+            // 但 Codex Responses 端点会拒绝其中大多数模型。这里优先映射到
+            // 已通过真实 store=false 流式 smoke test 的 gpt-5.4-mini。
+            let chatgpt_web_default = "gpt-5.4-mini";
+
             // GPT-5.4 系列
             for suffix in &["", "-none", "-low", "-medium", "-high", "-xhigh"] {
-                m.insert(leak_string(format!("gpt-5.4{}", suffix)), "gpt-5.4");
+                m.insert(
+                    leak_string(format!("gpt-5.4{}", suffix)),
+                    chatgpt_web_default,
+                );
             }
-            m.insert("gpt-5.4-mini", "gpt-5.4-mini");
-            m.insert("gpt-5.4-nano", "gpt-5.4-nano");
-            m.insert("gpt-5.2-chat-latest", "gpt-5.2-chat-latest");
+            m.insert("gpt-5.4-mini", chatgpt_web_default);
+            m.insert("gpt-5.4-nano", chatgpt_web_default);
+            m.insert("gpt-5.2-chat-latest", chatgpt_web_default);
 
-            // GPT-5.3 系列 → gpt-5.3-codex
+            // GPT-5.3 系列
             for suffix in &[
                 "",
                 "-codex",
@@ -342,44 +351,53 @@ pub fn normalize_codex_model(model: &str) -> &'static str {
                 "-high",
                 "-xhigh",
             ] {
-                m.insert(leak_string(format!("gpt-5.3{}", suffix)), "gpt-5.3-codex");
+                m.insert(
+                    leak_string(format!("gpt-5.3{}", suffix)),
+                    chatgpt_web_default,
+                );
             }
 
             // GPT-5.2 系列
             for suffix in &["", "-none", "-low", "-medium", "-high", "-xhigh"] {
-                m.insert(leak_string(format!("gpt-5.2{}", suffix)), "gpt-5.2");
+                m.insert(
+                    leak_string(format!("gpt-5.2{}", suffix)),
+                    chatgpt_web_default,
+                );
             }
             for suffix in &["", "-none", "-low", "-medium", "-high", "-xhigh"] {
                 m.insert(
                     leak_string(format!("gpt-5.2-codex{}", suffix)),
-                    "gpt-5.2-codex",
+                    chatgpt_web_default,
                 );
             }
 
             // GPT-5.1 系列
             for suffix in &["", "-none", "-low", "-medium", "-high", "-xhigh"] {
-                m.insert(leak_string(format!("gpt-5.1{}", suffix)), "gpt-5.1");
+                m.insert(
+                    leak_string(format!("gpt-5.1{}", suffix)),
+                    chatgpt_web_default,
+                );
                 m.insert(
                     leak_string(format!("gpt-5.1-codex{}", suffix)),
-                    "gpt-5.1-codex",
+                    chatgpt_web_default,
                 );
                 m.insert(
                     leak_string(format!("gpt-5.1-codex-max{}", suffix)),
-                    "gpt-5.1-codex-max",
+                    chatgpt_web_default,
                 );
                 m.insert(
                     leak_string(format!("gpt-5.1-codex-mini{}", suffix)),
-                    "gpt-5.1-codex-mini",
+                    chatgpt_web_default,
                 );
             }
 
             // GPT-5 通用别名
-            m.insert("gpt-5", "gpt-5.1");
-            m.insert("gpt-5-mini", "gpt-5.1");
-            m.insert("gpt-5-nano", "gpt-5.1");
-            m.insert("gpt-5-codex", "gpt-5.1-codex");
-            m.insert("gpt-5-codex-mini", "gpt-5.1-codex-mini");
-            m.insert("codex-mini-latest", "gpt-5.1-codex-mini");
+            m.insert("gpt-5", chatgpt_web_default);
+            m.insert("gpt-5-mini", chatgpt_web_default);
+            m.insert("gpt-5-nano", chatgpt_web_default);
+            m.insert("gpt-5-codex", chatgpt_web_default);
+            m.insert("gpt-5-codex-mini", chatgpt_web_default);
+            m.insert("codex-mini-latest", chatgpt_web_default);
 
             m
         });
@@ -393,19 +411,19 @@ pub fn normalize_codex_model(model: &str) -> &'static str {
     // 模糊匹配（包含关键词）
     let fuzzy_rules: &[(&str, &str)] = &[
         ("gpt-5.4-mini", "gpt-5.4-mini"),
-        ("gpt-5.4-nano", "gpt-5.4-nano"),
-        ("gpt-5.4", "gpt-5.4"),
-        ("gpt-5.3-codex", "gpt-5.3-codex"),
-        ("gpt-5.3", "gpt-5.3-codex"),
-        ("gpt-5.2-chat-latest", "gpt-5.2-chat-latest"),
-        ("gpt-5.2-codex", "gpt-5.2-codex"),
-        ("gpt-5.2", "gpt-5.2"),
-        ("gpt-5.1-codex-max", "gpt-5.1-codex-max"),
-        ("gpt-5.1-codex-mini", "gpt-5.1-codex-mini"),
-        ("gpt-5.1-codex", "gpt-5.1-codex"),
-        ("gpt-5.1", "gpt-5.1"),
-        ("codex", "gpt-5.1-codex"),
-        ("gpt-5", "gpt-5.1"),
+        ("gpt-5.4-nano", "gpt-5.4-mini"),
+        ("gpt-5.4", "gpt-5.4-mini"),
+        ("gpt-5.3-codex", "gpt-5.4-mini"),
+        ("gpt-5.3", "gpt-5.4-mini"),
+        ("gpt-5.2-chat-latest", "gpt-5.4-mini"),
+        ("gpt-5.2-codex", "gpt-5.4-mini"),
+        ("gpt-5.2", "gpt-5.4-mini"),
+        ("gpt-5.1-codex-max", "gpt-5.4-mini"),
+        ("gpt-5.1-codex-mini", "gpt-5.4-mini"),
+        ("gpt-5.1-codex", "gpt-5.4-mini"),
+        ("gpt-5.1", "gpt-5.4-mini"),
+        ("codex", "gpt-5.4-mini"),
+        ("gpt-5", "gpt-5.4-mini"),
     ];
 
     for (keyword, target) in fuzzy_rules {
@@ -415,7 +433,7 @@ pub fn normalize_codex_model(model: &str) -> &'static str {
     }
 
     // 默认
-    "gpt-5.1"
+    "gpt-5.4-mini"
 }
 
 /// 将 format!() 生成的 String 泄漏为 &'static str，用于静态 HashMap

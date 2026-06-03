@@ -60,6 +60,7 @@ import {
   updateModelStatus,
   findModel,
 } from './services/models/modelState';
+import { getChatModelRequestName, getDefaultChatModelId, normalizeChatModelId } from './services/models/chatModelCompatibility';
 import { getDefaultProtocol } from './data/protocols';  // v0.9.4: 导入协议工具函数
 import {
   createAgent,
@@ -124,16 +125,8 @@ import { useI18n, translate } from './i18n';
 import { logger, LogTags } from './utils/logger';
 import { calculateAllStats, calculateModelUsage, generateRecentActivity } from './utils/statsUtils';
 
-const APP_STORAGE_KEYS = {
-    MODELS: 'mobaus_models',
-    CHATS: 'mobaus_chats',
-    AGENTS: 'mobaus_agents',
-    SKILLS: 'mobaus_skills',
-    MCP: 'mobaus_mcp_servers',
-    SETTINGS: 'mobaus_settings',
-} as const;
-
 const APP_BACKUP_KEY = 'mobaus_backup';
+const APP_BACKUP_CANCELLED_MESSAGE = '导入前备份已取消，导入未执行。';
 
 function App() {
   // i18n
@@ -516,7 +509,7 @@ function App() {
   const handleCreateChat = useCallback((): string => {
     const newChatId = Date.now().toString();
     // v2.3.0: 使用第一个可用模型的 ID，而不是硬编码
-    const defaultModelId = models[0]?.id || '';
+    const defaultModelId = getDefaultChatModelId(models);
     const newChat: Chat = {
       id: newChatId,
       title: '新对话',
@@ -1357,7 +1350,7 @@ function App() {
         request: {
           provider: model.provider,
           api_key: apiKey,
-          model_name: model.modelId || model.name,
+          model_name: getChatModelRequestName(model),
           messages: apiMessages,
           endpoint: model.endpoint,
           tools: hasTools ? agentTools : undefined,
@@ -1781,7 +1774,7 @@ function App() {
           request: {
             provider: model.provider,
             api_key: apiKey,
-            model_name: model.modelId || model.name,
+            model_name: getChatModelRequestName(model),
             messages: continueRequestMessages,
             endpoint: model.endpoint,
             tools: hasTools ? agentTools : undefined,
@@ -2229,7 +2222,7 @@ const handleRoundtableSummarize = useCallback(async (chatId: string) => {
       request: {
         provider: model.provider,
         api_key: apiKey,
-        model_name: model.modelId || model.name,
+        model_name: getChatModelRequestName(model),
         messages: apiMessages,
         endpoint: model.endpoint,
         protocol: model.protocol || providers.find(p => p.id === model.provider)?.protocol || getDefaultProtocol(model.provider),  // v0.9.6: 补充缺失的 protocol 字段，使用三级回退逻辑
@@ -2475,7 +2468,8 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
   let streamErrorReported = false;
 
   try {
-    const selectedModel = models.find(m => m.id === modelId);
+    const effectiveModelId = normalizeChatModelId(modelId, models);
+    const selectedModel = models.find(m => m.id === effectiveModelId) || models.find(m => m.id === modelId);
     if (!selectedModel) {
       throw new Error('Selected model not found');
     }
@@ -2517,7 +2511,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
 
     // v2.6.0: 埋点 - 发送消息
     trackEvents.messageSent({
-      modelId,
+      modelId: selectedModel.id,
       messageLength: content.length,
       hasAttachment: attachments.length > 0,
     });
@@ -3266,7 +3260,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
     const chatRequest: Record<string, unknown> = {
       provider: selectedModel.provider,
       api_key: apiKey,
-      model_name: selectedModel.modelId || selectedModel.name,
+      model_name: getChatModelRequestName(selectedModel),
       messages: apiMessages,
       endpoint: selectedModel.endpoint,
       message_id: messageId,  // 传递 messageId 用于区分不同对话的消息
@@ -3311,7 +3305,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
     if (import.meta.env.DEV) {
       logger.debug(LogTags.APP, '发送消息请求', {
         provider: selectedModel.provider,
-        model: selectedModel.modelId || selectedModel.name,
+        model: getChatModelRequestName(selectedModel),
         messageCount: apiMessages.length,
         hasTools: !!tools,
         toolCount: tools?.length || 0,
@@ -3431,7 +3425,7 @@ const handleSendMessage = useCallback(async (chatId: string, content: string, mo
       const continueRequest: Record<string, unknown> = {
         provider: continueModel.provider,
         api_key: continueApiKey,
-        model_name: continueModel.modelId || continueModel.name,
+        model_name: getChatModelRequestName(continueModel),
         messages: continueMessages,
         endpoint: continueModel.endpoint,
         message_id: continueMessageId,  // 使用新的 messageId，每轮创建新消息
@@ -3630,7 +3624,7 @@ const handleRunAgent = useCallback((id: string) => {
   const agent = agents.find(a => a.id === id);
 
   // 使用 Agent 配置的模型，如果没有则使用第一个可用模型
-  const modelId = agent?.model || models[0]?.id || '';
+  const modelId = agent?.model || getDefaultChatModelId(models);
 
   const newChat: Chat = {
     id: newChatId,
@@ -4392,7 +4386,7 @@ const handleTestModel = useCallback(async (id: string) => {
       provider: model.provider,
       api_key: apiKey,
       endpoint: model.endpoint || null,
-      model_name: model.modelId || model.name || null,
+      model_name: getChatModelRequestName(model) || null,
       protocol: model.protocol || null,
     };
 
@@ -4521,7 +4515,7 @@ const handleBatchTestModels = useCallback(async () => {
             provider: model.provider,
             api_key: apiKey,
             endpoint: model.endpoint || null,
-            model_name: model.modelId || model.name || null,
+              model_name: getChatModelRequestName(model) || null,
             protocol: effectiveProtocol || null,  // v0.9.4: 使用有效协议
           };
 
@@ -4662,6 +4656,54 @@ const handleExport = useCallback(async (config: ExportConfig) => {
   }
 }, [addToast, t]);
 
+const createPreImportBackup = useCallback(async () => {
+  const backupData = {
+    version: '1.0.0',
+    backupType: 'pre-import',
+    exportedAt: new Date().toISOString(),
+    models: await modelsStorage.load(),
+    chats: await chatsStorage.load(),
+    agents: await agentsStorage.load(),
+    skills: await skillsStorage.load(),
+    mcp: await mcpServersStorage.load(),
+    roundtableChats: await roundtableChatsStorage.load(),
+    settings: await settingsStorage.loadAsync(),
+  };
+
+  const jsonContent = JSON.stringify(backupData, null, 2);
+  const defaultFileName = `mobaus-backup-${new Date().toISOString().split('T')[0]}.json`;
+
+  try {
+    localStorage.setItem(APP_BACKUP_KEY, jsonContent);
+  } catch (error) {
+    logger.warn(LogTags.APP, '导入前本地应急备份写入失败，继续创建备份文件', error);
+  }
+
+  if (isTauri()) {
+    const filePath = await save({
+      defaultPath: defaultFileName,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+
+    if (!filePath) {
+      throw new Error(APP_BACKUP_CANCELLED_MESSAGE);
+    }
+
+    await writeTextFile(filePath, jsonContent);
+    return;
+  }
+
+  const blob = new Blob([jsonContent], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = defaultFileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}, []);
+
 const handleImport = useCallback((file: File, options: ImportOptions) => {
   if (importingRef.current) {
     return;
@@ -4704,15 +4746,7 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
       }
 
       if (options.backup) {
-        const backup = {
-          models: localStorage.getItem(APP_STORAGE_KEYS.MODELS),
-          chats: localStorage.getItem(APP_STORAGE_KEYS.CHATS),
-          agents: localStorage.getItem(APP_STORAGE_KEYS.AGENTS),
-          skills: localStorage.getItem(APP_STORAGE_KEYS.SKILLS),
-          mcp: localStorage.getItem(APP_STORAGE_KEYS.MCP),
-          settings: localStorage.getItem(APP_STORAGE_KEYS.SETTINGS),
-        };
-        localStorage.setItem(APP_BACKUP_KEY, JSON.stringify(backup));
+        await createPreImportBackup();
       }
 
       const models = Object.prototype.hasOwnProperty.call(data, 'models')
@@ -4832,7 +4866,7 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
         }
       }
 
-      if (skills && !agentsData) {
+      if (skills) {
         if (options.merge) {
           const existing = await skillsStorage.load();
           await skillsStorage.save(mergeById(existing, skills));
@@ -4841,15 +4875,14 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
         }
       }
 
-      if (!agentsData) {
+      {
         const importMcp = mcp ?? legacyMcp ?? [];
-        if (importMcp?.length || Object.prototype.hasOwnProperty.call(data, 'mcp') || Object.prototype.hasOwnProperty.call(data, 'mcpServers')) {
-          const mcpToImport = importMcp || [];
+        if (importMcp.length || Object.prototype.hasOwnProperty.call(data, 'mcp') || Object.prototype.hasOwnProperty.call(data, 'mcpServers')) {
           if (options.merge) {
             const existing = await mcpServersStorage.load();
-            await mcpServersStorage.save(mergeById(existing, mcpToImport));
+            await mcpServersStorage.save(mergeById(existing, importMcp));
           } else {
-            await mcpServersStorage.save(mcpToImport);
+            await mcpServersStorage.save(importMcp);
           }
         }
       }
@@ -4878,10 +4911,13 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
       }, 300);
     } catch (error) {
       logger.error(LogTags.APP, '导入失败', error);
+      const importErrorMessage = error instanceof Error && error.message === APP_BACKUP_CANCELLED_MESSAGE
+        ? APP_BACKUP_CANCELLED_MESSAGE
+        : (t.messages.importError || '导入失败：文件格式无效');
       addToast({
         type: 'error',
-        title: t.messages.importError || '导入失败：文件格式无效',
-        message: t.messages.importError || '导入失败：文件格式无效',
+        title: importErrorMessage,
+        message: importErrorMessage,
         duration: 5000,
       });
     } finally {
@@ -4900,7 +4936,7 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
   };
 
   reader.readAsText(file);
-}, [addToast, t]);
+}, [addToast, createPreImportBackup, t]);
 
 const unreadCount = notifications.filter((n) => !n.read).length;
 

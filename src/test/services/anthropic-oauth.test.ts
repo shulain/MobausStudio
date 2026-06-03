@@ -15,8 +15,44 @@ import {
 } from '../../services/anthropic-oauth';
 
 const mockStartOAuthCallbackServer = vi.fn();
+const mockStopOAuthCallbackServer = vi.fn();
 const mockCheckPortAvailable = vi.fn();
 const mockGetAvailablePort = vi.fn();
+
+function waitForMockOAuthCallback(
+    callbackPromise: Promise<{ success: boolean; error?: string; actualPort: number }>,
+    signal?: AbortSignal,
+    actualPort = 0
+) {
+    if (!signal) return callbackPromise;
+    if (signal.aborted) {
+        mockStopOAuthCallbackServer();
+        return Promise.resolve({ success: false, error: 'cancelled', actualPort });
+    }
+    return Promise.race([
+        callbackPromise,
+        new Promise<{ success: boolean; error?: string; actualPort: number }>((resolve) => {
+            signal.addEventListener('abort', () => {
+                mockStopOAuthCallbackServer();
+                resolve({ success: false, error: 'cancelled', actualPort });
+            }, { once: true });
+        }),
+    ]);
+}
+
+async function waitForAssertion(assertion: () => void) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+            assertion();
+            return;
+        } catch (error) {
+            lastError = error;
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+    throw lastError;
+}
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -44,6 +80,8 @@ vi.mock('../../utils/logger', () => ({
 // Mock OAuth callback service
 vi.mock('../../services/oauth-callback', () => ({
     startOAuthCallbackServer: (...args: unknown[]) => mockStartOAuthCallbackServer(...args),
+    stopOAuthCallbackServer: (...args: unknown[]) => mockStopOAuthCallbackServer(...args),
+    waitForOAuthCallback: waitForMockOAuthCallback,
     checkPortAvailable: (...args: unknown[]) => mockCheckPortAvailable(...args),
     getAvailablePort: (...args: unknown[]) => mockGetAvailablePort(...args),
     buildRedirectUri: (port: number, path: string) => `http://localhost:${port}${path}`,
@@ -75,6 +113,7 @@ describe('Anthropic OAuth 服务测试', () => {
         mockCheck = mockCheckPortAvailable as ReturnType<typeof vi.fn>;
         mockGetPort = mockGetAvailablePort as ReturnType<typeof vi.fn>;
         mockStart.mockReset();
+        mockStopOAuthCallbackServer.mockReset();
         mockCheck.mockReset();
         mockGetPort.mockReset();
     });
@@ -104,6 +143,23 @@ describe('Anthropic OAuth 服务测试', () => {
             expect(result.refreshToken).toBe('test-refresh-token');
             expect(result.expiresAt).toBeGreaterThan(Date.now());
             expect(result.apiKey).toBeUndefined(); // max 模式不返回 API Key
+        });
+
+        it('取消授权时应立即失败并停止回调监听', async () => {
+            mockCheck.mockResolvedValue(true);
+            mockStart.mockReturnValue(new Promise(() => undefined));
+
+            const onAuthUrl = vi.fn();
+            const onStatusChange = vi.fn();
+            const controller = new AbortController();
+            const resultPromise = anthropicOAuth.authorize('max', onAuthUrl, onStatusChange, controller.signal);
+
+            await waitForAssertion(() => expect(onAuthUrl).toHaveBeenCalled());
+            controller.abort();
+
+            const result = await resultPromise;
+            expect(result.type).toBe('failed');
+            expect(mockStopOAuthCallbackServer).toHaveBeenCalled();
         });
     });
 

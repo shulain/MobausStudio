@@ -21,6 +21,7 @@ import {
     getAvailablePort,
     getProviderPortConfig,
     startOAuthCallbackServer,
+    waitForOAuthCallback,
 } from './oauth-callback';
 
 /**
@@ -590,14 +591,6 @@ export const kiroOAuth = {
                 timeout: 300,
             });
 
-            const callbackResultPromise = callbackPromise
-                .then(result => result as TauriOAuthCallbackResult)
-                .catch((error: unknown) => ({
-                    success: false,
-                    error: error instanceof Error ? error.message : 'oauth callback server failed',
-                    actualPort: callbackPort,
-                } as TauriOAuthCallbackResult));
-
             // 3. 打开浏览器
             const { openUrl } = await import('@tauri-apps/plugin-opener');
             try {
@@ -606,24 +599,11 @@ export const kiroOAuth = {
                 logger.warn(LogTags.APP, '无法自动打开浏览器', { error });
             }
 
-            const callbackResult = await (abortSignal
-                ? Promise.race([
-                    callbackResultPromise,
-                    new Promise<TauriOAuthCallbackResult>((resolve) => {
-                        abortSignal.addEventListener(
-                            'abort',
-                            () => {
-                                resolve({
-                                    success: false,
-                                    error: 'cancelled',
-                                    actualPort: 0,
-                                });
-                            },
-                            { once: true }
-                        );
-                    }),
-                ])
-                : callbackResultPromise);
+            const callbackResult = await waitForOAuthCallback(
+                callbackPromise,
+                abortSignal,
+                callbackPort
+            ) as TauriOAuthCallbackResult;
 
             if (callbackResult.error === 'cancelled' || abortSignal?.aborted) {
                 logger.info(LogTags.APP, 'Kiro Social Auth 被取消');

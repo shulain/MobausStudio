@@ -1,8 +1,10 @@
 # Docker Deployment Guide | Docker 部署指南
 
-Using Docker to deploy MobausStudio Web version is the simplest self-hosting method.
+Using Docker to deploy MobausStudio serves the static Web preview. It is useful for UI exploration, documentation demos, and local configuration preview.
 
-使用 Docker 部署 MobausStudio Web 版本是最简单的自托管方式。
+使用 Docker 部署 MobausStudio 会提供静态 Web 预览，适合界面体验、文档演示和本地配置预览。
+
+> **生产说明：** Docker 镜像不包含 Tauri/Rust 后端。AI 对话请求、OAuth 魔法登录回调、MCP 执行、文件系统安全存储和自动更新都需要使用桌面应用。
 
 ---
 
@@ -15,6 +17,15 @@ docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:lates
 ```
 
 Visit | 访问 `http://localhost:8080`
+
+## Feature Scope | 功能范围
+
+| Docker 静态预览可用 | 需要桌面应用 |
+|--------------------|-------------|
+| UI navigation and layout preview / 界面导航和布局预览 | AI chat request execution / AI 对话请求执行 |
+| Local browser storage preview / 本地浏览器存储预览 | OAuth magic login callbacks / OAuth 魔法登录回调 |
+| Static documentation/demo hosting / 静态文档和演示托管 | MCP server execution and tool calls / MCP 服务器执行和工具调用 |
+| Health check endpoint / 健康检查端点 | Tauri filesystem storage and auto-updates / Tauri 文件系统存储和自动更新 |
 
 ### Stop and Remove | 停止和删除
 

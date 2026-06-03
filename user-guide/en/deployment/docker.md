@@ -1,6 +1,8 @@
 # Docker Deployment Guide
 
-Using Docker to deploy MobausStudio Web version is the simplest self-hosting method.
+Using Docker to deploy MobausStudio serves the static Web preview. It is useful for UI exploration, documentation demos, and local configuration preview.
+
+> **Production note:** The Docker image does not include the Tauri/Rust backend. AI chat requests, OAuth magic login callbacks, MCP execution, filesystem-backed secure storage, and auto-updates require the desktop app.
 
 ---
 
@@ -13,6 +15,15 @@ docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:lates
 ```
 
 Visit `http://localhost:8080`
+
+## Feature Scope
+
+| Available in Docker static preview | Requires desktop app |
+|------------------------------------|----------------------|
+| UI navigation and layout preview | AI chat request execution |
+| Local browser storage preview | OAuth magic login callbacks |
+| Static documentation/demo hosting | MCP server execution and tool calls |
+| Health check endpoint | Tauri filesystem storage and auto-updates |
 
 ### Stop and Remove
 

@@ -723,7 +723,7 @@ export const en: Translations = {
         mergeExisting: 'Merge with existing',
         mergeExistingDesc: 'Keep existing configuration, only add new content',
         backupBefore: 'Backup before import',
-        backupBeforeDesc: 'Automatically create a backup of current configuration before import',
+        backupBeforeDesc: 'Save a current configuration backup file before import; canceling the backup save stops the import',
         startImport: 'Start Import',
     },
 

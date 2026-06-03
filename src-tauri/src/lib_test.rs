@@ -71,7 +71,6 @@ mod streaming_api_tests {
 mod oauth_tests {
     use crate::parse_oauth_callback_request;
 
-
     /// TC-OAUTH-001: 测试 OAuth 错误响应格式
     #[test]
     fn test_oauth_error_response_format() {

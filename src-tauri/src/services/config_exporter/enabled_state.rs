@@ -119,14 +119,20 @@ impl EnabledState {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn setup_test_dir() -> PathBuf {
+        let counter = TEST_DIR_COUNTER.fetch_add(1, Ordering::SeqCst);
         let dir = std::env::temp_dir().join(format!(
-            "mobaus_enabled_state_test_{}",
+            "mobaus_enabled_state_test_{}_{}_{}",
+            std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            counter
         ));
         fs::create_dir_all(&dir).unwrap();
         dir

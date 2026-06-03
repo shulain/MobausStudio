@@ -34,6 +34,11 @@ export type UpdateProgressCallback = (progress: number, total: number) => void;
 // 缓存的更新对象
 let cachedUpdate: Update | null = null;
 
+function isDevelopmentVersion(version: string): boolean {
+  const normalized = version.trim().toLowerCase();
+  return normalized === '0.0.0-dev' || normalized.endsWith('-dev') || normalized.includes('.dev');
+}
+
 /**
  * 检查是否有新版本
  *
@@ -46,6 +51,16 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
     // 获取当前版本
     const currentVersion = await getVersion();
     logger.info(LogTags.APP, `当前版本: ${currentVersion}`);
+
+    if (isDevelopmentVersion(currentVersion)) {
+      logger.info(LogTags.APP, '开发版本跳过自动更新检查');
+      cachedUpdate = null;
+
+      return {
+        available: false,
+        currentVersion,
+      };
+    }
 
     // 检查更新
     const update = await check();

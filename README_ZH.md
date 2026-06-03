@@ -42,9 +42,9 @@
 
 ### 平台支持
 
-- **跨平台桌面应用** -- 基于 Tauri 2 的 macOS、Windows、Linux 原生应用
-- **Web 版本** -- 可自托管的静态 Web 构建
-- **Docker 部署** -- 一键容器化部署
+- **跨平台桌面应用** -- 基于 Tauri 2 的 macOS、Windows、Linux 原生应用；这是完整生产级 AI 客户端
+- **Web 静态预览** -- 可自托管的静态构建，用于界面体验和本地配置预览
+- **Docker 静态预览** -- 一键容器化静态预览
 - **自动更新** -- 内置签名验证的自动更新
 - **国际化** -- 中文和英文界面
 
@@ -80,6 +80,8 @@
 
 ### Docker
 
+> **重要说明：** Docker 镜像只提供静态 Web 预览，不包含 Tauri/Rust 后端。因此 AI 对话请求、OAuth 魔法登录回调、MCP 执行、文件系统安全存储和自动更新都需要使用桌面应用。
+
 ```bash
 docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:latest
 # 访问 http://localhost:8080
@@ -99,7 +101,9 @@ services:
 
 </details>
 
-### Web 版本（自托管）
+### Web 静态预览（自托管）
+
+> 自托管 Web 构建是静态预览。完整生产级 AI 客户端体验请使用桌面版 Release。
 
 从 Releases 下载 `MobausStudio-web.zip`，解压后托管：
 
@@ -134,7 +138,7 @@ npm run tauri dev
 ### 构建
 
 ```bash
-# Web 构建
+# Web/静态预览构建
 npm run build
 
 # 桌面应用构建

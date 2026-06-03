@@ -246,6 +246,49 @@ impl ChatProtocol for OpenAIProtocol {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+        let mut buffer = Vec::new();
+        let mut chunk = [0_u8; 4096];
+
+        loop {
+            let size = stream.read(&mut chunk).unwrap();
+            if size == 0 {
+                break;
+            }
+
+            buffer.extend_from_slice(&chunk[..size]);
+
+            let header_end = buffer
+                .windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .map(|pos| pos + 4);
+
+            if let Some(header_end) = header_end {
+                let headers = String::from_utf8_lossy(&buffer[..header_end]);
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        if name.eq_ignore_ascii_case("content-length") {
+                            value.trim().parse::<usize>().ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0);
+
+                if buffer.len() >= header_end + content_length {
+                    break;
+                }
+            }
+        }
+
+        String::from_utf8_lossy(&buffer).to_string()
+    }
 
     /// TC-PROTO-MSG-001: OpenAI 消息格式
     #[test]
@@ -376,5 +419,97 @@ mod tests {
             protocol.build_url(&request2),
             "https://api.deepseek.com/v1/chat/completions"
         );
+    }
+
+    /// 本机 OpenAI-compatible mock 服务闭环：
+    /// 构建请求 -> 真实 HTTP POST -> 接收 SSE -> 协议解析出 chunk/usage/done。
+    #[tokio::test]
+    async fn test_openai_compatible_local_stream_roundtrip() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let endpoint = format!("http://127.0.0.1:{}/v1", port);
+
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_http_request(&mut stream);
+
+            assert!(request.starts_with("POST /v1/chat/completions "));
+            assert!(request
+                .to_ascii_lowercase()
+                .contains("authorization: bearer test-key"));
+            assert!(request.contains("\"model\":\"mock-model\""));
+            assert!(request.contains("\"stream\":true"));
+
+            let response_body = concat!(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n",
+                "data: {\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2,\"total_tokens\":5}}\n\n",
+                "data: [DONE]\n\n"
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        let protocol = OpenAIProtocol;
+        let request = ChatStreamRequest {
+            provider: "custom".to_string(),
+            api_key: "test-key".to_string(),
+            model_name: "mock-model".to_string(),
+            messages: vec![super::super::ChatMessage {
+                role: "user".to_string(),
+                content: serde_json::json!("hello"),
+                tool_calls: None,
+                tool_call_id: None,
+            }],
+            endpoint: Some(endpoint),
+            temperature: Some(0.2),
+            max_tokens: Some(32),
+            system_prompt: None,
+            tools: None,
+            account_id: None,
+            project_id: None,
+            message_id: None,
+            protocol: None,
+        };
+
+        let response = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap()
+            .post(protocol.build_url(&request))
+            .headers(protocol.build_headers(&request))
+            .json(&protocol.build_body(&request))
+            .send()
+            .await
+            .unwrap();
+
+        assert!(response.status().is_success());
+
+        let mut stream_buffer = StreamBuffer::default();
+        let mut events = Vec::new();
+        let mut response = response;
+        while let Some(chunk) = response.chunk().await.unwrap() {
+            events.extend(protocol.parse_chunk(&chunk, &mut stream_buffer));
+        }
+
+        assert!(events.iter().any(|event| matches!(
+            event,
+            StreamEvent::Chunk { content } if content == "Hello"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            StreamEvent::Usage {
+                prompt_tokens: 3,
+                completion_tokens: 2,
+                total_tokens: 5
+            }
+        )));
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, StreamEvent::Done)));
+        server.join().unwrap();
     }
 }

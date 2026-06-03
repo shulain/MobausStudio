@@ -20,6 +20,8 @@ import { generatePKCE, generateState } from '../utils/pkce';
 import { logger, LogTags } from '../utils/logger';
 import {
     startOAuthCallbackServer,
+    stopOAuthCallbackServer,
+    waitForOAuthCallback,
     checkPortAvailable,
     getAvailablePort,
     buildRedirectUri,
@@ -343,10 +345,10 @@ export class AnthropicOAuth {
             }
 
             // 5. 等待回调服务器返回结果
-            const callbackResult = await callbackPromise;
+            const callbackResult = await waitForOAuthCallback(callbackPromise, signal, callbackPort);
 
             // 检查是否被取消
-            if (signal?.aborted) {
+            if (callbackResult.error === 'cancelled' || signal?.aborted) {
                 cancelAnthropicAuth();
                 return { type: 'failed' };
             }
@@ -393,8 +395,7 @@ export class AnthropicOAuth {
             this.abortController.abort();
         }
         cancelAnthropicAuth();
-        // 停止回调服务器（旧接口，保持兼容）
-        invoke('anthropic_stop_oauth_callback_server').catch(err => {
+        stopOAuthCallbackServer().catch(err => {
             logger.warn(LogTags.AUTH, '停止 Anthropic OAuth 回调服务器失败', { error: err });
         });
     }

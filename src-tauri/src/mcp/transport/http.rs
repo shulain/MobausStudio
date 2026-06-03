@@ -10,8 +10,10 @@ use crate::mcp::transport::MCPTransport;
 use async_trait::async_trait;
 use reqwest::{Client, Response, StatusCode};
 use serde_json::Value;
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
+use url::Url;
 
 /// 默认请求超时时间 (秒)
 const DEFAULT_REQUEST_TIMEOUT: u64 = 60;
@@ -95,12 +97,21 @@ impl HttpTransport {
         };
 
         // 创建 HTTP 客户端
-        let client = Client::builder()
-            .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT))
-            .build()
-            .map_err(|e| {
-                MCPError::InvalidTransportConfig(format!("创建 HTTP 客户端失败: {}", e))
-            })?;
+        //
+        // 本机 MCP 服务不应经过系统代理。真实运行中，Surge/Clash 等代理可能会拦截
+        // http://localhost:* 请求并返回自己的错误页，导致本地 MCP 服务器连接失败。
+        // 仅对 loopback endpoint 禁用代理，远程 MCP 仍保留系统代理能力。
+        let mut client_builder =
+            Client::builder().timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT));
+
+        if Self::endpoint_uses_loopback_host(endpoint) {
+            log::debug!("[MCP HTTP] 检测到本机 endpoint，禁用系统代理: {}", endpoint);
+            client_builder = client_builder.no_proxy();
+        }
+
+        let client = client_builder.build().map_err(|e| {
+            MCPError::InvalidTransportConfig(format!("创建 HTTP 客户端失败: {}", e))
+        })?;
 
         Ok(Self {
             client: Some(client),
@@ -157,6 +168,34 @@ impl HttpTransport {
     /// 获取下一个请求 ID
     fn next_request_id(&self) -> u64 {
         self.request_id.fetch_add(1, Ordering::SeqCst)
+    }
+
+    /// 判断 endpoint 是否指向本机 loopback。
+    ///
+    /// 对本机 MCP 服务禁用系统代理，避免代理软件拦截 localhost/127.0.0.1/::1。
+    fn endpoint_uses_loopback_host(endpoint: &str) -> bool {
+        let Ok(url) = Url::parse(endpoint) else {
+            return false;
+        };
+
+        let Some(host) = url.host_str() else {
+            return false;
+        };
+
+        let normalized_host = host.trim_end_matches('.').to_ascii_lowercase();
+        if normalized_host == "localhost" || normalized_host.ends_with(".localhost") {
+            return true;
+        }
+
+        let ip_host = normalized_host
+            .strip_prefix('[')
+            .and_then(|host| host.strip_suffix(']'))
+            .unwrap_or(&normalized_host);
+
+        ip_host
+            .parse::<IpAddr>()
+            .map(|ip| ip.is_loopback())
+            .unwrap_or(false)
     }
 
     /// 从 SSE 事件流中提取最后一个 JSON-RPC 消息
@@ -470,6 +509,49 @@ impl MCPTransport for HttpTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
+
+    fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+        let mut buffer = Vec::new();
+        let mut chunk = [0_u8; 4096];
+
+        loop {
+            let size = stream.read(&mut chunk).unwrap();
+            if size == 0 {
+                break;
+            }
+
+            buffer.extend_from_slice(&chunk[..size]);
+
+            let header_end = buffer
+                .windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .map(|pos| pos + 4);
+
+            if let Some(header_end) = header_end {
+                let headers = String::from_utf8_lossy(&buffer[..header_end]);
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        if name.eq_ignore_ascii_case("content-length") {
+                            value.trim().parse::<usize>().ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0);
+
+                if buffer.len() >= header_end + content_length {
+                    break;
+                }
+            }
+        }
+
+        String::from_utf8_lossy(&buffer).to_string()
+    }
 
     /// 测试 HTTP 传输创建 - 有效端点
     #[test]
@@ -505,6 +587,89 @@ mod tests {
         assert_eq!(transport.next_request_id(), 1);
         assert_eq!(transport.next_request_id(), 2);
         assert_eq!(transport.next_request_id(), 3);
+    }
+
+    /// 测试本机 endpoint 检测 - 应禁用代理
+    #[test]
+    fn test_endpoint_uses_loopback_host_true() {
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://localhost:18060/mcp"
+        ));
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://localhost.:18060/mcp"
+        ));
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://api.localhost:18060/mcp"
+        ));
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://127.0.0.1:18060/mcp"
+        ));
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://127.42.0.1:18060/mcp"
+        ));
+        assert!(HttpTransport::endpoint_uses_loopback_host(
+            "http://[::1]:18060/mcp"
+        ));
+    }
+
+    /// 测试非本机 endpoint 检测 - 保留系统代理
+    #[test]
+    fn test_endpoint_uses_loopback_host_false() {
+        assert!(!HttpTransport::endpoint_uses_loopback_host(
+            "https://mcp.example.com/mcp"
+        ));
+        assert!(!HttpTransport::endpoint_uses_loopback_host(
+            "http://192.168.1.10:18060/mcp"
+        ));
+        assert!(!HttpTransport::endpoint_uses_loopback_host(
+            "http://10.0.0.5:18060/mcp"
+        ));
+        assert!(!HttpTransport::endpoint_uses_loopback_host("not-a-url"));
+    }
+
+    /// 测试本机 HTTP MCP 请求真实闭环。
+    ///
+    /// 使用 localhost endpoint 访问 127.0.0.1 mock 服务，覆盖：
+    /// - HttpTransport::new 为 loopback endpoint 构建真实 reqwest client
+    /// - send_request 发出 JSON-RPC POST
+    /// - 响应 JSON-RPC result 被正确解析
+    ///
+    /// 如果 localhost 被系统代理拦截，这个测试会无法命中 mock server。
+    #[tokio::test]
+    async fn test_loopback_http_request_completes_json_rpc() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let endpoint = format!("http://localhost:{}/mcp", port);
+
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_http_request(&mut stream);
+
+            assert!(request.starts_with("POST /mcp "));
+            assert!(request.contains("\"method\":\"initialize\""));
+            assert!(request.contains("application/json"));
+
+            let response_body = r#"{"jsonrpc":"2.0","id":1,"result":{"ok":true}}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nMcp-Session-Id: test-session\r\nConnection: close\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        let transport = HttpTransport::new(&endpoint, None, None).unwrap();
+        let result = transport
+            .send_request("initialize", serde_json::json!({}))
+            .await
+            .unwrap();
+
+        assert_eq!(result["ok"], true);
+        assert_eq!(
+            transport.session_id.read().await.as_deref(),
+            Some("test-session")
+        );
+        server.join().unwrap();
     }
 
     /// 测试认证头构建 - API Key
