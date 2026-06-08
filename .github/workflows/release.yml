@@ -89,7 +89,7 @@ jobs:
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
-      - name: 创建 Release
+      - name: 创建 Draft Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version }}
@@ -110,7 +110,7 @@ jobs:
             | Linux (Fedora/RHEL) | `.rpm` |
             | Linux (General) | `.AppImage` |
 
-          draft: false
+          draft: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -235,8 +235,8 @@ jobs:
         with:
           tagName: v${{ steps.version.outputs.version }}
           releaseName: "MobausStudio v${{ steps.version.outputs.version }}"
-          releaseDraft: false
-          prerelease: false
+          releaseDraft: true
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: ${{ matrix.args }}
 
   # 构建 Web 版本
@@ -274,6 +274,8 @@ jobs:
         with:
           files: MobausStudio-web.zip
           tag_name: v${{ needs.prepare-release.outputs.version }}
+          draft: true
+          prerelease: ${{ contains(needs.prepare-release.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -326,3 +328,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+
+  # 所有发布产物成功后再公开 Release
+  publish-release:
+    needs: [prepare-release, build-desktop, build-web, build-docker]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 发布 Draft Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.prepare-release.outputs.version }}';
+            const tag = `v${version}`;
+            const { owner, repo } = context.repo;
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag,
+            });
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              draft: false,
+              prerelease: version.includes('-'),
+            });
