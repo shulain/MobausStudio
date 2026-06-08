@@ -19,7 +19,9 @@
     "test:rust": "cd src-tauri && cargo test",
     "docs:dev": "cd user-guide && npm run dev",
     "docs:build": "cd user-guide && npm run build",
-    "docs:preview": "cd user-guide && npm run preview"
+    "docs:preview": "cd user-guide && npm run preview",
+    "verify:release-version": "node scripts/verify-release-version.mjs",
+    "test:release-version": "node --test scripts/verify-release-version.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

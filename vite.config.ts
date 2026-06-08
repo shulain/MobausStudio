@@ -45,4 +45,35 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+
+          if (id.includes("/@tauri-apps/")) {
+            return "vendor-tauri";
+          }
+
+          if (
+            id.includes("/react-syntax-highlighter/") ||
+            id.includes("/refractor/") ||
+            id.includes("/prismjs/")
+          ) {
+            return "vendor-syntax";
+          }
+
+          if (id.includes("/lucide-react/")) {
+            return "vendor-icons";
+          }
+
+          return "vendor";
+        },
+      },
+    },
+    chunkSizeWarningLimit: 700,
+  },
 }));

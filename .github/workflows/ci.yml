@@ -41,6 +41,9 @@ jobs:
       - name: ESLint 代码质量检查
         run: npm run lint
 
+      - name: 发布版本门禁测试
+        run: npm run test:release-version
+
       - name: 运行单元测试
         run: npm test
 

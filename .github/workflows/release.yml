@@ -183,6 +183,12 @@ jobs:
         shell: bash
         run: npm ci --silent > /dev/null 2>&1
 
+      - name: 验证发布版本配置
+        shell: bash
+        env:
+          EXPECTED_RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: npm run verify:release-version
+
       - name: 验证 Tauri 更新签名私钥
         shell: bash
         env:
