@@ -54,6 +54,16 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 版本号: $VERSION"
 
+      - name: 验证 Release 必需 Secrets
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::缺少 TAURI_SIGNING_PRIVATE_KEY。src-tauri/tauri.conf.json 已启用 createUpdaterArtifacts 并配置 updater pubkey，发布构建必须提供 Tauri 更新签名私钥。"
+            exit 1
+          fi
+
       - name: 检出代码
         uses: actions/checkout@v6
 
