@@ -251,6 +251,8 @@ jobs:
 
       - name: 构建 Web 版本
         shell: bash
+        env:
+          VITE_APP_VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           npm ci --silent > /dev/null 2>&1
           npm run build > /dev/null 2>&1
@@ -313,6 +315,8 @@ jobs:
             ${{ steps.image.outputs.name }}:${{ needs.prepare-release.outputs.version }}
             ${{ steps.image.outputs.name }}:${{ steps.image.outputs.major_minor }}
             ${{ steps.image.outputs.name }}:latest
+          build-args: |
+            APP_VERSION=${{ needs.prepare-release.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false

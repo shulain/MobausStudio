@@ -577,7 +577,7 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
             debug: import.meta.env.DEV,
           });
 
-          let appVersion = '0.0.0-dev';
+          let appVersion = import.meta.env.VITE_APP_VERSION || '0.0.0-dev';
           if (isTauri()) {
             try {
               const { getVersion } = await import('@tauri-apps/api/app');

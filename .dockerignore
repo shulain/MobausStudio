@@ -4,18 +4,37 @@ node_modules
 # 构建产物
 dist
 target
+pkg
+bin
+coverage
+test_output.log
 
 # Tauri 相关
-src-tauri/target
+src-tauri
 
 # 开发文件
 *.log
 .git
+.git.backup
 .gitignore
 .github
-coverage
+.agents
+.claude
+.codex
+.DS_Store
 *.md
 !README.md
+docs
+user-guide
+*.dmg
+*.app
+*.app.tar.gz
+*.zip
+*.rpm
+*.deb
+*.AppImage
+*.msi
+*.exe
 
 # IDE
 .vscode

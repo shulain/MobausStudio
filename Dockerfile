@@ -11,6 +11,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ARG APP_VERSION=0.0.0-dev
+ENV VITE_APP_VERSION=$APP_VERSION
+
 # 复制依赖文件
 COPY package*.json ./
 
@@ -25,6 +28,10 @@ RUN npm run build
 
 # 阶段2: 生产镜像
 FROM nginx:alpine
+
+ARG APP_VERSION=0.0.0-dev
+LABEL org.opencontainers.image.title="MobausStudio Web"
+LABEL org.opencontainers.image.version=$APP_VERSION
 
 # 复制自定义 nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
