@@ -57,10 +57,35 @@ jobs:
       - name: 验证 Release 必需 Secrets
         shell: bash
         env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::error::缺少 TAURI_SIGNING_PRIVATE_KEY。src-tauri/tauri.conf.json 已启用 createUpdaterArtifacts 并配置 updater pubkey，发布构建必须提供 Tauri 更新签名私钥。"
+          REQUIRED_SECRETS=(
+            APPLE_CERTIFICATE
+            APPLE_CERTIFICATE_PASSWORD
+            APPLE_SIGNING_IDENTITY
+            APPLE_ID
+            APPLE_PASSWORD
+            APPLE_TEAM_ID
+            TAURI_SIGNING_PRIVATE_KEY
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+          )
+          MISSING_SECRETS=()
+
+          for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
+            if [ -z "${!SECRET_NAME}" ]; then
+              MISSING_SECRETS+=("$SECRET_NAME")
+            fi
+          done
+
+          if [ "${#MISSING_SECRETS[@]}" -gt 0 ]; then
+            echo "::error::缺少 Release 必需 Secrets: ${MISSING_SECRETS[*]}。正式发布必须在创建 Draft Release 前完成签名和 updater secret 配置。"
             exit 1
           fi
 
