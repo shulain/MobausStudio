@@ -383,3 +383,45 @@ jobs:
               draft: false,
               prerelease: version.includes('-'),
             });
+
+  # 发布失败或取消时清理 Draft Release，避免留下半成品草稿
+  cleanup-release-draft:
+    needs: [prepare-release, build-desktop, build-web, build-docker]
+    if: ${{ failure() || cancelled() }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 删除失败发布的 Draft Release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const version = '${{ needs.prepare-release.outputs.version }}';
+            const tag = `v${version}`;
+            const { owner, repo } = context.repo;
+
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag,
+              });
+
+              if (!release.draft) {
+                core.info(`Release ${tag} is not a draft; skip cleanup.`);
+                return;
+              }
+
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+              core.info(`Deleted draft release ${tag} after release failure or cancellation.`);
+            } catch (error) {
+              if (error.status === 404) {
+                core.info(`No draft release found for ${tag}; skip cleanup.`);
+                return;
+              }
+              throw error;
+            }
