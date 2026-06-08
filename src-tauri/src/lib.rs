@@ -3158,9 +3158,10 @@ async fn request_kiro_idc_device_code(
 }
 
 /// Kiro Social Auth 状态存储（用于存储 PKCE 和 state）
-static KIRO_SOCIAL_AUTH_STATE: once_cell::sync::Lazy<
-    std::sync::Mutex<Option<(String, String, String, String, String)>>,
-> = once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
+type KiroSocialAuthState = Option<(String, String, String, String, String)>;
+
+static KIRO_SOCIAL_AUTH_STATE: once_cell::sync::Lazy<std::sync::Mutex<KiroSocialAuthState>> =
+    once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
 
 /// 生成 PKCE code_verifier 和 code_challenge
 fn generate_pkce() -> (String, String) {
