@@ -91,6 +91,63 @@ export interface UseAppBootstrapReturn {
   roundtableChatsRef: React.MutableRefObject<RoundtableChat[]>;
 }
 
+export type McpAutoStartStatusUpdate =
+  | {
+      serverId: string;
+      status: 'connected';
+      connectedAt: Date;
+      serverName?: string;
+      serverVersion?: string;
+      tools: MCPTool[];
+    }
+  | {
+      serverId: string;
+      status: 'error';
+      errorMessage: string;
+    };
+
+/**
+ * 合并 MCP 自动启动状态更新。
+ *
+ * 启动时会顺序连接多个 MCP。用累计更新集重新应用到最新状态，避免连续异步
+ * setState/持久化保存时只体现最后一次状态更新，导致“部分可用”误显示为异常。
+ */
+export function applyMcpAutoStartUpdates(
+  servers: MCPServer[],
+  updates: McpAutoStartStatusUpdate[],
+): MCPServer[] {
+  if (updates.length === 0) return servers;
+
+  const updateByServerId = new Map(updates.map(update => [update.serverId, update]));
+
+  return servers.map(server => {
+    const update = updateByServerId.get(server.id);
+    if (!update) return server;
+
+    if (update.status === 'connected') {
+      return {
+        ...server,
+        status: 'connected' as const,
+        lastActiveAt: update.connectedAt,
+        errorMessage: undefined,
+        serverInfo: update.serverName && update.serverVersion
+          ? {
+              name: update.serverName,
+              version: update.serverVersion,
+            }
+          : undefined,
+        tools: update.tools,
+      };
+    }
+
+    return {
+      ...server,
+      status: 'error' as const,
+      errorMessage: update.errorMessage,
+    };
+  });
+}
+
 // ==================== Hook 实现 ====================
 
 /**
@@ -222,6 +279,12 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
           // 延迟执行自动连接，确保状态已更新
           const timerId = setTimeout(async () => {
             timeoutIdsRef.current.delete(timerId);
+            const autoStartUpdates = new Map<string, McpAutoStartStatusUpdate>();
+            const commitAutoStartUpdate = (update: McpAutoStartStatusUpdate) => {
+              autoStartUpdates.set(update.serverId, update);
+              setMcpServers(prev => applyMcpAutoStartUpdates(prev, Array.from(autoStartUpdates.values())));
+            };
+
             for (const server of autoStartServers) {
               if (import.meta.env.DEV) {
                 logger.debug(LogTags.APP, '自动连接 MCP 服务器', { name: server.name });
@@ -252,39 +315,32 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
                     logger.warn(LogTags.APP, '自动启动 - 获取工具列表失败', e);
                   }
 
-                  setMcpServers(prev => prev.map(s =>
-                    s.id === server.id
-                      ? {
-                        ...s,
-                        status: 'connected' as const,
-                        lastActiveAt: new Date(),
-                        errorMessage: undefined,
-                        serverInfo: result.server_name && result.server_version ? {
-                          name: result.server_name,
-                          version: result.server_version,
-                        } : undefined,
-                        tools,
-                      }
-                      : s
-                  ));
+                  commitAutoStartUpdate({
+                    serverId: server.id,
+                    status: 'connected',
+                    connectedAt: new Date(),
+                    serverName: result.server_name,
+                    serverVersion: result.server_version,
+                    tools,
+                  });
 
                   if (import.meta.env.DEV) {
                     logger.debug(LogTags.APP, '自动启动成功', { name: server.name });
                   }
                 } else {
-                  setMcpServers(prev => prev.map(s =>
-                    s.id === server.id
-                      ? { ...s, status: 'error' as const, errorMessage: result.error || '自动连接失败' }
-                      : s
-                  ));
+                  commitAutoStartUpdate({
+                    serverId: server.id,
+                    status: 'error',
+                    errorMessage: result.error || '自动连接失败',
+                  });
                   logger.error(LogTags.APP, '自动启动失败', { name: server.name, error: result.error });
                 }
               } catch (error) {
-                setMcpServers(prev => prev.map(s =>
-                  s.id === server.id
-                    ? { ...s, status: 'error' as const, errorMessage: String(error) }
-                    : s
-                ));
+                commitAutoStartUpdate({
+                  serverId: server.id,
+                  status: 'error',
+                  errorMessage: String(error),
+                });
                 logger.error(LogTags.APP, '自动启动异常', { name: server.name, error });
               }
             }
