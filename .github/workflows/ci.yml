@@ -20,14 +20,10 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 安装 Node.js
-        uses: actions/setup-node@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -56,9 +52,7 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 安装系统依赖
         run: |

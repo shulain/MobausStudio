@@ -55,9 +55,7 @@ jobs:
           echo "📦 版本号: $VERSION"
 
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 提取 Changelog
         id: changelog
@@ -90,7 +88,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: 创建 Draft Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: "MobausStudio v${{ steps.version.outputs.version }}"
@@ -141,9 +139,7 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 准备构建环境
         id: version
@@ -161,9 +157,7 @@ jobs:
           fi
 
       - name: 安装 Node.js
-        uses: actions/setup-node@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: "npm"
@@ -247,14 +241,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 安装 Node.js
-        uses: actions/setup-node@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: "npm"
@@ -270,7 +260,7 @@ jobs:
           cd dist && zip -rq ../MobausStudio-web.zip .
 
       - name: 上传到 Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: MobausStudio-web.zip
           tag_name: v${{ needs.prepare-release.outputs.version }}
@@ -288,9 +278,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        uses: actions/checkout@v6
 
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
@@ -337,7 +325,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 发布 Draft Release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const version = '${{ needs.prepare-release.outputs.version }}';
