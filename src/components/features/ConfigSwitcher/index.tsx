@@ -18,6 +18,7 @@ import type { AIProvider, AIModelConfig, CustomProvider, MCPServer, Skill } from
 import { useI18n } from '../../../i18n';
 import { getDefaultProtocol, getEffectiveProtocol } from '../../../data/protocols';
 import { logger, LogTags } from '../../../utils/logger';
+import { isTauri } from '../../../utils/platform';
 
 interface ConfigSwitcherPageProps {
   providers: AIProvider[];
@@ -63,6 +64,10 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
   // 从后端加载启用状态
   useEffect(() => {
     const loadEnabledProviders = async () => {
+      if (!isTauri()) {
+        return;
+      }
+
       try {
         const state = await invoke<Record<string, string>>('get_enabled_providers');
         setEnabledProviders({
@@ -82,6 +87,11 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
   // 获取工具配置路径（从后端）
   useEffect(() => {
     const fetchConfigPaths = async () => {
+      if (!isTauri()) {
+        setConfigPaths([]);
+        return;
+      }
+
       try {
         const paths = await invoke<string[]>('get_tool_config_paths', { toolName: activeToolId });
         setConfigPaths(paths);
@@ -101,6 +111,13 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
 
     // 记录当前工具ID，用于后续清理
     const targetToolId = activeToolId;
+
+    if (!isTauri()) {
+      setMessageType('error');
+      setExportMessage(t.configSwitcher.desktopOnly);
+      setTimeout(() => setExportMessage(''), 5000);
+      return;
+    }
 
     setIsExporting(true);
     setMessageType('info');
@@ -179,6 +196,13 @@ export const ConfigSwitcherPage: React.FC<ConfigSwitcherPageProps> = ({
   const handleDisable = async () => {
     // 使当前请求失效，防止竞态条件
     currentExportIdRef.current = Date.now();
+
+    if (!isTauri()) {
+      setMessageType('error');
+      setExportMessage(t.configSwitcher.desktopOnly);
+      setTimeout(() => setExportMessage(''), 5000);
+      return;
+    }
 
     setIsExporting(true);
     setMessageType('info');

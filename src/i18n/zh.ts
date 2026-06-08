@@ -1040,6 +1040,7 @@ export const zh = {
         enableFailed: '❌ 启用失败: {error}',
         disableSuccess: '✅ 已禁用 {tool} 的配置',
         disableFailed: '❌ 禁用失败: {error}',
+        desktopOnly: '此操作需要桌面应用环境，浏览器预览不支持写入 CLI 配置',
 
         // 路径复制
         copyPath: '复制路径',

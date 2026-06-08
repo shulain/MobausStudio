@@ -15,10 +15,16 @@ import { ConfigSwitcherPage } from '../../../components/features/ConfigSwitcher'
 import { renderWithI18n } from '../../testUtils';
 import type { AIProvider, MCPServer, Skill } from '../../../types';
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '../../../utils/platform';
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+}));
+
+vi.mock('../../../utils/platform', () => ({
+  isTauri: vi.fn(() => true),
+  isWeb: vi.fn(() => false),
 }));
 
 /**
@@ -85,6 +91,7 @@ describe('ConfigSwitcher', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(isTauri).mockReturnValue(true);
     // Mock 默认返回值
     (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === 'get_enabled_providers') {
@@ -425,6 +432,32 @@ describe('ConfigSwitcher', () => {
     await waitFor(() => {
       expect(screen.getByText(/暂无可用的|No providers available/i)).toBeDefined();
     });
+  });
+
+  it('TC-UI-012: 浏览器预览不应调用 Tauri 配置命令并应显示受控提示', async () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+
+    renderWithI18n(
+      <ConfigSwitcherPage
+        providers={mockProviders}
+        mcpServers={mockMCPServers}
+        skills={mockSkills}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/配置切换|Config Switcher/)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Enable for|启用/ })).toBeDefined();
+    });
+
+    expect(invoke).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Enable for|启用/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/浏览器预览不支持写入 CLI 配置|browser preview cannot write CLI configuration/i)).toBeDefined();
+    });
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   /**

@@ -1042,6 +1042,7 @@ export const en: Translations = {
         enableFailed: '❌ Enable failed: {error}',
         disableSuccess: '✅ Configuration disabled for {tool}',
         disableFailed: '❌ Disable failed: {error}',
+        desktopOnly: 'This action requires the desktop app; browser preview cannot write CLI configuration',
 
         // Path copy
         copyPath: 'Copy path',
