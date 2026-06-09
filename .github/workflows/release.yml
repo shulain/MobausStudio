@@ -26,6 +26,10 @@ on:
         description: "版本号 (如 0.5.0)"
         required: true
 
+concurrency:
+  group: release-${{ github.event.inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   # 验证并准备发布
   prepare-release:
@@ -107,6 +111,24 @@ jobs:
                 exit 1
               fi
             done
+          fi
+
+      - name: 验证发布目标未存在
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release ${TAG} already exists. Use a new version instead of overwriting an existing release."
+            exit 1
+          fi
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Git tag ${TAG} already exists. Use a new version instead of reusing an existing tag."
+            exit 1
           fi
 
       - name: 检出代码
