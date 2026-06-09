@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import App from '../App';
 import { I18nProvider } from '../i18n';
+import { ThemeProvider } from '../theme';
 
 // 模拟 Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -73,50 +74,77 @@ Object.defineProperty(window, 'matchMedia', {
     })),
 });
 
-const renderWithI18n = (component: React.ReactElement) => {
-    return render(<I18nProvider>{component}</I18nProvider>);
+const renderWithProviders = (component: React.ReactElement) => {
+    return render(
+        <ThemeProvider>
+            <I18nProvider>{component}</I18nProvider>
+        </ThemeProvider>
+    );
 };
 
+const waitForAppReady = () => screen.findByPlaceholderText('搜索对话...');
+
 describe('App', () => {
-    it('should render Mobaus Studio header', () => {
-        renderWithI18n(<App />);
+    it('should render Mobaus Studio header', async () => {
+        renderWithProviders(<App />);
+        await waitForAppReady();
         expect(screen.getByText('Mobaus Studio')).toBeDefined();
     });
 
-    it('should render sidebar navigation', () => {
-        renderWithI18n(<App />);
+    it('should render sidebar navigation', async () => {
+        renderWithProviders(<App />);
+        await waitForAppReady();
         expect(screen.getAllByText('对话').length).toBeGreaterThan(0);
         expect(screen.getAllByText('Agent').length).toBeGreaterThan(0);
         expect(screen.getAllByText('Skills').length).toBeGreaterThan(0);
         expect(screen.getAllByText('MCP').length).toBeGreaterThan(0);
     });
 
-    it('should render new chat button', () => {
-        renderWithI18n(<App />);
+    it('should render new chat button', async () => {
+        renderWithProviders(<App />);
+        await waitForAppReady();
         expect(screen.getByText('新建对话')).toBeDefined();
     });
 
-    it('should render stats button in sidebar', () => {
-        renderWithI18n(<App />);
+    it('should render stats button in sidebar', async () => {
+        renderWithProviders(<App />);
+        await waitForAppReady();
         expect(screen.getByText('统计')).toBeDefined();
     });
 
-    it('should render settings button in sidebar', () => {
-        renderWithI18n(<App />);
+    it('should render settings button in sidebar', async () => {
+        renderWithProviders(<App />);
+        await waitForAppReady();
         expect(screen.getByText('设置')).toBeDefined();
     });
 
-    it('should render chat page by default', () => {
-        renderWithI18n(<App />);
+    it('should render chat page by default', async () => {
+        renderWithProviders(<App />);
         // 搜索对话输入框应该存在
-        expect(screen.getByPlaceholderText('搜索对话...')).toBeDefined();
+        expect(await waitForAppReady()).toBeDefined();
     });
 
     it('should render chat list', async () => {
-        renderWithI18n(<App />);
+        renderWithProviders(<App />);
         // 等待页面加载完成
         await screen.findByPlaceholderText('搜索对话...');
         // 验证新建对话按钮存在
         expect(screen.getByText('新建对话')).toBeDefined();
+    });
+
+    it('should navigate to primary production sections from the sidebar', async () => {
+        renderWithProviders(<App />);
+
+        fireEvent.click(screen.getAllByText('Agent')[0]);
+        expect(await screen.findByText('Agent 管理')).toBeDefined();
+
+        fireEvent.click(screen.getAllByText('Skills')[0]);
+        expect(await screen.findByText('技能管理')).toBeDefined();
+
+        fireEvent.click(screen.getAllByText('MCP')[0]);
+        expect(await screen.findByText('MCP 服务器')).toBeDefined();
+
+        fireEvent.click(screen.getByText('设置'));
+        expect(await screen.findByText('外观设置')).toBeDefined();
     });
 });
