@@ -336,9 +336,20 @@ jobs:
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           VERSION="${{ needs.prepare-release.outputs.version }}"
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          IMAGE_NAME="ghcr.io/${REPO_LOWER}"
 
-          echo "name=ghcr.io/${REPO_LOWER}" >> $GITHUB_OUTPUT
+          echo "name=$IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE_NAME}:${VERSION}"
+            if [[ "$VERSION" != *-* ]]; then
+              echo "${IMAGE_NAME}:${MAJOR_MINOR}"
+              echo "${IMAGE_NAME}:latest"
+            fi
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: 构建并推送镜像
         uses: docker/build-push-action@v7
@@ -346,10 +357,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ needs.prepare-release.outputs.version }}
-            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.major_minor }}
-            ${{ steps.image.outputs.name }}:latest
+          tags: ${{ steps.image.outputs.tags }}
           build-args: |
             APP_VERSION=${{ needs.prepare-release.outputs.version }}
           cache-from: type=gha
