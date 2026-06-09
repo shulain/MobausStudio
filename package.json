@@ -23,7 +23,8 @@
     "docs:preview": "cd user-guide && npm run preview",
     "verify:release-version": "node scripts/verify-release-version.mjs",
     "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
-    "test:release-version": "node --test scripts/verify-release-version.test.mjs"
+    "test:release-version": "node --test scripts/verify-release-version.test.mjs",
+    "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

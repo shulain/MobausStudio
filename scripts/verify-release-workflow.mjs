@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const WORKFLOW_PATH = '.github/workflows/release.yml';
+const WORKFLOW_PATH = process.env.RELEASE_WORKFLOW_PATH || '.github/workflows/release.yml';
 const workflow = readFileSync(WORKFLOW_PATH, 'utf8');
 
 function fail(message) {
