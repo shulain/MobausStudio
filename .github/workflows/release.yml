@@ -89,6 +89,26 @@ jobs:
             exit 1
           fi
 
+      - name: 验证 Windows MSI 兼容版本号
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE="${VERSION#*-}"
+            if [[ ! "$PRERELEASE" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+              echo "::error::Windows MSI requires numeric-only prerelease identifiers; use a version such as ${VERSION%%-*}-1 instead of ${VERSION}."
+              exit 1
+            fi
+
+            IFS='.' read -ra PARTS <<< "$PRERELEASE"
+            for PART in "${PARTS[@]}"; do
+              if (( 10#$PART > 65535 )); then
+                echo "::error::Windows MSI prerelease identifier '${PART}' must be <= 65535."
+                exit 1
+              fi
+            done
+          fi
+
       - name: 检出代码
         uses: actions/checkout@v6
 
@@ -251,6 +271,21 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH 2>/dev/null
           security list-keychain -d user -s $KEYCHAIN_PATH 2>/dev/null
 
+      - name: 验证 Apple Notarization 可用性 (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if ! xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" >/dev/null; then
+            echo "::error::Apple notarization preflight failed. Check Apple Developer Program agreements and APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID secrets."
+            exit 1
+          fi
+
       - name: 构建应用
         uses: tauri-apps/tauri-action@v0
         env:
@@ -408,28 +443,26 @@ jobs:
             const tag = `v${version}`;
             const { owner, repo } = context.repo;
 
-            try {
-              const { data: release } = await github.rest.repos.getReleaseByTag({
-                owner,
-                repo,
-                tag,
-              });
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === tag);
 
-              if (!release.draft) {
-                core.info(`Release ${tag} is not a draft; skip cleanup.`);
-                return;
-              }
-
-              await github.rest.repos.deleteRelease({
-                owner,
-                repo,
-                release_id: release.id,
-              });
-              core.info(`Deleted draft release ${tag} after release failure or cancellation.`);
-            } catch (error) {
-              if (error.status === 404) {
-                core.info(`No draft release found for ${tag}; skip cleanup.`);
-                return;
-              }
-              throw error;
+            if (!release) {
+              core.info(`No release found for ${tag}; skip cleanup.`);
+              return;
             }
+
+            if (!release.draft) {
+              core.info(`Release ${tag} is not a draft; skip cleanup.`);
+              return;
+            }
+
+            await github.rest.repos.deleteRelease({
+              owner,
+              repo,
+              release_id: release.id,
+            });
+            core.info(`Deleted draft release ${tag} after release failure or cancellation.`);
