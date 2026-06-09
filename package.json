@@ -24,7 +24,8 @@
     "verify:release-version": "node scripts/verify-release-version.mjs",
     "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
     "test:release-version": "node --test scripts/verify-release-version.test.mjs",
-    "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs"
+    "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs",
+    "smoke:web:production": "node scripts/smoke-production-web.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
@@ -59,6 +60,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.4.0",
     "jsdom": "^27.4.0",
+    "playwright-core": "^1.60.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.3",

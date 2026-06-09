@@ -134,6 +134,7 @@ Before triggering Release, run:
 npm run verify:release-workflow
 npm run test:release-workflow
 npm run test:release-version
+npm run smoke:web:production
 ```
 
 For full repository CI parity, rely on GitHub Actions CI:
