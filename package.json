@@ -22,6 +22,7 @@
     "docs:build": "cd user-guide && npm run build",
     "docs:preview": "cd user-guide && npm run preview",
     "verify:release-version": "node scripts/verify-release-version.mjs",
+    "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
     "test:release-version": "node --test scripts/verify-release-version.test.mjs"
   },
   "dependencies": {

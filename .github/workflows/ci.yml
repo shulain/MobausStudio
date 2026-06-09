@@ -42,6 +42,9 @@ jobs:
       - name: 发布版本门禁测试
         run: npm run test:release-version
 
+      - name: Release Workflow 结构门禁
+        run: npm run verify:release-workflow
+
       - name: 运行单元测试
         run: npm test
 
