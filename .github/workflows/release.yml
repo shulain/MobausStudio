@@ -341,11 +341,61 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 构建 Docker 镜像
+  # 验证 Docker 镜像构建
   build-docker:
     needs: [prepare-release]
     permissions:
       contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 设置镜像名称
+        id: image
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          IMAGE_NAME="ghcr.io/${REPO_LOWER}"
+
+          echo "name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE_NAME}:${VERSION}"
+            if [[ "$VERSION" != *-* ]]; then
+              echo "${IMAGE_NAME}:${MAJOR_MINOR}"
+              echo "${IMAGE_NAME}:latest"
+            fi
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: 验证 Docker 镜像构建
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.image.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ needs.prepare-release.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  # 所有发布产物成功后再公开 Release
+  publish-release:
+    needs: [prepare-release, build-desktop, build-web, build-docker]
+    permissions:
+      contents: write
       packages: write
     runs-on: ubuntu-latest
     steps:
@@ -373,9 +423,6 @@ jobs:
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           IMAGE_NAME="ghcr.io/${REPO_LOWER}"
 
-          echo "name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
-
           {
             echo "tags<<EOF"
             echo "${IMAGE_NAME}:${VERSION}"
@@ -386,7 +433,7 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: 构建并推送镜像
+      - name: 推送 Docker 镜像
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -399,13 +446,6 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
-  # 所有发布产物成功后再公开 Release
-  publish-release:
-    needs: [prepare-release, build-desktop, build-web, build-docker]
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
       - name: 发布 Draft Release
         uses: actions/github-script@v9
         with:
@@ -429,7 +469,7 @@ jobs:
 
   # 发布失败或取消时清理 Draft Release，避免留下半成品草稿
   cleanup-release-draft:
-    needs: [prepare-release, build-desktop, build-web, build-docker]
+    needs: [prepare-release, build-desktop, build-web, build-docker, publish-release]
     if: ${{ failure() || cancelled() }}
     permissions:
       contents: write
