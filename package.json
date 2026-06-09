@@ -25,7 +25,8 @@
     "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
     "test:release-version": "node --test scripts/verify-release-version.test.mjs",
     "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs",
-    "smoke:web:production": "node scripts/smoke-production-web.mjs"
+    "smoke:web:production": "node scripts/smoke-production-web.mjs",
+    "audit:web": "npm audit --audit-level=moderate"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
