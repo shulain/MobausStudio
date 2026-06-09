@@ -31,7 +31,7 @@ jobs:
   prepare-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       changelog: ${{ steps.changelog.outputs.content }}
@@ -142,13 +142,39 @@ jobs:
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
+  # Apple notarization 必须在创建 Draft Release 和启动矩阵构建前可用
+  apple-notarization-preflight:
+    needs: [prepare-release]
+    runs-on: macos-latest
+    steps:
+      - name: 验证 Apple Notarization 可用性
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if ! xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" >/dev/null; then
+            echo "::error::Apple notarization preflight failed. Check Apple Developer Program agreements and APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID secrets."
+            exit 1
+          fi
+
+  # 创建 Draft Release
+  create-draft-release:
+    needs: [prepare-release, apple-notarization-preflight]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - name: 创建 Draft Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: "MobausStudio v${{ steps.version.outputs.version }}"
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          name: "MobausStudio v${{ needs.prepare-release.outputs.version }}"
           body: |
-            ${{ steps.changelog.outputs.content }}
+            ${{ needs.prepare-release.outputs.changelog }}
 
             ---
 
@@ -164,13 +190,13 @@ jobs:
             | Linux (General) | `.AppImage` |
 
           draft: true
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          prerelease: ${{ contains(needs.prepare-release.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # 构建桌面应用
   build-desktop:
-    needs: [prepare-release]
+    needs: [prepare-release, create-draft-release]
     permissions:
       contents: write
     strategy:
@@ -305,7 +331,7 @@ jobs:
 
   # 构建 Web 版本
   build-web:
-    needs: [prepare-release]
+    needs: [prepare-release, create-draft-release]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -343,7 +369,7 @@ jobs:
 
   # 验证 Docker 镜像构建
   build-docker:
-    needs: [prepare-release]
+    needs: [prepare-release, create-draft-release]
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -396,7 +422,7 @@ jobs:
 
   # 所有发布产物成功后再公开 Release
   publish-release:
-    needs: [prepare-release, build-desktop, build-web, build-docker]
+    needs: [prepare-release, create-draft-release, build-desktop, build-web, build-docker]
     permissions:
       contents: write
       packages: write
@@ -474,7 +500,7 @@ jobs:
 
   # 发布失败或取消时清理 Draft Release，避免留下半成品草稿
   cleanup-release-draft:
-    needs: [prepare-release, build-desktop, build-web, build-docker, publish-release]
+    needs: [prepare-release, create-draft-release, build-desktop, build-web, build-docker, publish-release]
     if: ${{ failure() || cancelled() }}
     permissions:
       contents: write
