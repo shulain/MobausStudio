@@ -6,6 +6,7 @@
 # - 单元测试
 # - 代码风格检查（可选）
 # - Docker Web 镜像构建烟测
+# - RustSec 漏洞审计
 
 name: CI
 
@@ -94,6 +95,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+
+      - name: 安装 cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: RustSec 漏洞审计
+        run: |
+          cd src-tauri
+          cargo audit
 
       - name: Rust 编译检查
         run: |
