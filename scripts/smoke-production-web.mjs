@@ -136,7 +136,11 @@ async function runBrowserSmoke(url) {
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
 
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+    locale: 'zh-CN',
+  });
+  const page = await context.newPage();
   const consoleErrors = [];
   const pageErrors = [];
 
@@ -167,6 +171,7 @@ async function runBrowserSmoke(url) {
   mkdirSync(dirname(screenshotPath), { recursive: true });
   await page.screenshot({ path: screenshotPath, fullPage: true });
 
+  await context.close();
   await browser.close();
 
   if (consoleErrors.length > 0 || pageErrors.length > 0) {
