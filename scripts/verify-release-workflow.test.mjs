@@ -77,3 +77,12 @@ test('rejects Docker push before release asset verification', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /release asset verification before Docker push has the wrong order/);
 });
+
+test('rejects cleanup without workflow_dispatch tag deletion', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace('await github.rest.git.deleteRef', 'await github.rest.git.getRef'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /failed workflow_dispatch tag cleanup is missing/);
+});

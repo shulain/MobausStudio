@@ -568,20 +568,38 @@ jobs:
               per_page: 100,
             });
             const release = releases.find((candidate) => candidate.tag_name === tag);
+            let shouldDeleteWorkflowDispatchTag = context.eventName === 'workflow_dispatch';
 
             if (!release) {
-              core.info(`No release found for ${tag}; skip cleanup.`);
-              return;
-            }
-
-            if (!release.draft) {
+              core.info(`No release found for ${tag}; skip draft release cleanup.`);
+            } else if (!release.draft) {
               core.info(`Release ${tag} is not a draft; skip cleanup.`);
+              shouldDeleteWorkflowDispatchTag = false;
+            } else {
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+              core.info(`Deleted draft release ${tag} after release failure or cancellation.`);
+            }
+
+            if (!shouldDeleteWorkflowDispatchTag) {
+              core.info(`Skip tag cleanup for ${tag}; only workflow_dispatch-created release tags are cleaned up.`);
               return;
             }
 
-            await github.rest.repos.deleteRelease({
-              owner,
-              repo,
-              release_id: release.id,
-            });
-            core.info(`Deleted draft release ${tag} after release failure or cancellation.`);
+            try {
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`,
+              });
+              core.info(`Deleted workflow_dispatch-created tag ${tag} after release failure or cancellation.`);
+            } catch (error) {
+              if (error.status === 404) {
+                core.info(`No tag ref found for ${tag}; skip tag cleanup.`);
+                return;
+              }
+              throw error;
+            }

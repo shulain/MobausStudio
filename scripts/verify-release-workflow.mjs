@@ -118,6 +118,8 @@ assertIncludes(
 );
 assertIncludes(cleanupReleaseDraft, '${{ failure() || cancelled() }}', 'cleanup failure/cancel condition');
 assertIncludes(cleanupReleaseDraft, 'deleteRelease', 'failed draft release cleanup');
+assertIncludes(cleanupReleaseDraft, "context.eventName === 'workflow_dispatch'", 'workflow_dispatch tag cleanup guard');
+assertIncludes(cleanupReleaseDraft, 'deleteRef', 'failed workflow_dispatch tag cleanup');
 
 if (process.exitCode) {
   process.exit();

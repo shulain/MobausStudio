@@ -101,7 +101,7 @@ The Release workflow currently enforces these guardrails:
 - Apple notarization availability is checked before any Draft Release is created.
 - Desktop, Web, and Docker release jobs depend on Draft Release creation.
 - Docker image push only happens in `publish-release`, after all release gates pass.
-- Failed or cancelled draft releases are cleaned up.
+- Failed or cancelled draft releases are cleaned up; failed manual `workflow_dispatch` releases also clean up the automatically created tag.
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
 - The Release `build-web` job runs a browser smoke against the versioned Web `dist` before uploading `MobausStudio-web.zip`, and uploads the smoke screenshot/report as an artifact.
