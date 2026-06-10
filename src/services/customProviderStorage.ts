@@ -2,7 +2,7 @@
  * 自定义提供商存储服务 (v0.9.3)
  *
  * 管理用户添加的自定义 AI 提供商配置
- * 支持 Tauri 文件系统和 localStorage 双重存储
+ * 支持 Tauri 文件系统和浏览器 localStorage 双重存储
  *
  * @module services/customProviderStorage
  * @version 0.9.3
@@ -18,7 +18,7 @@ const STORAGE_KEY = 'mobaus_custom_providers';
  * 检查是否在 Tauri 环境中运行
  */
 function isTauri(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 }
 
 /**
@@ -38,8 +38,8 @@ class CustomProviderStorage {
             try {
                 await invoke('save_custom_providers', { providers: providersStr });
             } catch (error) {
-                logger.error(LogTags.STORAGE, 'Tauri save failed, falling back to localStorage', error);
-                localStorage.setItem(STORAGE_KEY, providersStr);
+                logger.error(LogTags.STORAGE, 'Tauri custom provider save failed', error);
+                throw error;
             }
         } else {
             // 浏览器环境：使用 localStorage
@@ -61,8 +61,8 @@ class CustomProviderStorage {
                 try {
                     providersStr = await invoke<string>('load_custom_providers');
                 } catch (error) {
-                    logger.warn(LogTags.STORAGE, 'Tauri load failed, falling back to localStorage', error);
-                    providersStr = localStorage.getItem(STORAGE_KEY);
+                    logger.error(LogTags.STORAGE, 'Tauri custom provider load failed', error);
+                    throw error;
                 }
             } else {
                 // 浏览器环境：从 localStorage 加载
@@ -146,6 +146,13 @@ class CustomProviderStorage {
     async get(id: string): Promise<CustomProvider | null> {
         const providers = await this.load();
         return providers.find(p => p.id === id) || null;
+    }
+
+    /**
+     * 清除所有自定义提供商
+     */
+    async clear(): Promise<void> {
+        await this.save([]);
     }
 
     /**

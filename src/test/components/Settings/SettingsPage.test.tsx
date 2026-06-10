@@ -12,7 +12,11 @@ import {
     skillsStorage,
     mcpServersStorage,
     roundtableChatsStorage,
+    providerCredentialsStorage,
+    settingsStorage,
 } from '../../../services/storage';
+import { customProviderStorage } from '../../../services/customProviderStorage';
+import { modelFetcher } from '../../../services/modelFetcher';
 
 // v2.6.2: Mock Tauri dialog 插件
 vi.mock('@tauri-apps/plugin-dialog', () => ({
@@ -53,11 +57,28 @@ vi.mock('../../../services/storage', () => ({
         load: vi.fn().mockResolvedValue([]),
         save: vi.fn().mockResolvedValue(undefined),
     },
+    providerCredentialsStorage: {
+        load: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue(undefined),
+        clear: vi.fn().mockResolvedValue(undefined),
+    },
     settingsStorage: {
         load: vi.fn().mockReturnValue({ theme: 'system', language: 'zh' }),
         loadAsync: vi.fn().mockResolvedValue({ theme: 'system', language: 'zh' }),
         save: vi.fn().mockResolvedValue(undefined),
         saveSync: vi.fn(),
+    },
+}));
+
+vi.mock('../../../services/customProviderStorage', () => ({
+    customProviderStorage: {
+        clear: vi.fn().mockResolvedValue(undefined),
+    },
+}));
+
+vi.mock('../../../services/modelFetcher', () => ({
+    modelFetcher: {
+        clearCache: vi.fn().mockResolvedValue(undefined),
     },
 }));
 
@@ -312,6 +333,10 @@ describe('SettingsPage', () => {
         expect(skillsStorage.save).toHaveBeenCalledWith([]);
         expect(mcpServersStorage.save).toHaveBeenCalledWith([]);
         expect(roundtableChatsStorage.save).toHaveBeenCalledWith([]);
+        expect(providerCredentialsStorage.clear).toHaveBeenCalled();
+        expect(customProviderStorage.clear).toHaveBeenCalled();
+        expect(settingsStorage.save).toHaveBeenCalledWith({ theme: 'system', language: 'zh' });
+        expect(modelFetcher.clearCache).toHaveBeenCalledWith(undefined, true);
 
         // v2.6.5: 验证 localStorage 也被清理
         expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_models');
@@ -319,6 +344,15 @@ describe('SettingsPage', () => {
         expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_agents');
         expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_skills');
         expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_mcp_servers');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_settings');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_provider_credentials');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_custom_providers');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_roundtable_chats');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_model_cache');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_models_dev_cache');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_device_id');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_first_launch');
+        expect(localStorageMock.removeItem).toHaveBeenCalledWith('mobaus_backup');
         expect(mockReload).toHaveBeenCalled();
     });
 

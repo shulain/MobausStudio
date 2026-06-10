@@ -18,7 +18,10 @@ import {
     mcpServersStorage,
     roundtableChatsStorage,  // v2.6.5: 圆桌对话存储
     settingsStorage,         // v2.6.5: 应用设置存储
+    providerCredentialsStorage,
 } from '../../../services/storage';
+import { customProviderStorage } from '../../../services/customProviderStorage';
+import { modelFetcher } from '../../../services/modelFetcher';
 // v2.6.2: 导入 Tauri dialog 用于文件保存对话框和消息提示
 import { save, message } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
@@ -44,6 +47,15 @@ const STORAGE_KEYS = {
     AGENTS: 'mobaus_agents',
     SKILLS: 'mobaus_skills',
     MCP: 'mobaus_mcp_servers',    // v2.6.1: 修正键名，与 storage.ts 保持一致
+    SETTINGS: 'mobaus_settings',
+    API_KEYS: 'mobaus_api_keys',
+    PROVIDER_CREDENTIALS: 'mobaus_provider_credentials',
+    CUSTOM_PROVIDERS: 'mobaus_custom_providers',
+    ROUNDTABLE_CHATS: 'mobaus_roundtable_chats',
+    MODEL_CACHE: 'mobaus_model_cache',
+    MODELS_DEV_CACHE: 'mobaus_models_dev_cache',
+    DEVICE_ID: 'mobaus_device_id',
+    FIRST_LAUNCH: 'mobaus_first_launch',
 };
 
 const BACKUP_STORAGE_KEY = 'mobaus_backup';
@@ -484,13 +496,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 await skillsStorage.save([]);
                 await mcpServersStorage.save([]);
                 await roundtableChatsStorage.save([]);
+                await providerCredentialsStorage.clear();
+                await customProviderStorage.clear();
+                await settingsStorage.save({ theme: 'system', language: 'zh' });
+                await modelFetcher.clearCache(undefined, true);
 
                 // 同时清理 localStorage（确保浏览器环境和 Tauri 环境都被清理）
-                localStorage.removeItem(STORAGE_KEYS.MODELS);
-                localStorage.removeItem(STORAGE_KEYS.CHATS);
-                localStorage.removeItem(STORAGE_KEYS.AGENTS);
-                localStorage.removeItem(STORAGE_KEYS.SKILLS);
-                localStorage.removeItem(STORAGE_KEYS.MCP);
+                Object.values(STORAGE_KEYS).forEach((key) => {
+                    localStorage.removeItem(key);
+                });
+                localStorage.removeItem(BACKUP_STORAGE_KEY);
 
                 logger.info(LogTags.SETTINGS, '数据清理完成');
 
