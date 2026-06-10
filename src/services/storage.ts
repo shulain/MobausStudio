@@ -1292,7 +1292,10 @@ export const providerCredentialsStorage = {
      */
     async add(credential: ProviderCredential): Promise<void> {
         const credentials = await this.load();
-        const existingIndex = credentials.findIndex(c => c.providerId === credential.providerId);
+        const normalizedProviderId = credential.providerId.toLowerCase();
+        const existingIndex = credentials.findIndex(
+            c => c.providerId.toLowerCase() === normalizedProviderId
+        );
 
         if (existingIndex >= 0) {
             // 更新现有凭证
@@ -1321,7 +1324,10 @@ export const providerCredentialsStorage = {
      */
     async remove(providerId: string): Promise<void> {
         const credentials = await this.load();
-        const filtered = credentials.filter(c => c.providerId !== providerId);
+        const normalizedProviderId = providerId.toLowerCase();
+        const filtered = credentials.filter(
+            c => c.providerId.toLowerCase() !== normalizedProviderId
+        );
 
         if (filtered.length < credentials.length) {
             await this.save(filtered);

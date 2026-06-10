@@ -1783,6 +1783,58 @@ describe('Provider Credentials Storage Detailed Tests', () => {
         expect(loaded[0].apiKey).toBe('sk-new-key');
     });
 
+    it('TC-PROV-013b: 更新大小写不同的同一 Provider 凭证不应产生重复记录', async () => {
+        const { providerCredentialsStorage } = await import('../../services/storage');
+
+        await providerCredentialsStorage.add({
+            providerId: 'OpenAI',
+            type: 'api',
+            apiKey: 'sk-old-key',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+
+        await providerCredentialsStorage.add({
+            providerId: 'openai',
+            type: 'api',
+            apiKey: 'sk-new-key',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+
+        const loaded = await providerCredentialsStorage.load();
+        expect(loaded.length).toBe(1);
+        expect(loaded[0].providerId).toBe('openai');
+        expect(loaded[0].apiKey).toBe('sk-new-key');
+    });
+
+    it('TC-PROV-013c: 删除大小写不同的 Provider ID 应删除对应凭证', async () => {
+        const { providerCredentialsStorage } = await import('../../services/storage');
+
+        await providerCredentialsStorage.save([
+            {
+                providerId: 'OpenAI',
+                type: 'api',
+                apiKey: 'sk-openai',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+            {
+                providerId: 'anthropic',
+                type: 'api',
+                apiKey: 'sk-anthropic',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        ]);
+
+        await providerCredentialsStorage.remove('openai');
+
+        const loaded = await providerCredentialsStorage.load();
+        expect(loaded).toHaveLength(1);
+        expect(loaded[0].providerId).toBe('anthropic');
+    });
+
     /**
      * TC-PROV-014: 保存多个不同类型的凭证
      */
