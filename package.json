@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "build:app:local": "tauri build --bundles app --config '{\"bundle\":{\"createUpdaterArtifacts\":false}}'",
     "verify:macos-app-bundle": "bash scripts/verify-macos-app-bundle.sh",
+    "smoke:macos-app-launch": "bash scripts/smoke-macos-app-launch.sh",
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",

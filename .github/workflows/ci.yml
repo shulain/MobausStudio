@@ -129,6 +129,9 @@ jobs:
       - name: 验证 macOS App Bundle 结构
         run: npm run verify:macos-app-bundle
 
+      - name: macOS App LaunchServices 启动烟测
+        run: npm run smoke:macos-app-launch
+
   # 可选：Rust 编译检查（Tauri 后端）
   rust-check:
     runs-on: ubuntu-latest

@@ -112,7 +112,7 @@ CI currently enforces these non-release smoke gates on every `main` push and pul
 - `test`: npm vulnerability audit, TypeScript, ESLint, release workflow guard verifier, release version verifier, frontend tests, and Web build.
 - `web-production-smoke`: production Vite build, preview server startup, real browser navigation through Chat, Agent, Skills, MCP, and Settings, plus browser console/page-error failure capture.
 - `docker-web-smoke`: Docker Web image build and OCI version label verification.
-- `macos-app-local-build`: unsigned local macOS `.app` build and bundle structure verification.
+- `macos-app-local-build`: unsigned local macOS `.app` build, bundle structure verification, and LaunchServices open smoke when the runner has a GUI-capable session.
 - `rust-check`: RustSec audit, `cargo check`, Rust format check, Clippy with warnings denied, and Rust tests.
 
 ## Revalidation steps after Apple is fixed
@@ -162,6 +162,7 @@ npm run audit:web
 npm run smoke:web:production
 npm run build:app:local
 npm run verify:macos-app-bundle
+npm run smoke:macos-app-launch
 ```
 
 For full repository CI parity, rely on GitHub Actions CI:
