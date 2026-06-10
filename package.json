@@ -27,10 +27,12 @@
     "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
     "verify:release-assets": "node scripts/verify-release-assets.mjs",
     "verify:updater-manifest": "node scripts/verify-updater-manifest.mjs",
+    "verify:tauri-security": "node scripts/verify-tauri-security.mjs",
     "test:release-version": "node --test scripts/verify-release-version.test.mjs",
     "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs",
     "test:release-assets": "node --test scripts/verify-release-assets.test.mjs",
     "test:updater-manifest": "node --test scripts/verify-updater-manifest.test.mjs",
+    "test:tauri-security": "node --test scripts/verify-tauri-security.test.mjs",
     "smoke:web:production": "node scripts/smoke-production-web.mjs",
     "audit:web": "npm audit --audit-level=moderate"
   },

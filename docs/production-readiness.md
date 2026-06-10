@@ -117,6 +117,7 @@ CI currently enforces these non-release smoke gates on every `main` push and pul
 - `docker-web-smoke`: Docker Web image build and OCI version label verification.
 - `macos-app-local-build`: unsigned local macOS `.app` build, bundle structure verification, and LaunchServices open smoke when the runner has a GUI-capable session.
 - `rust-check`: RustSec audit, `cargo check`, Rust format check, Clippy with warnings denied, and Rust tests.
+- `test`: includes a Tauri security gate that rejects disabled CSP and unsafe script sources.
 
 ## Revalidation steps after Apple is fixed
 

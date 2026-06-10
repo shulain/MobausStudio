@@ -58,6 +58,11 @@ jobs:
       - name: Updater Manifest 门禁测试
         run: npm run test:updater-manifest
 
+      - name: Tauri 安全配置门禁
+        run: |
+          npm run verify:tauri-security
+          npm run test:tauri-security
+
       - name: 运行单元测试
         run: npm test
 
