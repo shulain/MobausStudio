@@ -375,6 +375,21 @@ jobs:
           npm ci --silent > /dev/null 2>&1
           npm run build > /dev/null 2>&1
 
+      - name: 发布 Web 产物浏览器烟测
+        env:
+          SMOKE_SKIP_BUILD: '1'
+          PRODUCTION_SMOKE_SCREENSHOT: artifacts/release-web-smoke/mobausstudio-release-web-smoke.png
+          PRODUCTION_SMOKE_REPORT: artifacts/release-web-smoke/report.json
+        run: npm run smoke:web:production
+
+      - name: 上传发布 Web 烟测证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web-smoke-${{ needs.prepare-release.outputs.version }}
+          path: artifacts/release-web-smoke
+          if-no-files-found: warn
+
       - name: 打包并上传
         run: |
           cd dist && zip -rq ../MobausStudio-web.zip .

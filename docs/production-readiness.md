@@ -104,6 +104,7 @@ The Release workflow currently enforces these guardrails:
 - Failed or cancelled draft releases are cleaned up.
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
+- The Release `build-web` job runs a browser smoke against the versioned Web `dist` before uploading `MobausStudio-web.zip`, and uploads the smoke screenshot/report as an artifact.
 
 ## CI production smoke gates
 
@@ -142,7 +143,7 @@ Production-ready release criteria:
 - `apple-notarization-preflight`: success
 - `create-draft-release`: success
 - `build-desktop`: success on macOS aarch64, macOS x86_64, Windows, and Ubuntu
-- `build-web`: success
+- `build-web`: success, including release Web browser smoke and smoke artifact upload
 - `build-docker`: success
 - `publish-release`: success
 - `cleanup-release-draft`: skipped
