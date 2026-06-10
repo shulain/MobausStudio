@@ -53,26 +53,26 @@ class CustomProviderStorage {
      * @returns 自定义提供商列表
      */
     async load(): Promise<CustomProvider[]> {
+        let providersStr: string | null = null;
+
+        // Tauri 环境：优先从文件系统加载
+        if (isTauri()) {
+            try {
+                providersStr = await invoke<string>('load_custom_providers');
+            } catch (error) {
+                logger.error(LogTags.STORAGE, 'Tauri custom provider load failed', error);
+                throw error;
+            }
+        } else {
+            // 浏览器环境：从 localStorage 加载
+            providersStr = localStorage.getItem(STORAGE_KEY);
+        }
+
+        if (!providersStr) {
+            return [];
+        }
+
         try {
-            let providersStr: string | null = null;
-
-            // Tauri 环境：优先从文件系统加载
-            if (isTauri()) {
-                try {
-                    providersStr = await invoke<string>('load_custom_providers');
-                } catch (error) {
-                    logger.error(LogTags.STORAGE, 'Tauri custom provider load failed', error);
-                    throw error;
-                }
-            } else {
-                // 浏览器环境：从 localStorage 加载
-                providersStr = localStorage.getItem(STORAGE_KEY);
-            }
-
-            if (!providersStr) {
-                return [];
-            }
-
             const providers = JSON.parse(providersStr) as CustomProvider[];
 
             // 转换日期字符串为 Date 对象
@@ -82,7 +82,7 @@ class CustomProviderStorage {
                 updatedAt: new Date(p.updatedAt),
             }));
         } catch (error) {
-            logger.error(LogTags.STORAGE, 'Failed to load custom providers', error);
+            logger.error(LogTags.STORAGE, 'Failed to parse custom providers', error);
             return [];
         }
     }

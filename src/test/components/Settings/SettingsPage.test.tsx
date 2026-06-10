@@ -72,6 +72,8 @@ vi.mock('../../../services/storage', () => ({
 
 vi.mock('../../../services/customProviderStorage', () => ({
     customProviderStorage: {
+        load: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue(undefined),
         clear: vi.fn().mockResolvedValue(undefined),
     },
 }));
@@ -219,42 +221,118 @@ describe('SettingsPage', () => {
     });
 
     it('creates a full storage-service backup before importing', async () => {
-        vi.mocked(modelsStorage.load).mockResolvedValueOnce([{ id: 'model-1', name: 'Model 1' } as any]);
-        vi.mocked(chatsStorage.load).mockResolvedValueOnce([{ id: 'chat-1', title: 'Chat 1' } as any]);
-        vi.mocked(agentsStorage.load).mockResolvedValueOnce([{ id: 'agent-1', name: 'Agent 1' } as any]);
-        vi.mocked(skillsStorage.load).mockResolvedValueOnce([{ id: 'skill-1', name: 'Skill 1' } as any]);
-        vi.mocked(mcpServersStorage.load).mockResolvedValueOnce([{ id: 'mcp-1', name: 'MCP 1' } as any]);
-        vi.mocked(roundtableChatsStorage.load).mockResolvedValueOnce([{ id: 'roundtable-1', title: 'Roundtable 1' } as any]);
+        const OriginalGlobalBlob = globalThis.Blob;
+        const OriginalWindowBlob = window.Blob;
+        let fileBackupContent = '';
+        class CapturingBlob extends OriginalGlobalBlob {
+            constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+                if (parts?.some(part => typeof part === 'string' && part.includes('"backupType"'))) {
+                    fileBackupContent = parts.map(part => String(part)).join('');
+                }
+                super(parts, options);
+            }
+        }
+        Object.defineProperty(globalThis, 'Blob', { value: CapturingBlob, configurable: true });
+        Object.defineProperty(window, 'Blob', { value: CapturingBlob, configurable: true });
 
-        renderWithProviders(<SettingsPage />);
-        fireEvent.click(screen.getByText('数据管理'));
-        fireEvent.click(screen.getByText('导入配置'));
+        try {
+            vi.mocked(modelsStorage.load).mockResolvedValueOnce([{ id: 'model-1', name: 'Model 1' } as any]);
+            vi.mocked(chatsStorage.load).mockResolvedValueOnce([{ id: 'chat-1', title: 'Chat 1' } as any]);
+            vi.mocked(agentsStorage.load).mockResolvedValueOnce([{ id: 'agent-1', name: 'Agent 1' } as any]);
+            vi.mocked(skillsStorage.load).mockResolvedValueOnce([{ id: 'skill-1', name: 'Skill 1' } as any]);
+            vi.mocked(mcpServersStorage.load).mockResolvedValueOnce([{ id: 'mcp-1', name: 'MCP 1' } as any]);
+            vi.mocked(providerCredentialsStorage.load).mockResolvedValueOnce([{ providerId: 'openai', type: 'api_key', apiKey: 'sk-test' } as any]);
+            vi.mocked(customProviderStorage.load).mockResolvedValueOnce([{ id: 'custom-1', name: 'Custom Provider' } as any]);
+            vi.mocked(roundtableChatsStorage.load).mockResolvedValueOnce([{ id: 'roundtable-1', title: 'Roundtable 1' } as any]);
 
-        const file = new File(['{}'], 'config.json', { type: 'application/json' });
-        const input = screen.getByLabelText(/选择文件/i);
-        fireEvent.change(input, { target: { files: [file] } });
-        fireEvent.click(screen.getByText('开始导入'));
+            renderWithProviders(<SettingsPage />);
+            fireEvent.click(screen.getByText('数据管理'));
+            fireEvent.click(screen.getByText('导入配置'));
 
-        await waitFor(() => {
-            expect(localStorageMock.setItem).toHaveBeenCalledWith('mobaus_backup', expect.any(String));
-        });
+            const file = new File(['{}'], 'config.json', { type: 'application/json' });
+            const input = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(input, { target: { files: [file] } });
+            fireEvent.click(screen.getByText('开始导入'));
 
-        const backupCall = vi.mocked(localStorageMock.setItem).mock.calls.find(([key]) => key === 'mobaus_backup');
-        expect(backupCall).toBeDefined();
+            await waitFor(() => {
+                expect(localStorageMock.setItem).toHaveBeenCalledWith('mobaus_backup', expect.any(String));
+            });
 
-        const backup = JSON.parse(backupCall![1]);
-        expect(backup).toMatchObject({
-            version: '1.0.0',
-            backupType: 'pre-import',
-            models: [{ id: 'model-1', name: 'Model 1' }],
-            chats: [{ id: 'chat-1', title: 'Chat 1' }],
-            agents: [{ id: 'agent-1', name: 'Agent 1' }],
-            skills: [{ id: 'skill-1', name: 'Skill 1' }],
-            mcp: [{ id: 'mcp-1', name: 'MCP 1' }],
-            roundtableChats: [{ id: 'roundtable-1', title: 'Roundtable 1' }],
-            settings: { theme: 'system', language: 'zh' },
-        });
-        expect(window.URL.createObjectURL).toHaveBeenCalled();
+            const backupCall = vi.mocked(localStorageMock.setItem).mock.calls.find(([key]) => key === 'mobaus_backup');
+            expect(backupCall).toBeDefined();
+
+            const backup = JSON.parse(backupCall![1]);
+            expect(backup).toMatchObject({
+                version: '1.0.0',
+                backupType: 'pre-import',
+                models: [{ id: 'model-1', name: 'Model 1' }],
+                chats: [{ id: 'chat-1', title: 'Chat 1' }],
+                agents: [{ id: 'agent-1', name: 'Agent 1' }],
+                skills: [{ id: 'skill-1', name: 'Skill 1' }],
+                mcp: [{ id: 'mcp-1', name: 'MCP 1' }],
+                customProviders: [{ id: 'custom-1', name: 'Custom Provider' }],
+                roundtableChats: [{ id: 'roundtable-1', title: 'Roundtable 1' }],
+                settings: { theme: 'system', language: 'zh' },
+            });
+            expect(backup.providerCredentials).toBeUndefined();
+
+            const fileBackup = JSON.parse(fileBackupContent);
+            expect(fileBackup).toMatchObject({
+                providerCredentials: [{ providerId: 'openai', type: 'api_key', apiKey: 'sk-test' }],
+                customProviders: [{ id: 'custom-1', name: 'Custom Provider' }],
+            });
+            expect(window.URL.createObjectURL).toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(globalThis, 'Blob', { value: OriginalGlobalBlob, configurable: true });
+            Object.defineProperty(window, 'Blob', { value: OriginalWindowBlob, configurable: true });
+        }
+    });
+
+    it('imports provider credentials and custom providers from backup packages', async () => {
+        const OriginalFileReader = window.FileReader;
+        class BackupFileReader {
+            onload: ((e: any) => void) | null = null;
+            readAsText(_file: Blob) {
+                setTimeout(() => {
+                    this.onload?.({
+                        target: {
+                            result: JSON.stringify({
+                                providerCredentials: [
+                                    { providerId: 'openai', type: 'api_key', apiKey: 'sk-imported' },
+                                ],
+                                customProviders: [
+                                    { id: 'custom-imported', name: 'Imported Provider' },
+                                ],
+                            }),
+                        },
+                    });
+                }, 0);
+            }
+        }
+
+        window.FileReader = BackupFileReader as any;
+
+        try {
+            renderWithProviders(<SettingsPage />);
+            fireEvent.click(screen.getByText('数据管理'));
+            fireEvent.click(screen.getByText('导入配置'));
+
+            const file = new File(['{}'], 'backup-config.json', { type: 'application/json' });
+            const input = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(input, { target: { files: [file] } });
+            fireEvent.click(screen.getByText('开始导入'));
+
+            await waitFor(() => {
+                expect(providerCredentialsStorage.save).toHaveBeenCalledWith([
+                    { providerId: 'openai', type: 'api_key', apiKey: 'sk-imported' },
+                ]);
+                expect(customProviderStorage.save).toHaveBeenCalledWith([
+                    { id: 'custom-imported', name: 'Imported Provider' },
+                ]);
+            });
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
     });
 
     it('imports standalone skills and MCP servers when the package also contains agents', async () => {

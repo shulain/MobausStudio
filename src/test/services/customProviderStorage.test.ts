@@ -11,6 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import { customProviderStorage } from '../../services/customProviderStorage';
 import type { CustomProvider } from '../../types';
 
@@ -39,6 +40,8 @@ describe('customProviderStorage 自定义提供商存储', () => {
     beforeEach(() => {
         // 清理 localStorage
         localStorage.clear();
+        delete (window as any).__TAURI__;
+        delete (window as any).__TAURI_INTERNALS__;
         vi.clearAllMocks();
     });
 
@@ -232,5 +235,15 @@ describe('customProviderStorage 自定义提供商存储', () => {
         expect(loaded[1].protocol).toBe('anthropic');
         expect(loaded[2].protocol).toBe('google');
         expect(loaded[3].protocol).toBe('aws');
+    });
+
+    it('TC-CUSTOM-PROV-008: Tauri 读取失败时不回退为空列表', async () => {
+        Object.defineProperty(window, '__TAURI_INTERNALS__', {
+            value: {},
+            configurable: true,
+        });
+        vi.mocked(invoke).mockRejectedValueOnce(new Error('native custom provider load failed'));
+
+        await expect(customProviderStorage.load()).rejects.toThrow('native custom provider load failed');
     });
 });

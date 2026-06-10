@@ -8,7 +8,7 @@ import { ImportModal } from './ImportModal';
 import { useI18n } from '../../../i18n';
 import { useTheme } from '../../../theme';
 import { trackEvents } from '../../../services/analytics';
-import type { ExportConfig, ImportOptions } from '../../../types';
+import type { CustomProvider, ExportConfig, ImportOptions, ProviderCredential } from '../../../types';
 // v2.6.5: 导入 storage services 用于异步数据读取和清理
 import {
     modelsStorage,
@@ -210,15 +210,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             agents: await agentsStorage.load(),
             skills: await skillsStorage.load(),
             mcp: await mcpServersStorage.load(),
+            providerCredentials: await providerCredentialsStorage.load(),
+            customProviders: await customProviderStorage.load(),
             roundtableChats: await roundtableChatsStorage.load(),
             settings: await settingsStorage.loadAsync(),
         };
 
         const jsonContent = JSON.stringify(backupData, null, 2);
+        const localBackupData: Record<string, unknown> = { ...backupData };
+        delete localBackupData.providerCredentials;
+        const localBackupContent = JSON.stringify(localBackupData, null, 2);
         const defaultFileName = `mobaus-backup-${new Date().toISOString().split('T')[0]}.json`;
 
         try {
-            localStorage.setItem(BACKUP_STORAGE_KEY, jsonContent);
+            localStorage.setItem(BACKUP_STORAGE_KEY, localBackupContent);
         } catch (error) {
             logger.warn(LogTags.SETTINGS, '导入前本地应急备份写入失败，继续创建备份文件', error);
         }
@@ -287,6 +292,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 const importMcp = Array.isArray(data.mcp)
                     ? data.mcp
                     : (Array.isArray(data.mcpServers) ? data.mcpServers : undefined);
+                const providerCredentials = Array.isArray(data.providerCredentials)
+                    ? (data.providerCredentials as ProviderCredential[])
+                    : undefined;
+                const customProviders = Array.isArray(data.customProviders)
+                    ? (data.customProviders as CustomProvider[])
+                    : undefined;
 
                 if (data.models) {
                     if (options.merge) {
@@ -434,6 +445,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         await mcpServersStorage.save(merged);
                     } else {
                         await mcpServersStorage.save(importMcp);
+                    }
+                }
+                if (providerCredentials) {
+                    if (options.merge) {
+                        const existing = await providerCredentialsStorage.load();
+                        const credentialMap = new Map<string, ProviderCredential>();
+                        existing.forEach((item) => credentialMap.set(item.providerId.toLowerCase(), item));
+                        providerCredentials.forEach((item) => credentialMap.set(item.providerId.toLowerCase(), item));
+                        await providerCredentialsStorage.save(Array.from(credentialMap.values()));
+                    } else {
+                        await providerCredentialsStorage.save(providerCredentials);
+                    }
+                }
+                if (customProviders) {
+                    if (options.merge) {
+                        const existing = await customProviderStorage.load();
+                        const merged = mergeById(existing, customProviders);
+                        await customProviderStorage.save(merged);
+                    } else {
+                        await customProviderStorage.save(customProviders);
                     }
                 }
                 // v2.6.5: 添加圆桌对话导入
