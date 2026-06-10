@@ -106,7 +106,7 @@ The Release workflow currently enforces these guardrails:
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
 - The Release `build-web` job runs a browser smoke against the versioned Web `dist` before uploading `MobausStudio-web.zip`, and uploads the smoke screenshot/report as an artifact.
 - `publish-release` verifies that the Draft Release contains Web, macOS Apple Silicon, macOS Intel, Windows, Linux, and updater assets before pushing GHCR images and before making the Release public.
-- `publish-release` downloads `latest.json` from the Draft Release and verifies that updater manifest entries exist for macOS Apple Silicon, macOS Intel, Windows, and Linux with non-empty URLs and signatures.
+- `publish-release` downloads `latest.json` from the Draft Release and verifies that updater manifest entries exist for macOS Apple Silicon, macOS Intel, Windows, and Linux with non-empty URLs and signatures, match the release version, and point to assets present in the Draft Release.
 
 ## CI production smoke gates
 
@@ -152,7 +152,7 @@ Production-ready release criteria:
 - The GitHub Release is public or prerelease as intended
 - Release assets are present for supported platforms
 - Release assets include Web zip, macOS Apple Silicon DMG, macOS Intel DMG, Windows installer, Linux installer, `latest.json`, and updater signatures
-- `latest.json` includes updater entries with URLs and signatures for macOS Apple Silicon, macOS Intel, Windows, and Linux
+- `latest.json` includes updater entries with URLs and signatures for macOS Apple Silicon, macOS Intel, Windows, and Linux; its version matches the Release version and every updater URL points to an uploaded Release asset
 - GHCR image tags are present only after release publish succeeds
 
 ## Local checks

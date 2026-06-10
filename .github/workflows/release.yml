@@ -510,7 +510,7 @@ jobs:
           npm run verify:release-assets -- /tmp/release-assets.txt
           mkdir -p /tmp/release-assets
           gh release download "$TAG" --pattern latest.json --dir /tmp/release-assets
-          npm run verify:updater-manifest -- /tmp/release-assets/latest.json
+          npm run verify:updater-manifest -- /tmp/release-assets/latest.json "${{ needs.prepare-release.outputs.version }}" /tmp/release-assets.txt
 
       - name: 推送 Docker 镜像
         uses: docker/build-push-action@v7

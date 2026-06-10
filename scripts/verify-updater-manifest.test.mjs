@@ -27,8 +27,25 @@ const completeManifest = {
 };
 
 describe('verifyUpdaterManifest', () => {
+  const completeAssetNames = [
+    'MobausStudio_0.9.0_aarch64.app.tar.gz',
+    'MobausStudio_0.9.0_x64.app.tar.gz',
+    'MobausStudio_0.9.0_x64-setup.exe',
+    'MobausStudio_0.9.0_amd64.AppImage.tar.gz',
+  ];
+
   it('accepts a complete updater manifest', () => {
     const result = verifyUpdaterManifest(completeManifest);
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it('accepts a manifest matching the release version and release asset list', () => {
+    const result = verifyUpdaterManifest(completeManifest, {
+      expectedVersion: '0.9.0',
+      releaseAssetNames: completeAssetNames,
+    });
 
     assert.equal(result.ok, true);
     assert.deepEqual(result.errors, []);
@@ -67,5 +84,28 @@ describe('verifyUpdaterManifest', () => {
 
     assert.equal(result.ok, false);
     assert.match(result.errors.join('\n'), /version must be a semantic version string/);
+  });
+
+  it('rejects a manifest version that does not match the release version', () => {
+    const result = verifyUpdaterManifest(completeManifest, {
+      expectedVersion: '0.9.1',
+      releaseAssetNames: completeAssetNames,
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /version must match release version 0.9.1/);
+  });
+
+  it('rejects updater URLs that do not point to release assets', () => {
+    const result = verifyUpdaterManifest(completeManifest, {
+      expectedVersion: '0.9.0',
+      releaseAssetNames: completeAssetNames.filter((name) => name !== 'MobausStudio_0.9.0_x64.app.tar.gz'),
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.errors.join('\n'),
+      /platform darwin-x86_64 url asset is missing from release assets: MobausStudio_0.9.0_x64.app.tar.gz/,
+    );
   });
 });
