@@ -86,6 +86,7 @@ export async function checkForUpdates(): Promise<UpdateInfo> {
       };
     }
   } catch (error) {
+    cachedUpdate = null;
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error(LogTags.APP, `检查更新失败: ${errorMsg}`);
 

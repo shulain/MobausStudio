@@ -43,10 +43,14 @@ vi.mock('../../utils/logger', () => ({
 }));
 
 // 延迟导入，确保 mock 先生效
-import { checkForUpdates, getCurrentVersion } from '../../services/updater';
+import { checkForUpdates, downloadAndInstall, getCurrentVersion } from '../../services/updater';
 
 describe('updater 软件更新服务', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
+        vi.useRealTimers();
+        mockGetVersion.mockResolvedValue('0.0.0-dev');
+        mockCheck.mockResolvedValue(null);
+        await checkForUpdates();
         vi.clearAllMocks();
     });
 
@@ -119,5 +123,68 @@ describe('updater 软件更新服务', () => {
         expect(info.available).toBe(false);
         expect(info.currentVersion).toBe('0.0.0-dev');
         expect(mockCheck).not.toHaveBeenCalled();
+    });
+
+    /**
+     * TC-UPDATER-005: 下载并安装更新
+     * 测试场景: 有缓存更新时应转发下载进度，并在安装完成后调度重启
+     */
+    it('TC-UPDATER-005: 下载并安装更新后调度重启', async () => {
+        vi.useFakeTimers();
+        mockRelaunch.mockResolvedValue(undefined);
+
+        const mockDownloadAndInstall = vi.fn(async (onEvent: (event: any) => void) => {
+            onEvent({ event: 'Started', data: { contentLength: 100 } });
+            onEvent({ event: 'Progress', data: { chunkLength: 40 } });
+            onEvent({ event: 'Progress', data: { chunkLength: 60 } });
+            onEvent({ event: 'Finished', data: {} });
+        });
+
+        mockGetVersion.mockResolvedValue('0.9.2');
+        mockCheck.mockResolvedValue({
+            version: '0.9.3',
+            body: '修复了一些问题',
+            date: '2026-02-28',
+            downloadAndInstall: mockDownloadAndInstall,
+        });
+
+        await checkForUpdates();
+
+        const onProgress = vi.fn();
+        await downloadAndInstall(onProgress);
+
+        expect(mockDownloadAndInstall).toHaveBeenCalledTimes(1);
+        expect(onProgress).toHaveBeenNthCalledWith(1, 40, 100);
+        expect(onProgress).toHaveBeenNthCalledWith(2, 100, 100);
+        expect(mockRelaunch).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(100);
+
+        expect(mockRelaunch).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * TC-UPDATER-006: 检查更新失败清空缓存
+     * 测试场景: 远端检查失败后不能继续使用上一次缓存的更新包
+     */
+    it('TC-UPDATER-006: 检查更新失败后清空旧更新缓存', async () => {
+        const oldDownloadAndInstall = vi.fn();
+
+        mockGetVersion.mockResolvedValue('0.9.2');
+        mockCheck.mockResolvedValue({
+            version: '0.9.3',
+            body: '旧更新',
+            date: '2026-02-28',
+            downloadAndInstall: oldDownloadAndInstall,
+        });
+
+        await checkForUpdates();
+
+        mockGetVersion.mockResolvedValue('0.9.2');
+        mockCheck.mockRejectedValue(new Error('network unavailable'));
+
+        await expect(checkForUpdates()).rejects.toThrow('检查更新失败');
+        await expect(downloadAndInstall()).rejects.toThrow('没有可用的更新，请先检查更新');
+        expect(oldDownloadAndInstall).not.toHaveBeenCalled();
     });
 });
