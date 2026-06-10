@@ -55,6 +55,9 @@ jobs:
       - name: Release 资产完整性门禁测试
         run: npm run test:release-assets
 
+      - name: Updater Manifest 门禁测试
+        run: npm run test:updater-manifest
+
       - name: 运行单元测试
         run: npm test
 

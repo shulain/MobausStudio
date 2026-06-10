@@ -508,6 +508,9 @@ jobs:
           TAG="v${{ needs.prepare-release.outputs.version }}"
           gh release view "$TAG" --json assets --jq '.assets[].name' > /tmp/release-assets.txt
           npm run verify:release-assets -- /tmp/release-assets.txt
+          mkdir -p /tmp/release-assets
+          gh release download "$TAG" --pattern latest.json --dir /tmp/release-assets
+          npm run verify:updater-manifest -- /tmp/release-assets/latest.json
 
       - name: 推送 Docker 镜像
         uses: docker/build-push-action@v7

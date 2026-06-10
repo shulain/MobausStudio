@@ -95,6 +95,7 @@ assertIncludes(
 assertIncludes(publishRelease, '推送 Docker 镜像', 'publish-time Docker push');
 assertIncludes(publishRelease, '验证 Draft Release 资产完整性', 'release asset completeness guard');
 assertIncludes(publishRelease, 'npm run verify:release-assets', 'release asset verifier command');
+assertIncludes(publishRelease, 'npm run verify:updater-manifest', 'updater manifest verifier command');
 assertIncludes(publishRelease, '发布 Draft Release', 'draft release publish step');
 assertOrder(
   publishRelease,
