@@ -9,6 +9,7 @@
 pub mod client;
 pub mod error;
 pub mod protocol;
+pub mod security;
 pub mod session;
 pub mod transport;
 

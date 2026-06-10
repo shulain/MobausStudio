@@ -2183,6 +2183,28 @@ pub struct MCPServerConfig {
     pub updated_at: String,
 }
 
+fn validate_mcp_server_config(server: &MCPServerConfig) -> Result<(), String> {
+    if server.transport_type != "stdio" {
+        return Ok(());
+    }
+
+    let command = server.command.as_deref().ok_or_else(|| {
+        format!(
+            "MCP 服务器 '{}' 的 stdio 配置缺少 command 字段",
+            server.name
+        )
+    })?;
+
+    let empty_args = Vec::new();
+    let args = server.args.as_ref().unwrap_or(&empty_args);
+
+    let empty_env = HashMap::new();
+    let env = server.env.as_ref().unwrap_or(&empty_env);
+
+    mcp::security::validate_stdio_launch(command, args, env)
+        .map_err(|err| format!("MCP 服务器 '{}' 的 stdio 配置无效: {}", server.name, err))
+}
+
 /// 默认传输类型为 http（兼容旧版本数据）
 fn default_transport_type() -> String {
     "http".to_string()
@@ -2283,6 +2305,10 @@ async fn save_mcp_servers(
         "[save_mcp_servers] 开始保存 MCP 服务器配置，数量: {}",
         servers.len()
     );
+
+    for server in &servers {
+        validate_mcp_server_config(server)?;
+    }
 
     // 获取数据目录
     let data_dir = get_data_dir(&app_handle)?;

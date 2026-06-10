@@ -11,6 +11,7 @@
 
 use crate::mcp::error::MCPError;
 use crate::mcp::protocol::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
+use crate::mcp::security::validate_stdio_launch;
 use crate::mcp::transport::MCPTransport;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -67,6 +68,8 @@ impl StdioTransport {
         args: &[String],
         env: &HashMap<String, String>,
     ) -> Result<Self, MCPError> {
+        validate_stdio_launch(command, args, env).map_err(MCPError::InvalidTransportConfig)?;
+
         log::info!("[MCP stdio] 启动服务器进程: {} {:?}", command, args);
 
         // 构建命令
@@ -141,7 +144,7 @@ impl StdioTransport {
         // 设置用户指定的环境变量
         for (key, value) in env {
             cmd.env(key, value);
-            log::debug!("[MCP stdio] 设置环境变量: {}={}", key, value);
+            log::debug!("[MCP stdio] 设置环境变量: {}=<redacted>", key);
         }
 
         // 启动子进程
