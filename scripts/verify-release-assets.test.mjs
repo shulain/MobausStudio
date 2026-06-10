@@ -7,6 +7,7 @@ describe('verifyReleaseAssets', () => {
     const result = verifyReleaseAssets([
       'MobausStudio-web.zip',
       'MobausStudio_0.9.0_aarch64.dmg',
+      'MobausStudio_0.9.0_x64.dmg',
       'MobausStudio_0.9.0_x64_en-US.msi',
       'MobausStudio_0.9.0_amd64.deb',
       'MobausStudio_0.9.0_amd64.AppImage',
@@ -22,6 +23,7 @@ describe('verifyReleaseAssets', () => {
     const result = verifyReleaseAssets([
       'MobausStudio-web.zip',
       'MobausStudio_0.9.0_aarch64.dmg',
+      'MobausStudio_0.9.0_x64.dmg',
       'MobausStudio_0.9.0_x64_en-US.msi',
       'MobausStudio_0.9.0_amd64.deb',
     ]);
@@ -43,7 +45,24 @@ describe('verifyReleaseAssets', () => {
     assert.equal(result.ok, false);
     assert.deepEqual(
       result.missing.map((item) => item.key),
-      ['macos', 'windows', 'linux'],
+      ['macos-apple-silicon', 'macos-intel', 'windows', 'linux'],
+    );
+  });
+
+  it('rejects a release missing either macOS architecture', () => {
+    const result = verifyReleaseAssets([
+      'MobausStudio-web.zip',
+      'MobausStudio_0.9.0_aarch64.dmg',
+      'MobausStudio_0.9.0_x64_en-US.msi',
+      'MobausStudio_0.9.0_amd64.deb',
+      'latest.json',
+      'MobausStudio_0.9.0_aarch64.app.tar.gz.sig',
+    ]);
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(
+      result.missing.map((item) => item.key),
+      ['macos-intel'],
     );
   });
 });

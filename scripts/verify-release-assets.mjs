@@ -7,9 +7,14 @@ const REQUIRED_ASSET_GROUPS = [
     matches: (name) => name === 'MobausStudio-web.zip',
   },
   {
-    key: 'macos',
-    description: 'macOS DMG artifact',
-    matches: (name) => name.endsWith('.dmg'),
+    key: 'macos-apple-silicon',
+    description: 'macOS Apple Silicon DMG artifact',
+    matches: (name) => name.endsWith('.dmg') && /(?:aarch64|arm64)/i.test(name),
+  },
+  {
+    key: 'macos-intel',
+    description: 'macOS Intel DMG artifact',
+    matches: (name) => name.endsWith('.dmg') && /(?:x64|x86_64|amd64)/i.test(name),
   },
   {
     key: 'windows',
