@@ -105,7 +105,7 @@ The Release workflow currently enforces these guardrails:
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
 - The Release `build-web` job runs a browser smoke against the versioned Web `dist` before uploading `MobausStudio-web.zip`, and uploads the smoke screenshot/report as an artifact.
-- `publish-release` verifies that the Draft Release contains Web, macOS, Windows, Linux, and updater assets before making the Release public.
+- `publish-release` verifies that the Draft Release contains Web, macOS, Windows, Linux, and updater assets before pushing GHCR images and before making the Release public.
 
 ## CI production smoke gates
 

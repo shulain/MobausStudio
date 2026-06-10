@@ -65,3 +65,15 @@ test('rejects release builds that do not depend on draft creation', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /build-desktop draft release dependency is missing/);
 });
+
+test('rejects Docker push before release asset verification', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW
+      .replace('      - name: 验证 Draft Release 资产完整性', '      - name: TEMP_ASSET_GUARD')
+      .replace('      - name: 推送 Docker 镜像', '      - name: 验证 Draft Release 资产完整性')
+      .replace('      - name: TEMP_ASSET_GUARD', '      - name: 推送 Docker 镜像'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /release asset verification before Docker push has the wrong order/);
+});

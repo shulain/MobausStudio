@@ -14,6 +14,20 @@ function assertIncludes(haystack, needle, description) {
   }
 }
 
+function assertOrder(haystack, first, second, description) {
+  const firstIndex = haystack.indexOf(first);
+  const secondIndex = haystack.indexOf(second);
+
+  if (firstIndex === -1 || secondIndex === -1) {
+    fail(`${description} could not be checked because a required marker is missing`);
+    return;
+  }
+
+  if (firstIndex > secondIndex) {
+    fail(`${description} has the wrong order`);
+  }
+}
+
 function jobBlock(jobName) {
   const lines = workflow.split(/\r?\n/);
   const start = lines.findIndex((line) => line === `  ${jobName}:`);
@@ -79,7 +93,21 @@ assertIncludes(
   'publish release dependency chain',
 );
 assertIncludes(publishRelease, '推送 Docker 镜像', 'publish-time Docker push');
+assertIncludes(publishRelease, '验证 Draft Release 资产完整性', 'release asset completeness guard');
+assertIncludes(publishRelease, 'npm run verify:release-assets', 'release asset verifier command');
 assertIncludes(publishRelease, '发布 Draft Release', 'draft release publish step');
+assertOrder(
+  publishRelease,
+  '验证 Draft Release 资产完整性',
+  '推送 Docker 镜像',
+  'release asset verification before Docker push',
+);
+assertOrder(
+  publishRelease,
+  '推送 Docker 镜像',
+  '发布 Draft Release',
+  'Docker push before draft publication',
+);
 
 const cleanupReleaseDraft = jobBlock('cleanup-release-draft');
 assertIncludes(

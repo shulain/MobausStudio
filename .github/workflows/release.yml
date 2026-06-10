@@ -501,6 +501,14 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: 验证 Draft Release 资产完整性
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.prepare-release.outputs.version }}"
+          gh release view "$TAG" --json assets --jq '.assets[].name' > /tmp/release-assets.txt
+          npm run verify:release-assets -- /tmp/release-assets.txt
+
       - name: 推送 Docker 镜像
         uses: docker/build-push-action@v7
         with:
@@ -513,14 +521,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-
-      - name: 验证 Draft Release 资产完整性
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${{ needs.prepare-release.outputs.version }}"
-          gh release view "$TAG" --json assets --jq '.assets[].name' > /tmp/release-assets.txt
-          npm run verify:release-assets -- /tmp/release-assets.txt
 
       - name: 发布 Draft Release
         uses: actions/github-script@v9
