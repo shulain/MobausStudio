@@ -25,8 +25,10 @@
     "docs:preview": "cd user-guide && npm run preview",
     "verify:release-version": "node scripts/verify-release-version.mjs",
     "verify:release-workflow": "node scripts/verify-release-workflow.mjs",
+    "verify:release-assets": "node scripts/verify-release-assets.mjs",
     "test:release-version": "node --test scripts/verify-release-version.test.mjs",
     "test:release-workflow": "node --test scripts/verify-release-workflow.test.mjs",
+    "test:release-assets": "node --test scripts/verify-release-assets.test.mjs",
     "smoke:web:production": "node scripts/smoke-production-web.mjs",
     "audit:web": "npm audit --audit-level=moderate"
   },
