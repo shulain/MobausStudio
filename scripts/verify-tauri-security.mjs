@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 const CONFIG_PATH = process.env.TAURI_CONFIG_PATH || 'src-tauri/tauri.conf.json';
+const CAPABILITIES_PATH = process.env.TAURI_CAPABILITIES_PATH || 'src-tauri/capabilities/default.json';
 
 const REQUIRED_DIRECTIVES = [
   'default-src',
@@ -24,6 +25,36 @@ const REQUIRED_CONNECT_SOURCES = [
   'wss:',
 ];
 
+const REQUIRED_CAPABILITY_PERMISSIONS = [
+  'core:default',
+  'core:window:allow-start-dragging',
+  'opener:allow-open-url',
+  'dialog:allow-open',
+  'dialog:allow-save',
+  'dialog:allow-message',
+  'updater:allow-check',
+  'updater:allow-download-and-install',
+  'process:allow-restart',
+];
+
+const FORBIDDEN_CAPABILITY_PERMISSIONS = [
+  'dialog:default',
+  'fs:default',
+  'fs:allow-read-dir',
+  'fs:allow-read-file',
+  'fs:allow-read-text-file',
+  'fs:allow-remove',
+  'fs:allow-rename',
+  'fs:allow-write',
+  'fs:allow-write-file',
+  'opener:default',
+  'opener:allow-open-path',
+  'opener:allow-reveal-item-in-dir',
+  'process:default',
+  'process:allow-exit',
+  'updater:default',
+];
+
 function parseCsp(csp) {
   const directives = new Map();
 
@@ -40,7 +71,75 @@ function parseCsp(csp) {
   return directives;
 }
 
-export function verifyTauriSecurityConfig(config) {
+function getPermissionIdentifier(permission) {
+  if (typeof permission === 'string') {
+    return permission;
+  }
+
+  if (permission && typeof permission === 'object' && typeof permission.identifier === 'string') {
+    return permission.identifier;
+  }
+
+  return null;
+}
+
+function getScopedPermission(capability, identifier) {
+  return capability?.permissions?.find(
+    (permission) => permission && typeof permission === 'object' && permission.identifier === identifier,
+  );
+}
+
+function verifyCapability(capability) {
+  const errors = [];
+  const permissions = Array.isArray(capability?.permissions) ? capability.permissions : [];
+  const identifiers = permissions.map(getPermissionIdentifier).filter(Boolean);
+
+  if (!Array.isArray(capability?.windows) || !capability.windows.includes('main')) {
+    errors.push('default capability must target the main window');
+  }
+
+  for (const permission of REQUIRED_CAPABILITY_PERMISSIONS) {
+    if (!identifiers.includes(permission)) {
+      errors.push(`missing capability permission: ${permission}`);
+    }
+  }
+
+  for (const permission of FORBIDDEN_CAPABILITY_PERMISSIONS) {
+    if (identifiers.includes(permission)) {
+      errors.push(`forbidden broad capability permission: ${permission}`);
+    }
+  }
+
+  const writeTextPermission = getScopedPermission(capability, 'fs:allow-write-text-file');
+  if (!writeTextPermission) {
+    errors.push('missing scoped fs:allow-write-text-file permission');
+  } else {
+    const allowedPaths = Array.isArray(writeTextPermission.allow)
+      ? writeTextPermission.allow.map((entry) => entry?.path).filter(Boolean)
+      : [];
+
+    if (allowedPaths.length === 0) {
+      errors.push('fs:allow-write-text-file must declare allowed paths');
+    }
+
+    if (allowedPaths.includes('**')) {
+      errors.push('fs:allow-write-text-file must not allow **');
+    }
+
+    for (const path of allowedPaths) {
+      if (typeof path !== 'string' || path.trim().length === 0) {
+        errors.push('fs:allow-write-text-file has an invalid path scope');
+      }
+    }
+  }
+
+  return {
+    errors,
+    permissions: identifiers,
+  };
+}
+
+export function verifyTauriSecurityConfig(config, capability) {
   const errors = [];
   const csp = config?.app?.security?.csp;
 
@@ -85,17 +184,30 @@ export function verifyTauriSecurityConfig(config) {
     }
   }
 
+  let capabilityResult = {
+    errors: ['default capability file must be provided'],
+    permissions: [],
+  };
+
+  if (capability) {
+    capabilityResult = verifyCapability(capability);
+  }
+
+  errors.push(...capabilityResult.errors);
+
   return {
     ok: errors.length === 0,
     errors,
     directives: [...directives.keys()],
+    permissions: capabilityResult.permissions,
   };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-    const result = verifyTauriSecurityConfig(config);
+    const capability = JSON.parse(readFileSync(CAPABILITIES_PATH, 'utf8'));
+    const result = verifyTauriSecurityConfig(config, capability);
     console.log(JSON.stringify(result, null, 2));
 
     if (!result.ok) {

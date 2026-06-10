@@ -6,11 +6,12 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "opener:default",
-    "dialog:default",
+    "opener:allow-open-url",
     "dialog:allow-open",
-    "fs:default",
-    "updater:default",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
     "process:allow-restart",
     {
       "identifier": "fs:allow-write-text-file",
@@ -19,13 +20,6 @@
         { "path": "$DESKTOP/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DOCUMENT/**" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-read-dir",
-      "allow": [
-        { "path": "$HOME/**" },
-        { "path": "**" }
       ]
     }
   ]

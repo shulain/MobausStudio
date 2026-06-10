@@ -20,9 +20,34 @@ const validConfig = {
   },
 };
 
+const validCapability = {
+  identifier: 'default',
+  windows: ['main'],
+  permissions: [
+    'core:default',
+    'core:window:allow-start-dragging',
+    'opener:allow-open-url',
+    'dialog:allow-open',
+    'dialog:allow-save',
+    'dialog:allow-message',
+    'updater:allow-check',
+    'updater:allow-download-and-install',
+    'process:allow-restart',
+    {
+      identifier: 'fs:allow-write-text-file',
+      allow: [
+        { path: '$HOME/**' },
+        { path: '$DESKTOP/**' },
+        { path: '$DOWNLOAD/**' },
+        { path: '$DOCUMENT/**' },
+      ],
+    },
+  ],
+};
+
 describe('verifyTauriSecurityConfig', () => {
   it('accepts the production CSP contract', () => {
-    const result = verifyTauriSecurityConfig(validConfig);
+    const result = verifyTauriSecurityConfig(validConfig, validCapability);
 
     assert.equal(result.ok, true);
     assert.deepEqual(result.errors, []);
@@ -35,7 +60,7 @@ describe('verifyTauriSecurityConfig', () => {
           csp: null,
         },
       },
-    });
+    }, validCapability);
 
     assert.equal(result.ok, false);
     assert.match(result.errors.join('\n'), /app\.security\.csp must be a non-empty string/);
@@ -45,7 +70,7 @@ describe('verifyTauriSecurityConfig', () => {
     const config = structuredClone(validConfig);
     config.app.security.csp = config.app.security.csp.replace("script-src 'self'", "script-src 'self' 'unsafe-eval'");
 
-    const result = verifyTauriSecurityConfig(config);
+    const result = verifyTauriSecurityConfig(config, validCapability);
 
     assert.equal(result.ok, false);
     assert.match(result.errors.join('\n'), /script-src must not include/);
@@ -55,10 +80,46 @@ describe('verifyTauriSecurityConfig', () => {
     const config = structuredClone(validConfig);
     config.app.security.csp = config.app.security.csp.replace('ipc: http://ipc.localhost ', '');
 
-    const result = verifyTauriSecurityConfig(config);
+    const result = verifyTauriSecurityConfig(config, validCapability);
 
     assert.equal(result.ok, false);
     assert.match(result.errors.join('\n'), /connect-src must include ipc:/);
     assert.match(result.errors.join('\n'), /connect-src must include http:\/\/ipc\.localhost/);
+  });
+
+  it('rejects broad default Tauri plugin permissions', () => {
+    const capability = structuredClone(validCapability);
+    capability.permissions.push('fs:default', 'dialog:default', 'opener:default', 'updater:default');
+
+    const result = verifyTauriSecurityConfig(validConfig, capability);
+
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /forbidden broad capability permission: fs:default/);
+    assert.match(result.errors.join('\n'), /forbidden broad capability permission: dialog:default/);
+    assert.match(result.errors.join('\n'), /forbidden broad capability permission: opener:default/);
+    assert.match(result.errors.join('\n'), /forbidden broad capability permission: updater:default/);
+  });
+
+  it('rejects arbitrary filesystem path scopes', () => {
+    const capability = structuredClone(validCapability);
+    const writeTextPermission = capability.permissions.find(
+      (permission) => permission.identifier === 'fs:allow-write-text-file',
+    );
+    writeTextPermission.allow.push({ path: '**' });
+
+    const result = verifyTauriSecurityConfig(validConfig, capability);
+
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /fs:allow-write-text-file must not allow \*\*/);
+  });
+
+  it('requires the exact runtime permissions used by the desktop shell', () => {
+    const capability = structuredClone(validCapability);
+    capability.permissions = capability.permissions.filter((permission) => permission !== 'opener:allow-open-url');
+
+    const result = verifyTauriSecurityConfig(validConfig, capability);
+
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /missing capability permission: opener:allow-open-url/);
   });
 });
