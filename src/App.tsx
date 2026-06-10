@@ -18,16 +18,17 @@ import { StatsModal } from './components/features/Stats';
 import { Header } from './components/layout/Header';
 import { Sidebar, type PageType } from './components/layout/Sidebar';
 import {
-    agentsStorage,
-    chatsStorage,
-    providerCredentialsStorage,
+  agentsStorage,
+  chatsStorage,
+  providerCredentialsStorage,
     mcpServersStorage,
     modelsStorage,
     type AppSettings,
     roundtableChatsStorage,
     settingsStorage,
-    skillsStorage,
+  skillsStorage,
 } from './services/storage';
+import { customProviderStorage } from './services/customProviderStorage';
 import { tokenRefresher } from './services/tokenRefresher';
 import { checkForUpdates, type UpdateInfo } from './services/updater';
 import { loadProviderCredentialsSafe } from './services/auth/providerCredentialAccess';
@@ -103,6 +104,7 @@ import type {
   Attachment,
   Chat,
   ChatEventPayload,
+  CustomProvider,
   ExportConfig,
   ImportOptions,
   MCPServer,
@@ -4666,15 +4668,20 @@ const createPreImportBackup = useCallback(async () => {
     agents: await agentsStorage.load(),
     skills: await skillsStorage.load(),
     mcp: await mcpServersStorage.load(),
+    providerCredentials: await providerCredentialsStorage.load(),
+    customProviders: await customProviderStorage.load(),
     roundtableChats: await roundtableChatsStorage.load(),
     settings: await settingsStorage.loadAsync(),
   };
 
   const jsonContent = JSON.stringify(backupData, null, 2);
+  const localBackupData: Record<string, unknown> = { ...backupData };
+  delete localBackupData.providerCredentials;
+  const localBackupContent = JSON.stringify(localBackupData, null, 2);
   const defaultFileName = `mobaus-backup-${new Date().toISOString().split('T')[0]}.json`;
 
   try {
-    localStorage.setItem(APP_BACKUP_KEY, jsonContent);
+    localStorage.setItem(APP_BACKUP_KEY, localBackupContent);
   } catch (error) {
     logger.warn(LogTags.APP, '导入前本地应急备份写入失败，继续创建备份文件', error);
   }
@@ -4737,6 +4744,8 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
         'skills',
         'mcp',
         'mcpServers',
+        'providerCredentials',
+        'customProviders',
         'roundtableChats',
         'settings',
       ].some((key) => Object.prototype.hasOwnProperty.call(data, key));
@@ -4769,6 +4778,12 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
         : null;
       const roundtableChats = Object.prototype.hasOwnProperty.call(data, 'roundtableChats')
         ? toList<RoundtableChat>(data.roundtableChats)
+        : null;
+      const providerCredentials = Object.prototype.hasOwnProperty.call(data, 'providerCredentials')
+        ? toList<ProviderCredential>(data.providerCredentials)
+        : null;
+      const customProviders = Object.prototype.hasOwnProperty.call(data, 'customProviders')
+        ? toList<CustomProvider>(data.customProviders)
         : null;
 
       if (models) {
@@ -4893,6 +4908,27 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
           await roundtableChatsStorage.save(mergeById(existing, roundtableChats));
         } else {
           await roundtableChatsStorage.save(roundtableChats);
+        }
+      }
+
+      if (providerCredentials) {
+        if (options.merge) {
+          const existing = await providerCredentialsStorage.load();
+          const credentialMap = new Map<string, ProviderCredential>();
+          existing.forEach((item) => credentialMap.set(item.providerId.toLowerCase(), item));
+          providerCredentials.forEach((item) => credentialMap.set(item.providerId.toLowerCase(), item));
+          await providerCredentialsStorage.save(Array.from(credentialMap.values()));
+        } else {
+          await providerCredentialsStorage.save(providerCredentials);
+        }
+      }
+
+      if (customProviders) {
+        if (options.merge) {
+          const existing = await customProviderStorage.load();
+          await customProviderStorage.save(mergeById(existing, customProviders));
+        } else {
+          await customProviderStorage.save(customProviders);
         }
       }
 

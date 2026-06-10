@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App';
 import { I18nProvider } from '../i18n';
 import { ThemeProvider } from '../theme';
+import { providerCredentialsStorage } from '../services/storage';
+import { customProviderStorage } from '../services/customProviderStorage';
 
 // 模拟 Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
@@ -43,6 +45,10 @@ vi.mock('../services/storage', () => ({
     providerCredentialsStorage: {
         load: vi.fn().mockResolvedValue([]),
         save: vi.fn().mockResolvedValue(undefined),
+        get: vi.fn().mockResolvedValue(null),
+        add: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue(undefined),
+        clear: vi.fn().mockResolvedValue(undefined),
     },
     // v2.6.0: 添加 Settings 存储 mock
     settingsStorage: {
@@ -53,10 +59,19 @@ vi.mock('../services/storage', () => ({
     },
 }));
 
+vi.mock('../services/customProviderStorage', () => ({
+    customProviderStorage: {
+        load: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue(undefined),
+        clear: vi.fn().mockResolvedValue(undefined),
+    },
+}));
+
 // Setup localStorage mock
 beforeEach(() => {
     // Clear localStorage before each test
     localStorage.clear();
+    vi.clearAllMocks();
 });
 
 // Mock matchMedia
@@ -116,6 +131,55 @@ describe('App', () => {
         renderWithProviders(<App />);
         await waitForAppReady();
         expect(screen.getByText('设置')).toBeDefined();
+    });
+
+    it('should import provider credentials and custom providers from the global import modal', async () => {
+        const OriginalFileReader = window.FileReader;
+        class BackupFileReader {
+            onload: ((e: any) => void) | null = null;
+            readAsText(_file: Blob) {
+                setTimeout(() => {
+                    this.onload?.({
+                        target: {
+                            result: JSON.stringify({
+                                providerCredentials: [
+                                    { providerId: 'openai', type: 'api_key', apiKey: 'sk-global' },
+                                ],
+                                customProviders: [
+                                    { id: 'custom-global', name: 'Global Custom Provider' },
+                                ],
+                            }),
+                        },
+                    });
+                }, 0);
+            }
+        }
+
+        window.FileReader = BackupFileReader as any;
+
+        try {
+            renderWithProviders(<App />);
+            await waitForAppReady();
+
+            fireEvent.click(screen.getByTitle('导入配置'));
+            fireEvent.click(screen.getByLabelText(/导入前备份/i));
+
+            const file = new File(['{}'], 'global-backup.json', { type: 'application/json' });
+            const input = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(input, { target: { files: [file] } });
+            fireEvent.click(screen.getByText('开始导入'));
+
+            await waitFor(() => {
+                expect(providerCredentialsStorage.save).toHaveBeenCalledWith([
+                    { providerId: 'openai', type: 'api_key', apiKey: 'sk-global' },
+                ]);
+                expect(customProviderStorage.save).toHaveBeenCalledWith([
+                    { id: 'custom-global', name: 'Global Custom Provider' },
+                ]);
+            });
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
     });
 
     it('should render chat page by default', async () => {
