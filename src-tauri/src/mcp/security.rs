@@ -49,10 +49,7 @@ const FORBIDDEN_ENV_KEYS: &[&str] = &[
 ];
 
 fn command_basename(command: &str) -> &str {
-    command
-        .rsplit(|ch| ch == '/' || ch == '\\')
-        .next()
-        .unwrap_or(command)
+    command.rsplit(['/', '\\']).next().unwrap_or(command)
 }
 
 fn contains_forbidden_command_char(command: &str) -> bool {
