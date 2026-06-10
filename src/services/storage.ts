@@ -3,7 +3,7 @@
  * 
  * 支持双环境：
  * - Tauri 环境：使用 Tauri 命令保存到本地文件系统
- * - 浏览器环境：回退到 localStorage
+ * - 浏览器环境：使用 localStorage
  * 
  * @module services/storage
  */
@@ -782,8 +782,10 @@ export const mcpServersStorage = {
                 logDebug('已通过 Tauri 保存 MCP 服务器配置');
             } catch (error) {
                 logError(' Tauri save_mcp_servers 失败:', error);
-                // 回退到 localStorage
-                saveToLocalStorage(STORAGE_KEYS.MCP_SERVERS, serialized);
+                // v4.2.6: 不回退到 localStorage。
+                // MCP stdio 配置会启动本地子进程，后端保存阶段承担安全校验。
+                // 如果这里静默回退，导入/模板/本地配置就能绕过后端校验并造成状态不一致。
+                throw error;
             }
         } else {
             saveToLocalStorage(STORAGE_KEYS.MCP_SERVERS, serialized);
@@ -831,8 +833,8 @@ export const mcpServersStorage = {
                 }));
             } catch (error) {
                 logError(' Tauri load_mcp_servers 失败:', error);
-                // 回退到 localStorage
-                return this.loadSync();
+                // v4.2.6: 不回退到 localStorage，避免在 Tauri 原生存储不可用时加载陈旧或未校验的 MCP 配置。
+                throw error;
             }
         } else {
             return this.loadSync();

@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import {
     modelsStorage,
     agentsStorage,
@@ -21,6 +22,8 @@ describe('Storage Service', () => {
     // 每个测试前清空 localStorage
     beforeEach(() => {
         localStorage.clear();
+        delete (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+        vi.mocked(invoke).mockReset();
         vi.restoreAllMocks();
     });
 
@@ -861,6 +864,53 @@ describe('Storage Service', () => {
             const loaded = await mcpServersStorage.load();
             expect(loaded[0].enabled).toBe(true);  // 默认启用
             expect(loaded[0].autoStart).toBe(false);  // 默认不自动启动
+        });
+
+        it('MCP-SEC-001: Tauri 保存失败时不应回退到 localStorage', async () => {
+            Object.defineProperty(window, '__TAURI_INTERNALS__', {
+                value: {},
+                configurable: true,
+            });
+            vi.mocked(invoke).mockRejectedValueOnce(
+                new Error("MCP 服务器 'Bad MCP' 的 stdio 配置无效: stdio command must be an executable name or path, not a shell command string")
+            );
+
+            const unsafeServer: any = {
+                id: 'unsafe-server',
+                name: 'Bad MCP',
+                description: 'unsafe',
+                transportType: 'stdio',
+                command: 'npx;rm -rf /',
+                authType: 'none',
+                status: 'disconnected',
+                requestCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+
+            await expect(mcpServersStorage.save([unsafeServer])).rejects.toThrow(/stdio 配置无效/);
+            expect(localStorage.getItem('mobaus_mcp_servers')).toBeNull();
+        });
+
+        it('MCP-SEC-002: Tauri 加载失败时不应回退到陈旧 localStorage', async () => {
+            Object.defineProperty(window, '__TAURI_INTERNALS__', {
+                value: {},
+                configurable: true,
+            });
+            localStorage.setItem('mobaus_mcp_servers', JSON.stringify([{
+                id: 'stale-unsafe',
+                name: 'Stale Unsafe',
+                transport_type: 'stdio',
+                command: 'bash',
+                auth_type: 'none',
+                status: 'disconnected',
+                request_count: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            }]));
+            vi.mocked(invoke).mockRejectedValueOnce(new Error('native MCP store unavailable'));
+
+            await expect(mcpServersStorage.load()).rejects.toThrow(/native MCP store unavailable/);
         });
     });
 
