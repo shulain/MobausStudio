@@ -102,7 +102,18 @@ jobs:
         run: npm ci
 
       - name: 生产 Web 预览浏览器烟测
+        env:
+          PRODUCTION_SMOKE_SCREENSHOT: artifacts/production-smoke/mobausstudio-production-smoke.png
+          PRODUCTION_SMOKE_REPORT: artifacts/production-smoke/report.json
         run: npm run smoke:web:production
+
+      - name: 上传生产 Web 烟测证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-web-smoke-${{ github.sha }}
+          path: artifacts/production-smoke
+          if-no-files-found: warn
 
   macos-app-local-build:
     runs-on: macos-latest

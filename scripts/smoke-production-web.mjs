@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const HOST = '127.0.0.1';
 const DEFAULT_SCREENSHOT_PATH = join(tmpdir(), 'mobausstudio-production-smoke.png');
+const DEFAULT_REPORT_PATH = join(tmpdir(), 'mobausstudio-production-smoke-report.json');
 
 function log(message) {
   console.log(`[production-smoke] ${message}`);
@@ -249,7 +250,11 @@ async function main() {
     await waitForPreview(url, preview.output);
     log(`Running browser smoke against ${url}`);
     const result = await runBrowserSmoke(url);
-    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+    const report = { ok: true, ...result };
+    const reportPath = process.env.PRODUCTION_SMOKE_REPORT || DEFAULT_REPORT_PATH;
+    mkdirSync(dirname(reportPath), { recursive: true });
+    writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+    console.log(JSON.stringify({ ...report, reportPath }, null, 2));
   } finally {
     preview.stop();
   }
