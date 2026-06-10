@@ -183,6 +183,12 @@ async function runBrowserSmoke(url) {
   await expectVisible(page.getByRole('heading', { name: 'MCP 服务器' }), 'MCP page heading');
   await expectVisible(page.getByRole('button', { name: '添加服务器' }), 'MCP add server button');
 
+  await page.getByText('模型').first().click();
+  await expectVisible(page.getByPlaceholder('搜索模型...'), 'Models search input');
+
+  await page.getByText('提供商').first().click();
+  await expectVisible(page.getByPlaceholder('搜索提供商...'), 'Providers search input');
+
   await page.getByText('设置').first().click();
   await expectVisible(page.getByText('外观设置'), 'Settings appearance section');
   await page.getByText('数据管理').first().click();
@@ -226,6 +232,8 @@ async function runBrowserSmoke(url) {
       '安装技能 button',
       'MCP 服务器',
       'MCP add server button',
+      'Models search input',
+      'Providers search input',
       '外观设置',
       '数据管理',
       '导出配置 modal',
