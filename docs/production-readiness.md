@@ -6,7 +6,9 @@ This document records the current production-readiness boundary for MobausStudio
 
 ## Current status
 
-Repository-side release hardening is in place and verified. The remaining blocker is external to this repository:
+Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction.
+
+The remaining blocker is external to this repository:
 
 ```text
 Apple notarization preflight failed. Check Apple Developer Program agreements and APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID secrets.
@@ -16,18 +18,30 @@ Do not mark the project as fully production-ready until a Release workflow run c
 
 ## Verified evidence
 
-Latest repository CI evidence:
+Recent repository CI evidence:
 
 ```bash
-gh run view 27242076383
+gh run view 27243589318
 ```
 
 Expected result:
 
 ```text
 test: success
+web-production-smoke: success
 docker-web-smoke: success
 rust-check: success
+```
+
+The `test` job includes:
+
+```text
+npm audit --audit-level=moderate
+npm run verify:release-workflow
+npm run test:release-workflow
+npm run test:release-version
+npm test
+npm run build
 ```
 
 Release duplicate-version guard evidence:
@@ -91,6 +105,16 @@ The Release workflow currently enforces these guardrails:
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
 
+## CI production smoke gates
+
+CI currently enforces these non-release smoke gates on every `main` push and pull request:
+
+- `test`: npm vulnerability audit, TypeScript, ESLint, release workflow guard verifier, release version verifier, frontend tests, and Web build.
+- `web-production-smoke`: production Vite build, preview server startup, real browser navigation through Chat, Agent, Skills, MCP, and Settings, plus browser console/page-error failure capture.
+- `docker-web-smoke`: Docker Web image build and OCI version label verification.
+- `macos-app-local-build`: unsigned local macOS `.app` build and bundle structure verification.
+- `rust-check`: RustSec audit, `cargo check`, Rust format check, Clippy with warnings denied, and Rust tests.
+
 ## Revalidation steps after Apple is fixed
 
 After Apple Developer / App Store Connect agreements and GitHub secrets are corrected, run:
@@ -134,7 +158,10 @@ Before triggering Release, run:
 npm run verify:release-workflow
 npm run test:release-workflow
 npm run test:release-version
+npm run audit:web
 npm run smoke:web:production
+npm run build:app:local
+npm run verify:macos-app-bundle
 ```
 
 For full repository CI parity, rely on GitHub Actions CI:

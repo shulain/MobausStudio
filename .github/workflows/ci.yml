@@ -6,6 +6,7 @@
 # - 单元测试
 # - 代码风格检查（可选）
 # - Docker Web 镜像构建烟测
+# - macOS 本地 App 包构建烟测
 # - RustSec 漏洞审计
 
 name: CI
@@ -102,6 +103,31 @@ jobs:
 
       - name: 生产 Web 预览浏览器烟测
         run: npm run smoke:web:production
+
+  macos-app-local-build:
+    runs-on: macos-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 macOS 本地 App 包
+        run: npm run build:app:local
+
+      - name: 验证 macOS App Bundle 结构
+        run: npm run verify:macos-app-bundle
 
   # 可选：Rust 编译检查（Tauri 后端）
   rust-check:
