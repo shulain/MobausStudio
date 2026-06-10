@@ -15,6 +15,12 @@ function fail(message) {
   throw new Error(message);
 }
 
+async function expectVisible(locator, label, timeout = 10_000) {
+  await locator.waitFor({ state: 'visible', timeout }).catch((error) => {
+    throw new Error(`Expected visible: ${label}\n${error.message}`);
+  });
+}
+
 function findChromeExecutable() {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -152,20 +158,47 @@ async function runBrowserSmoke(url) {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await page.goto(url, { waitUntil: 'networkidle' });
-  await page.getByText('Mobaus Studio').waitFor({ timeout: 15_000 });
-  await page.getByPlaceholder('搜索对话...').waitFor({ timeout: 15_000 });
+  await expectVisible(page.getByText('Mobaus Studio'), 'app shell');
+  await expectVisible(page.getByPlaceholder('搜索对话...'), 'chat search input');
+
+  const chatInput = page.getByPlaceholder(/输入消息/);
+  await expectVisible(chatInput, 'chat message input', 15_000);
+  await chatInput.fill('生产烟测：验证输入框可编辑');
+  await chatInput.fill('');
+  await expectVisible(page.getByRole('button', { name: '新建对话' }), 'new chat button');
+  await page.getByRole('button', { name: '新建对话' }).click();
+  await expectVisible(chatInput, 'chat input after creating a chat');
 
   await page.getByText('Agent').first().click();
-  await page.getByRole('heading', { name: 'Agent 管理' }).waitFor({ timeout: 10_000 });
+  await expectVisible(page.getByRole('heading', { name: 'Agent 管理' }), 'Agent page heading');
+  await expectVisible(page.getByPlaceholder('搜索 Agent...'), 'Agent search input');
 
   await page.getByText('Skills').first().click();
-  await page.getByRole('heading', { name: '技能管理' }).waitFor({ timeout: 10_000 });
+  await expectVisible(page.getByRole('heading', { name: '技能管理' }), 'Skills page heading');
+  await expectVisible(page.getByPlaceholder('搜索技能...').first(), 'Skills search input');
+  await expectVisible(page.getByRole('button', { name: '安装技能' }), 'install skills button');
 
   await page.getByText('MCP').first().click();
-  await page.getByRole('heading', { name: 'MCP 服务器' }).waitFor({ timeout: 10_000 });
+  await expectVisible(page.getByRole('heading', { name: 'MCP 服务器' }), 'MCP page heading');
+  await expectVisible(page.getByRole('button', { name: '添加服务器' }), 'MCP add server button');
 
   await page.getByText('设置').first().click();
-  await page.getByText('外观设置').waitFor({ timeout: 10_000 });
+  await expectVisible(page.getByText('外观设置'), 'Settings appearance section');
+  await page.getByText('数据管理').first().click();
+  await expectVisible(page.getByText('备份与恢复'), 'Settings backup and restore section');
+  const backupSection = page.locator('section').filter({ hasText: '备份与恢复' });
+
+  await backupSection.getByRole('button', { name: '导出配置' }).click();
+  await expectVisible(page.getByText('Agents 配置'), 'export modal Agents option');
+  await expectVisible(page.getByText('Skills 配置'), 'export modal Skills option');
+  await page.getByRole('button', { name: '取消' }).click();
+  await expectVisible(page.getByText('备份与恢复'), 'backup and restore section after closing export modal');
+
+  await backupSection.getByRole('button', { name: '导入配置' }).click();
+  await expectVisible(page.getByText('合并现有配置'), 'import modal merge option');
+  await expectVisible(page.getByText('导入前备份'), 'import modal backup option');
+  await page.getByRole('button', { name: '取消' }).click();
+  await expectVisible(page.getByText('备份与恢复'), 'backup and restore section after closing import modal');
 
   const screenshotPath = process.env.PRODUCTION_SMOKE_SCREENSHOT || DEFAULT_SCREENSHOT_PATH;
   mkdirSync(dirname(screenshotPath), { recursive: true });
@@ -181,7 +214,22 @@ async function runBrowserSmoke(url) {
   return {
     url,
     screenshotPath,
-    checked: ['startup chat page', 'Agent 管理', '技能管理', 'MCP 服务器', '外观设置'],
+    checked: [
+      'startup chat page',
+      'chat input editable',
+      'new chat button',
+      'Agent 管理',
+      'Agent search input',
+      '技能管理',
+      'Skills search input',
+      '安装技能 button',
+      'MCP 服务器',
+      'MCP add server button',
+      '外观设置',
+      '数据管理',
+      '导出配置 modal',
+      '导入配置 modal',
+    ],
     consoleErrors,
     pageErrors,
   };
