@@ -184,6 +184,8 @@ export const AgentModal: React.FC<AgentModalProps> = ({
         return models.filter(m => m.status === 'online');
     }, [models]);
 
+    const canSubmit = name.trim().length > 0 && availableModels.some(m => m.id === model);
+
     /**
      * 使用 Tauri 打开目录选择器
      * @param target 目标：'working' | 'allowed' | 'denied'
@@ -356,6 +358,10 @@ export const AgentModal: React.FC<AgentModalProps> = ({
     };
 
     const handleSubmit = () => {
+        if (!canSubmit) {
+            return;
+        }
+
         // 构建权限配置
         const autoApprove: AgentAutoApprove | undefined =
             (autoApproveReadFiles || autoApproveWriteFiles || autoApproveBashCommands.length > 0 || autoApproveMcpTools.length > 0)
@@ -401,8 +407,8 @@ export const AgentModal: React.FC<AgentModalProps> = ({
                 : undefined;
 
         onSave({
-            name,
-            description,
+            name: name.trim(),
+            description: description.trim(),
             model,
             skills: selectedSkills,
             systemPrompt,
@@ -1188,7 +1194,7 @@ export const AgentModal: React.FC<AgentModalProps> = ({
                     <Button variant="secondary" onClick={onClose} className="flex-1">
                         {t.common.cancel}
                     </Button>
-                    <Button onClick={handleSubmit} className="flex-1">
+                    <Button onClick={handleSubmit} disabled={!canSubmit} className="flex-1">
                         {agent ? t.common.save : t.agent.createAgent}
                     </Button>
                 </div>

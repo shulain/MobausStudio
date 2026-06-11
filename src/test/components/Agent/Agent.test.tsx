@@ -350,6 +350,32 @@ describe('AgentModal', () => {
         expect(handleSave).toHaveBeenCalled();
     });
 
+    it('无可用模型时应禁用创建按钮并阻止创建无模型 Agent', () => {
+        const handleSave = vi.fn();
+        const offlineModels = mockModels.map(model => ({
+            ...model,
+            status: 'offline' as const,
+        }));
+
+        renderWithI18n(
+            <AgentModal
+                {...defaultProps}
+                models={offlineModels}
+                onSave={handleSave}
+            />
+        );
+
+        expect(screen.getByText('请先配置可用模型')).toBeDefined();
+        fireEvent.change(screen.getByPlaceholderText('例如: 代码助手'), {
+            target: { value: '无模型 Agent' },
+        });
+
+        const createButton = screen.getByRole('button', { name: '创建 Agent' });
+        expect(createButton).toBeDisabled();
+        fireEvent.click(createButton);
+        expect(handleSave).not.toHaveBeenCalled();
+    });
+
     it('AG-16/AG-17: 应渲染高级设置', () => {
         renderWithI18n(<AgentModal {...defaultProps} />);
         expect(screen.getByText('高级设置')).toBeDefined();
