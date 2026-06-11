@@ -48,10 +48,20 @@ export const ModelPage: React.FC<ModelPageProps> = ({
     // v3.6.0: 批量检查状态
     const [isBatchTesting, setIsBatchTesting] = useState(false);
 
+    const providerNameById = React.useMemo(
+        () => new Map(providers.map((provider) => [provider.id, provider.name])),
+        [providers]
+    );
+
+    const getProviderDisplayName = (providerId: string) => providerNameById.get(providerId) || providerId;
+
     const filteredModels = models.filter((model) => {
+        const query = searchQuery.toLowerCase();
+        const providerDisplayName = getProviderDisplayName(model.provider);
         const matchesSearch =
-            model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            model.provider.toLowerCase().includes(searchQuery.toLowerCase());
+            model.name.toLowerCase().includes(query) ||
+            model.provider.toLowerCase().includes(query) ||
+            providerDisplayName.toLowerCase().includes(query);
         const matchesProvider = providerFilter === 'all' || model.provider === providerFilter;
         return matchesSearch && matchesProvider;
     });
@@ -144,10 +154,10 @@ export const ModelPage: React.FC<ModelPageProps> = ({
                         >
                             <option value="all">{t.models.allProviders}</option>
                             {uniqueProviders.map((p) => (
-                                <option key={p} value={p}>{p}</option>
-                            ))}
-                        </select>
-                    }
+                            <option key={p} value={p}>{getProviderDisplayName(p)}</option>
+                        ))}
+                    </select>
+                }
                     actions={
                         <div className="flex gap-2">
                             {/* v3.6.0: 批量检查按钮 */}
@@ -175,6 +185,7 @@ export const ModelPage: React.FC<ModelPageProps> = ({
                             <ModelCard
                                 key={model.id}
                                 model={model}
+                                providerDisplayName={getProviderDisplayName(model.provider)}
                                 onEdit={() => handleEdit(model)}
                                 onTest={() => handleTest(model.id)}
                                 onDelete={() => setDeleteConfirmModel(model)}

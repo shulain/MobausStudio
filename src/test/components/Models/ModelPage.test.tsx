@@ -77,6 +77,48 @@ describe('ModelPage 集成测试', () => {
         expect(screen.getAllByText('在线').length).toBeGreaterThan(0);
     });
 
+    it('自定义提供商模型: 应显示提供商名称并支持按名称搜索', () => {
+        const customModels: AIModelConfig[] = [
+            {
+                ...mockModels[0],
+                id: 'custom-model-1',
+                name: 'custom-chat-model',
+                provider: 'custom-test-123',
+            },
+        ];
+        const customProviders: ModelProvider[] = [
+            ...mockProviders,
+            {
+                id: 'custom-test-123',
+                name: 'My Custom Provider',
+                icon: '🤖',
+                defaultEndpoint: 'https://api.example.com',
+                models: [],
+            },
+        ];
+
+        renderWithI18n(
+            <ModelPage
+                models={customModels}
+                providers={customProviders}
+                onAddModel={onAddModel}
+                onUpdateModel={onUpdateModel}
+                onDeleteModel={onDeleteModel}
+                onTestModel={onTestModel}
+            />
+        );
+
+        expect(screen.getAllByText('My Custom Provider').length).toBeGreaterThanOrEqual(1);
+        expect(screen.queryByText('custom-test-123')).not.toBeInTheDocument();
+
+        const searchButton = screen.getByTitle('搜索模型...');
+        fireEvent.click(searchButton);
+        const searchInput = screen.getByPlaceholderText('搜索模型...');
+        fireEvent.change(searchInput, { target: { value: 'My Custom Provider' } });
+
+        expect(screen.getByText('custom-chat-model')).toBeInTheDocument();
+    });
+
     /**
      * 测试场景: 过滤模型
      * 输入: 输入搜索关键词

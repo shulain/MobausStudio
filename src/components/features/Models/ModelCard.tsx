@@ -14,6 +14,7 @@ import type { AIModelConfig, ModelQuotaInfo } from '../../../types';
 
 interface ModelCardProps {
     model: AIModelConfig;
+    providerDisplayName?: string;
     onEdit: () => void;
     onTest: () => void;
     onDelete: () => void;
@@ -59,6 +60,7 @@ function getQuotaColorClass(fraction: number, isExhausted: boolean): string {
 
 export const ModelCard: React.FC<ModelCardProps> = ({
     model,
+    providerDisplayName,
     onEdit,
     onTest,
     onDelete,
@@ -66,8 +68,10 @@ export const ModelCard: React.FC<ModelCardProps> = ({
     quota,
 }) => {
     const { t } = useI18n();
-    const gradientClass = providerColors[model.provider] || 'from-gray-500 to-gray-600';
-    const icon = providerIcons[model.provider] || '🔌';
+    const displayProvider = providerDisplayName || model.provider;
+    const providerStyleKey = model.provider.startsWith('custom-') ? 'Custom' : displayProvider;
+    const gradientClass = providerColors[providerStyleKey] || 'from-gray-500 to-gray-600';
+    const icon = providerIcons[providerStyleKey] || '🔌';
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-[10px] border-2 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-500 hover:shadow-lg transition-all p-5">
@@ -82,7 +86,12 @@ export const ModelCard: React.FC<ModelCardProps> = ({
                     <div className="flex items-start justify-between mb-2">
                         <div>
                             <h3 className="font-bold text-gray-800 dark:text-gray-100">{model.name}</h3>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{model.provider}</span>
+                            <span
+                                className="text-xs text-gray-500 dark:text-gray-400"
+                                title={displayProvider !== model.provider ? model.provider : undefined}
+                            >
+                                {displayProvider}
+                            </span>
                         </div>
                         {/* v2.5.3: 支持 online/offline/error 三种状态 */}
                         <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${

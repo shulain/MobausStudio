@@ -49,6 +49,21 @@ describe('ModelCard 组件测试', () => {
         expect(screen.getByText('在线')).toBeInTheDocument();
     });
 
+    it('自定义提供商应显示用户配置的名称而不是内部 ID', () => {
+        renderWithI18n(
+            <ModelCard
+                model={{ ...mockModel, provider: 'custom-test-123' }}
+                providerDisplayName="My Custom Provider"
+                onEdit={() => { }}
+                onTest={() => { }}
+                onDelete={() => { }}
+            />
+        );
+
+        expect(screen.getByText('My Custom Provider')).toBeInTheDocument();
+        expect(screen.queryByText('custom-test-123')).not.toBeInTheDocument();
+    });
+
     /**
      * 测试场景: 渲染离线状态
      * 输入: 离线状态的模型数据

@@ -61,6 +61,9 @@ export const ModelModal: React.FC<ModelModalProps> = ({
     // v3.6.1: 是否为 Google 提供商（忽略大小写）
     const isGoogleProvider = selectedProvider?.id.toLowerCase() === 'google';
 
+    const getDefaultBaseUrlForProvider = (modelProvider?: ModelProvider) =>
+        modelProvider?.id.startsWith('custom-') ? modelProvider.defaultEndpoint : '';
+
     // v3.6.1: 获取 Google 配额信息（用于显示配额百分比）
     // v0.8.0: 模型列表已由 App.tsx 统一增强，这里只获取配额信息
     const {
@@ -136,7 +139,7 @@ export const ModelModal: React.FC<ModelModalProps> = ({
             }
             setModelId(''); // 清空 Model ID
             setApiKey('');
-            setBaseUrl('');
+            setBaseUrl(getDefaultBaseUrlForProvider(defaultProvider));
             setTemperature(0.7);
             // v3.2.0: 如果默认提供商已连接，自动勾选使用凭证
             setUseProviderCredential(defaultProvider?.connected === true);
@@ -173,7 +176,10 @@ export const ModelModal: React.FC<ModelModalProps> = ({
         }
 
         // v3.2.1: 如果使用已连接提供商的凭证且未手动设置端点，自动使用提供商默认端点
-        const finalBaseUrl = baseUrl || (useProviderCredential && selectedProvider ? selectedProvider.defaultEndpoint : undefined);
+        const finalBaseUrl =
+            baseUrl ||
+            getDefaultBaseUrlForProvider(selectedProvider) ||
+            (useProviderCredential && selectedProvider ? selectedProvider.defaultEndpoint : undefined);
 
         // v0.9.4: 保存协议（所有提供商都可以指定协议）
         const finalProtocol = protocol;
@@ -209,6 +215,7 @@ export const ModelModal: React.FC<ModelModalProps> = ({
             setMaxTokens(newProv.models[0].maxTokens);
         } else {
             setName('');
+            setMaxTokens(4096);
         }
         // v3.2.0: 如果新提供商已连接，自动勾选使用凭证
         setUseProviderCredential(newProv?.connected === true);
@@ -219,6 +226,7 @@ export const ModelModal: React.FC<ModelModalProps> = ({
         // v0.9.0: 切换提供商时更新默认协议
         // v4.2.7: 优先使用提供商的默认协议（自定义提供商）
         setProtocol(newProv?.protocol || getDefaultProtocol(val));
+        setBaseUrl(getDefaultBaseUrlForProvider(newProv));
     };
 
     // v3.2.0: 为已连接的提供商添加标识

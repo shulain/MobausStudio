@@ -168,7 +168,9 @@ describe('ModelModal 组件测试', () => {
         console.log('[步骤 6] 验证 onSave 包含自定义名称');
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
             provider: 'custom-test-123',
-            name: 'my-custom-model'
+            name: 'my-custom-model',
+            baseUrl: 'https://api.example.com',
+            maxTokens: 4096,
         }));
     });
 
