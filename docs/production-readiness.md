@@ -1,12 +1,14 @@
 # Production Readiness Evidence
 
-Last updated: 2026-06-10, Asia/Shanghai.
+Last updated: 2026-06-11, Asia/Shanghai.
 
 This document records the current production-readiness boundary for MobausStudio. It is an evidence index, not a replacement for CI or the Release workflow.
 
 ## Current status
 
 Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction.
+
+The Release workflow now also requires macOS distribution artifacts to pass signing and notarization verification after `tauri-apps/tauri-action` finishes. The gate rejects adhoc-signed apps, missing TeamIdentifier, missing hardened runtime, non-authoritative Gatekeeper checks, and DMGs without a stapled notarization ticket.
 
 The remaining blocker is external to this repository:
 
@@ -15,6 +17,31 @@ Apple notarization preflight failed. Check Apple Developer Program agreements an
 ```
 
 Do not mark the project as fully production-ready until a Release workflow run completes after Apple Developer / App Store Connect agreements and notarization credentials are valid.
+
+Local evidence from 2026-06-11:
+
+```text
+npm run verify:release-workflow: passed
+npm run test:release-workflow: passed, 7 tests
+npm run test:release-version: passed, 4 tests
+npm run audit:web: passed, found 0 vulnerabilities
+npm run build:app:local: passed
+npm run verify:macos-app-bundle: passed
+npm run smoke:macos-app-launch: passed
+LaunchServices screenshot: /tmp/mobausstudio-app-launch-smoke.png
+```
+
+Distribution boundary from the same local artifact:
+
+```text
+APPLE_CERTIFICATE / APPLE_ID / APPLE_TEAM_ID / TAURI_SIGNING_PRIVATE_KEY: missing locally
+codesign --verify --deep --strict: failed for the local adhoc app bundle
+Signature: adhoc
+TeamIdentifier: not set
+notarytool history: skipped because local Apple credentials are missing
+```
+
+This local artifact proves local launchability only. It does not prove user-distributable macOS release readiness.
 
 ## Verified evidence
 
@@ -100,6 +127,7 @@ The Release workflow currently enforces these guardrails:
 - Concurrent releases for the same target version are serialized.
 - Apple notarization availability is checked before any Draft Release is created.
 - Desktop, Web, and Docker release jobs depend on Draft Release creation.
+- macOS desktop Release jobs verify non-adhoc signing, TeamIdentifier, hardened runtime, Gatekeeper assessment, and stapled DMG notarization before the workflow can publish.
 - Docker image push only happens in `publish-release`, after all release gates pass.
 - Failed or cancelled draft releases are cleaned up; failed manual `workflow_dispatch` releases also clean up the automatically created tag.
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
@@ -169,6 +197,19 @@ npm run smoke:web:production
 npm run build:app:local
 npm run verify:macos-app-bundle
 npm run smoke:macos-app-launch
+```
+
+After a real signed and notarized macOS Release build, run the distribution verifier on the macOS runner artifact root:
+
+```bash
+npm run verify:macos-distribution -- <target-triple>
+```
+
+For example:
+
+```bash
+npm run verify:macos-distribution -- aarch64-apple-darwin
+npm run verify:macos-distribution -- x86_64-apple-darwin
 ```
 
 For full repository CI parity, rely on GitHub Actions CI:

@@ -8,6 +8,11 @@ import assert from 'node:assert/strict';
 const SCRIPT_PATH = 'scripts/verify-release-workflow.mjs';
 const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
 const VALID_WORKFLOW = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
+const MACOS_DISTRIBUTION_VERIFIER_STEP = `      - name: 验证 macOS 签名与公证产物
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: npm run verify:macos-distribution -- "\${{ matrix.target }}"
+`;
 
 function runVerifier(workflowContent) {
   const tempDir = mkdtempSync(join(tmpdir(), 'mobaus-release-workflow-'));
@@ -64,6 +69,13 @@ test('rejects release builds that do not depend on draft creation', () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /build-desktop draft release dependency is missing/);
+});
+
+test('rejects macOS release builds without distribution signing verification', () => {
+  const result = runVerifier(VALID_WORKFLOW.replace(MACOS_DISTRIBUTION_VERIFIER_STEP, ''));
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /macOS distribution signing verifier step is missing/);
 });
 
 test('rejects Docker push before release asset verification', () => {

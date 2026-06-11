@@ -86,6 +86,24 @@ for (const jobName of ['build-desktop', 'build-web', 'build-docker']) {
   );
 }
 
+const buildDesktop = jobBlock('build-desktop');
+assertIncludes(
+  buildDesktop,
+  '验证 macOS 签名与公证产物',
+  'macOS distribution signing verifier step',
+);
+assertIncludes(
+  buildDesktop,
+  'npm run verify:macos-distribution -- "${{ matrix.target }}"',
+  'macOS distribution signing verifier command',
+);
+assertOrder(
+  buildDesktop,
+  'uses: tauri-apps/tauri-action@v0',
+  '验证 macOS 签名与公证产物',
+  'macOS distribution verification after Tauri build',
+);
+
 const publishRelease = jobBlock('publish-release');
 assertIncludes(
   publishRelease,

@@ -351,6 +351,11 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: ${{ matrix.args }}
 
+      - name: 验证 macOS 签名与公证产物
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: npm run verify:macos-distribution -- "${{ matrix.target }}"
+
   # 构建 Web 版本
   build-web:
     needs: [prepare-release, create-draft-release]
