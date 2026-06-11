@@ -163,8 +163,11 @@ export const MCPCard: React.FC<MCPCardProps> = ({
                         </div>
                         <div className="flex items-center gap-1">
                             <button
+                                type="button"
                                 onClick={onDelete}
                                 disabled={isConnecting}
+                                title={t.mcp.deleteServer}
+                                aria-label={t.mcp.deleteServer}
                                 className={`p-2 rounded-[10px] transition-colors ${
                                     isConnecting
                                         ? 'cursor-not-allowed opacity-50'

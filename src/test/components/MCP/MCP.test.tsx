@@ -229,8 +229,8 @@ describe('MCPPage', () => {
         // MCP-D01: 点击删除按钮显示确认对话框
         it('should show delete confirmation dialog when delete button is clicked', () => {
             renderWithI18n(<MCPPage {...defaultProps} />);
-            // 找到删除按钮（Trash2图标按钮）并点击
-            const deleteButtons = screen.getAllByRole('button').filter(btn => btn.querySelector('svg.lucide-trash-2'));
+            // 找到删除按钮并点击
+            const deleteButtons = screen.getAllByRole('button', { name: '删除服务器' });
             // 点击第一个服务器的删除按钮
             if (deleteButtons.length > 0) {
                 fireEvent.click(deleteButtons[0]);
@@ -245,13 +245,7 @@ describe('MCPPage', () => {
             const handleDelete = vi.fn();
             renderWithI18n(<MCPPage {...defaultProps} onDeleteServer={handleDelete} />);
             // 打开删除确认对话框
-            const deleteButtons = document.querySelectorAll('button');
-            const trashButton = Array.from(deleteButtons).find(btn =>
-                btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-            );
-            if (trashButton) {
-                fireEvent.click(trashButton);
-            }
+            fireEvent.click(screen.getAllByRole('button', { name: '删除服务器' })[0]);
             // 点击确认删除按钮
             const confirmDeleteBtn = screen.getByRole('button', { name: '删除' });
             fireEvent.click(confirmDeleteBtn);
@@ -264,13 +258,7 @@ describe('MCPPage', () => {
             const handleDelete = vi.fn();
             renderWithI18n(<MCPPage {...defaultProps} onDeleteServer={handleDelete} />);
             // 打开删除确认对话框
-            const deleteButtons = document.querySelectorAll('button');
-            const trashButton = Array.from(deleteButtons).find(btn =>
-                btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-            );
-            if (trashButton) {
-                fireEvent.click(trashButton);
-            }
+            fireEvent.click(screen.getAllByRole('button', { name: '删除服务器' })[0]);
             // 点击取消按钮
             const cancelBtn = screen.getByRole('button', { name: '取消' });
             fireEvent.click(cancelBtn);
@@ -284,13 +272,7 @@ describe('MCPPage', () => {
         it('should display server name in confirmation dialog', () => {
             renderWithI18n(<MCPPage {...defaultProps} />);
             // 打开删除确认对话框
-            const deleteButtons = document.querySelectorAll('button');
-            const trashButton = Array.from(deleteButtons).find(btn =>
-                btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-            );
-            if (trashButton) {
-                fireEvent.click(trashButton);
-            }
+            fireEvent.click(screen.getAllByRole('button', { name: '删除服务器' })[0]);
             // 验证显示服务器名称（在确认对话框的提示文本中）- v3.5.0: 文本格式变化
             expect(screen.getByText(/确定要删除 MCP 服务器 "filesystem" 吗/)).toBeDefined();
             expect(screen.getByText(/此操作无法撤销/)).toBeDefined();
@@ -630,31 +612,21 @@ describe('MCPCard - 删除按钮状态', () => {
     // MCP-D05: 连接中的服务器删除按钮禁用
     it('MCP-D05: isLoading=true 时删除按钮禁用', () => {
         renderWithI18n(<MCPCard {...defaultCardProps} isLoading={true} />);
-        // 找到删除按钮（Trash2 图标的按钮）
-        const deleteButtons = document.querySelectorAll('button');
-        const trashButton = Array.from(deleteButtons).find(btn =>
-            btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-        );
-        expect(trashButton?.disabled).toBe(true);
+        const deleteButton = screen.getByRole('button', { name: '删除服务器' });
+        expect(deleteButton).toBeDisabled();
     });
 
     it('status=connecting 时删除按钮禁用', () => {
         const connectingServer = { ...mockServer, status: 'connecting' as const };
         renderWithI18n(<MCPCard {...defaultCardProps} server={connectingServer} />);
-        const deleteButtons = document.querySelectorAll('button');
-        const trashButton = Array.from(deleteButtons).find(btn =>
-            btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-        );
-        expect(trashButton?.disabled).toBe(true);
+        const deleteButton = screen.getByRole('button', { name: '删除服务器' });
+        expect(deleteButton).toBeDisabled();
     });
 
     it('正常状态下删除按钮可用', () => {
         renderWithI18n(<MCPCard {...defaultCardProps} isLoading={false} />);
-        const deleteButtons = document.querySelectorAll('button');
-        const trashButton = Array.from(deleteButtons).find(btn =>
-            btn.innerHTML.includes('lucide-trash-2') || btn.querySelector('.lucide-trash-2')
-        );
-        expect(trashButton?.disabled).toBe(false);
+        const deleteButton = screen.getByRole('button', { name: '删除服务器' });
+        expect(deleteButton).toBeEnabled();
     });
 });
 
