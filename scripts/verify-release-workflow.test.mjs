@@ -98,3 +98,15 @@ test('rejects cleanup without workflow_dispatch tag deletion', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /failed workflow_dispatch tag cleanup is missing/);
 });
+
+test('rejects cleanup that treats missing tag 422 as fatal', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW
+      .replace('error.status === 422', 'error.status === 409')
+      .replace('Reference does not exist', 'Reference already exists'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing tag cleanup 422 guard is missing/);
+  assert.match(result.stderr, /missing tag cleanup 422 message guard is missing/);
+});

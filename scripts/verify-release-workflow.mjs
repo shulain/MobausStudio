@@ -138,6 +138,8 @@ assertIncludes(cleanupReleaseDraft, '${{ failure() || cancelled() }}', 'cleanup 
 assertIncludes(cleanupReleaseDraft, 'deleteRelease', 'failed draft release cleanup');
 assertIncludes(cleanupReleaseDraft, "context.eventName === 'workflow_dispatch'", 'workflow_dispatch tag cleanup guard');
 assertIncludes(cleanupReleaseDraft, 'deleteRef', 'failed workflow_dispatch tag cleanup');
+assertIncludes(cleanupReleaseDraft, 'error.status === 422', 'missing tag cleanup 422 guard');
+assertIncludes(cleanupReleaseDraft, 'Reference does not exist', 'missing tag cleanup 422 message guard');
 
 if (process.exitCode) {
   process.exit();

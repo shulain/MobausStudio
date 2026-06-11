@@ -16,13 +16,25 @@ The remaining blocker is external to this repository:
 Apple notarization preflight failed. Check Apple Developer Program agreements and APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID secrets.
 ```
 
+The latest real Release verification run confirmed that the Apple secrets are present, but Apple rejects notarization access because the developer account has a missing or expired agreement:
+
+```bash
+gh run view 27343708414 --log-failed
+```
+
+Expected blocker evidence:
+
+```text
+Error: HTTP status code: 403. A required agreement is missing or has expired.
+```
+
 Do not mark the project as fully production-ready until a Release workflow run completes after Apple Developer / App Store Connect agreements and notarization credentials are valid.
 
 Local evidence from 2026-06-11:
 
 ```text
 npm run verify:release-workflow: passed
-npm run test:release-workflow: passed, 7 tests
+npm run test:release-workflow: passed, 8 tests
 npm run test:release-version: passed, 4 tests
 npm run audit:web: passed, found 0 vulnerabilities
 npm run build:app:local: passed
