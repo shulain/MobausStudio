@@ -19,13 +19,14 @@ Apple notarization preflight failed. Check Apple Developer Program agreements an
 The latest real Release verification run confirmed that the Apple secrets are present, but Apple rejects notarization access because the developer account has a missing or expired agreement:
 
 ```bash
-gh run view 27343708414 --log-failed
+gh run view 27344206620 --log-failed
 ```
 
 Expected blocker evidence:
 
 ```text
 Error: HTTP status code: 403. A required agreement is missing or has expired.
+cleanup-release-draft: success; no Draft Release or v0.8.7-10 tag remained after the failed preflight.
 ```
 
 Do not mark the project as fully production-ready until a Release workflow run completes after Apple Developer / App Store Connect agreements and notarization credentials are valid.
