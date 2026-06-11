@@ -61,7 +61,7 @@ This local artifact proves local launchability only. It does not prove user-dist
 Recent repository CI evidence:
 
 ```bash
-gh run view 27243589318
+gh run view 27349210478
 ```
 
 Expected result:
@@ -70,6 +70,7 @@ Expected result:
 test: success
 web-production-smoke: success
 docker-web-smoke: success
+macos-app-local-build: success
 rust-check: success
 ```
 
