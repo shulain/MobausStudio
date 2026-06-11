@@ -52,6 +52,11 @@ jobs:
       - name: Release Workflow 结构门禁测试
         run: npm run test:release-workflow
 
+      - name: GitHub Actions 运行时兼容门禁
+        run: |
+          npm run verify:github-actions-runtime
+          npm run test:github-actions-runtime
+
       - name: Release 资产完整性门禁测试
         run: npm run test:release-assets
 
@@ -120,7 +125,7 @@ jobs:
 
       - name: 上传生产 Web 烟测证据
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-web-smoke-${{ github.sha }}
           path: artifacts/production-smoke

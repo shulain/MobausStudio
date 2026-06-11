@@ -20,13 +20,21 @@ beforeAll(() => {
     });
 });
 
-// Mock templateService
-vi.mock('../../../services/templateService', () => ({
+const templateServiceMocks = vi.hoisted(() => ({
     parseTemplate: vi.fn(),
     getRequiredVariables: vi.fn(),
     installTemplate: vi.fn(),
     discoverTemplatesFromRepo: vi.fn(),
     isGitHubRepoUrl: vi.fn(),
+}));
+
+// Mock templateService
+vi.mock('../../../services/templateService', () => ({
+    parseTemplate: templateServiceMocks.parseTemplate,
+    getRequiredVariables: templateServiceMocks.getRequiredVariables,
+    installTemplate: templateServiceMocks.installTemplate,
+    discoverTemplatesFromRepo: templateServiceMocks.discoverTemplatesFromRepo,
+    isGitHubRepoUrl: templateServiceMocks.isGitHubRepoUrl,
 }));
 
 // Mock logger
@@ -44,6 +52,33 @@ vi.mock('../../../utils/logger', () => ({
 
 const renderWithI18n = (component: React.ReactElement) => {
     return render(<I18nProvider>{component}</I18nProvider>);
+};
+
+const resetTemplateServiceMocks = () => {
+    vi.clearAllMocks();
+    templateServiceMocks.parseTemplate.mockReset();
+    templateServiceMocks.getRequiredVariables.mockReset();
+    templateServiceMocks.installTemplate.mockReset();
+    templateServiceMocks.discoverTemplatesFromRepo.mockReset();
+    templateServiceMocks.isGitHubRepoUrl.mockReset();
+
+    templateServiceMocks.getRequiredVariables.mockReturnValue([]);
+    templateServiceMocks.installTemplate.mockResolvedValue({
+        success: true,
+        installed: {
+            mcpServers: [],
+            skills: [],
+            agents: [],
+        },
+        skipped: {
+            mcpServers: [],
+            skills: [],
+            agents: [],
+        },
+        errors: [],
+    });
+    templateServiceMocks.discoverTemplatesFromRepo.mockResolvedValue([]);
+    templateServiceMocks.isGitHubRepoUrl.mockReturnValue(false);
 };
 
 // Mock 数据
@@ -113,7 +148,7 @@ const defaultProps = {
 
 describe('TemplateInstallModal', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        resetTemplateServiceMocks();
     });
 
     /**
@@ -286,7 +321,7 @@ describe('TemplateInstallModal', () => {
 
 describe('TemplateInstallModal - 模板预览', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        resetTemplateServiceMocks();
     });
 
     /**
@@ -471,7 +506,7 @@ describe('TemplateInstallModal - 模板预览', () => {
 
 describe('TemplateInstallModal - 错误处理', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        resetTemplateServiceMocks();
     });
 
     /**
