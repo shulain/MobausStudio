@@ -120,6 +120,7 @@ describe('ExportModal', () => {
             <ExportModal isOpen={true} onClose={() => { }} onExport={() => { }} />
         );
         expect(screen.getByText('Agents 配置')).toBeDefined();
+        expect(screen.getByText('自定义提供商')).toBeDefined();
         expect(screen.getByText('Skills 配置')).toBeDefined();
         expect(screen.getByText('MCP 服务器')).toBeDefined();
         expect(screen.getByText('对话历史')).toBeDefined();
@@ -136,6 +137,7 @@ describe('ExportModal', () => {
         fireEvent.click(screen.getByRole('button', { name: /导出配置/i }));
         expect(handleExport).toHaveBeenCalledWith({
             models: true,  // v2.6.1: 新增
+            customProviders: true,
             agents: true,
             skills: true,
             mcp: true,

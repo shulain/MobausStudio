@@ -785,6 +785,7 @@ export interface AppNotification {
  */
 export interface ExportConfig {
     models: boolean;           // v2.6.1: AI 模型配置导出
+    customProviders: boolean;  // 自定义提供商定义导出
     agents: boolean;
     skills: boolean;
     mcp: boolean;

@@ -180,6 +180,8 @@ describe('SettingsPage', () => {
      * v2.6.2: handleExport 改为异步函数，测试需要等待异步操作完成
      */
     it('handles export flow', async () => {
+        vi.mocked(customProviderStorage.load).mockResolvedValueOnce([{ id: 'custom-exported', name: 'Exported Provider' } as any]);
+
         renderWithProviders(<SettingsPage />);
         fireEvent.click(screen.getByText('数据管理'));
         fireEvent.click(screen.getByText('导出配置'));
@@ -195,6 +197,7 @@ describe('SettingsPage', () => {
         await new Promise(resolve => setTimeout(resolve, 50));
 
         expect(window.URL.createObjectURL).toHaveBeenCalled();
+        expect(customProviderStorage.load).toHaveBeenCalled();
     });
 
     /**

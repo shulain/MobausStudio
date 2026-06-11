@@ -4593,6 +4593,9 @@ const handleExport = useCallback(async (config: ExportConfig) => {
     if (config.models) {
       exportData.models = await modelsStorage.load();
     }
+    if (config.customProviders) {
+      exportData.customProviders = await customProviderStorage.load();
+    }
     if (config.chats) {
       exportData.chats = await chatsStorage.load();
     }

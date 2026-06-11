@@ -134,6 +134,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         if (config.models) {
             exportData.models = await modelsStorage.load();
         }
+        if (config.customProviders) {
+            exportData.customProviders = await customProviderStorage.load();
+        }
         if (config.chats) {
             // v2.6.2: 使用 chatsStorage 确保在 Tauri 环境正确读取对话数据
             exportData.chats = await chatsStorage.load();

@@ -20,6 +20,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     // v2.6.5: 添加 roundtableChats 和 settings 选项，默认选中
     const [config, setConfig] = useState<ExportConfig>({
         models: true,
+        customProviders: true,
         agents: true,
         skills: true,
         mcp: true,
@@ -40,6 +41,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     // v2.6.5: 添加 roundtableChats 和 settings 选项
     const items = [
         { key: 'models' as const, label: t.exportModal.modelsConfig, desc: t.exportModal.modelsConfigDesc },
+        { key: 'customProviders' as const, label: t.exportModal.customProvidersConfig, desc: t.exportModal.customProvidersConfigDesc },
         { key: 'agents' as const, label: t.exportModal.agentsConfig, desc: t.exportModal.agentsConfigDesc },
         { key: 'skills' as const, label: t.exportModal.skillsConfig, desc: t.exportModal.skillsConfigDesc },
         { key: 'mcp' as const, label: t.exportModal.mcpServers, desc: t.exportModal.mcpServersDesc },

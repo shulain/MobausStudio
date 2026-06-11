@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const HOST = '127.0.0.1';
@@ -146,6 +146,7 @@ async function runBrowserSmoke(url) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     locale: 'zh-CN',
+    acceptDownloads: true,
   });
   const page = await context.newPage();
   const consoleErrors = [];
@@ -195,17 +196,268 @@ async function runBrowserSmoke(url) {
   await expectVisible(page.getByText('备份与恢复'), 'Settings backup and restore section');
   const backupSection = page.locator('section').filter({ hasText: '备份与恢复' });
 
+  const seededState = {
+    models: [
+      {
+        id: 'smoke-model-existing',
+        name: 'Smoke Existing Model',
+        provider: 'smoke-provider-existing',
+        status: 'offline',
+        apiKeySet: true,
+        apiKey: 'smoke-api-key',
+        endpoint: 'https://example.invalid/v1',
+        maxTokens: 1024,
+        pricing: { input: 0, output: 0 },
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    customProviders: [
+      {
+        id: 'smoke-provider-existing',
+        name: 'Smoke Existing Provider',
+        icon: '🧪',
+        description: { zh: '生产烟测自定义提供商', en: 'Production smoke custom provider' },
+        endpoint: 'https://example.invalid/v1',
+        authMethods: [{ type: 'api', label: 'API Key', description: 'Smoke API key' }],
+        protocol: 'openai',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    agents: [
+      {
+        id: 'smoke-agent-existing',
+        name: 'Smoke Existing Agent',
+        description: 'Production smoke export fixture',
+        model: 'smoke-model-existing',
+        skills: ['smoke-skill-existing'],
+        systemPrompt: 'You are the existing production smoke agent.',
+        temperature: 0.2,
+        maxTokens: 1024,
+        mcpServers: [{ serverId: 'smoke-mcp-existing', serverName: 'Smoke Existing MCP' }],
+        enableToolUse: true,
+        status: 'active',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+        usageCount: 0,
+      },
+    ],
+    skills: [
+      {
+        id: 'smoke-skill-existing',
+        name: 'Smoke Existing Skill',
+        description: 'Production smoke export fixture',
+        category: 'custom',
+        icon: 'Wrench',
+        color: 'purple',
+        enabled: true,
+        promptTemplate: 'Echo the production smoke fixture.',
+        builtIn: false,
+        version: '1.0.0',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    mcp: [
+      {
+        id: 'smoke-mcp-existing',
+        name: 'Smoke Existing MCP',
+        description: 'Production smoke export fixture',
+        enabled: true,
+        autoStart: false,
+        transportType: 'stdio',
+        command: 'node',
+        args: [],
+        authType: 'none',
+        status: 'disconnected',
+        requestCount: 0,
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    settings: {
+      theme: 'system',
+      language: 'zh',
+    },
+  };
+
+  await page.evaluate((state) => {
+    localStorage.setItem('mobaus_models', JSON.stringify(state.models));
+    localStorage.setItem('mobaus_custom_providers', JSON.stringify(state.customProviders));
+    localStorage.setItem('mobaus_agents', JSON.stringify(state.agents));
+    localStorage.setItem('mobaus_skills', JSON.stringify(state.skills));
+    localStorage.setItem('mobaus_mcp_servers', JSON.stringify(state.mcp));
+    localStorage.setItem('mobaus_settings', JSON.stringify(state.settings));
+  }, seededState);
+
   await backupSection.getByRole('button', { name: '导出配置' }).click();
   await expectVisible(page.getByText('Agents 配置'), 'export modal Agents option');
+  await expectVisible(page.getByText('自定义提供商', { exact: true }), 'export modal custom providers option');
   await expectVisible(page.getByText('Skills 配置'), 'export modal Skills option');
-  await page.getByRole('button', { name: '取消' }).click();
-  await expectVisible(page.getByText('备份与恢复'), 'backup and restore section after closing export modal');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出配置' }).last().click();
+  const exportDownload = await downloadPromise;
+  const exportedPath = join(tmpdir(), `mobaus-export-smoke-${Date.now()}.json`);
+  await exportDownload.saveAs(exportedPath);
+  const exportedData = JSON.parse(readFileSync(exportedPath, 'utf8'));
+  if (!exportedData.models?.some((item) => item.id === 'smoke-model-existing')) {
+    fail('Exported config did not include the seeded model.');
+  }
+  if (!exportedData.customProviders?.some((item) => item.id === 'smoke-provider-existing')) {
+    fail('Exported config did not include the seeded custom provider.');
+  }
+  if (!exportedData.agents?.some((item) => item.id === 'smoke-agent-existing')) {
+    fail('Exported config did not include the seeded agent.');
+  }
+  if (!exportedData.skills?.some((item) => item.id === 'smoke-skill-existing')) {
+    fail('Exported config did not include the seeded skill.');
+  }
+  if (!exportedData.mcp?.some((item) => item.id === 'smoke-mcp-existing')) {
+    fail('Exported config did not include the seeded MCP server.');
+  }
+  if (exportedData.chats !== undefined) {
+    fail('Exported config unexpectedly included chat history when the default chat option is off.');
+  }
+  await expectVisible(page.getByText('备份与恢复'), 'backup and restore section after completed export');
 
   await backupSection.getByRole('button', { name: '导入配置' }).click();
   await expectVisible(page.getByText('合并现有配置'), 'import modal merge option');
   await expectVisible(page.getByText('导入前备份'), 'import modal backup option');
-  await page.getByRole('button', { name: '取消' }).click();
-  await expectVisible(page.getByText('备份与恢复'), 'backup and restore section after closing import modal');
+
+  const importPayload = {
+    version: '1.0.0',
+    models: [
+      {
+        id: 'smoke-model-imported',
+        name: 'Smoke Imported Model',
+        provider: 'smoke-provider-imported',
+        status: 'offline',
+        apiKeySet: true,
+        apiKey: 'smoke-imported-api-key',
+        endpoint: 'https://imported.example.invalid/v1',
+        maxTokens: 2048,
+        pricing: { input: 0, output: 0 },
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    customProviders: [
+      {
+        id: 'smoke-provider-imported',
+        name: 'Smoke Imported Provider',
+        icon: '🧪',
+        description: { zh: '导入烟测自定义提供商', en: 'Imported smoke custom provider' },
+        endpoint: 'https://imported.example.invalid/v1',
+        authMethods: [{ type: 'api', label: 'API Key', description: 'Smoke imported API key' }],
+        protocol: 'openai',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    agents: [
+      {
+        id: 'smoke-agent-imported',
+        name: 'Smoke Imported Agent',
+        description: 'Production smoke import fixture',
+        model: 'smoke-model-imported',
+        skills: ['smoke-skill-imported'],
+        systemPrompt: 'You are the imported production smoke agent.',
+        temperature: 0.2,
+        maxTokens: 2048,
+        mcpServers: [{ serverId: 'smoke-mcp-imported', serverName: 'Smoke Imported MCP' }],
+        enableToolUse: true,
+        status: 'active',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+        usageCount: 0,
+      },
+    ],
+    skills: [
+      {
+        id: 'smoke-skill-imported',
+        name: 'Smoke Imported Skill',
+        description: 'Production smoke import fixture',
+        category: 'custom',
+        icon: 'Wrench',
+        color: 'purple',
+        enabled: true,
+        promptTemplate: 'Echo the imported production smoke fixture.',
+        builtIn: false,
+        version: '1.0.0',
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    mcp: [
+      {
+        id: 'smoke-mcp-imported',
+        name: 'Smoke Imported MCP',
+        description: 'Production smoke import fixture',
+        enabled: true,
+        autoStart: false,
+        transportType: 'stdio',
+        command: 'node',
+        args: [],
+        authType: 'none',
+        status: 'disconnected',
+        requestCount: 0,
+        createdAt: '2026-06-11T00:00:00.000Z',
+        updatedAt: '2026-06-11T00:00:00.000Z',
+      },
+    ],
+    settings: {
+      theme: 'system',
+      language: 'zh',
+    },
+  };
+  const importPath = join(tmpdir(), `mobaus-import-smoke-${Date.now()}.json`);
+  writeFileSync(importPath, JSON.stringify(importPayload, null, 2));
+  await page.locator('input[type="file"]').setInputFiles(importPath);
+  await expectVisible(page.getByText(basename(importPath)), 'selected import file name');
+
+  const backupCheckbox = page.getByLabel('导入前备份');
+  if (await backupCheckbox.isChecked()) {
+    await backupCheckbox.click();
+  }
+
+  await page.getByRole('button', { name: '开始导入' }).click();
+
+  try {
+    await page.waitForFunction(() => {
+      const parse = (key) => JSON.parse(localStorage.getItem(key) || '[]');
+      return (
+        parse('mobaus_models').some((item) => item.id === 'smoke-model-existing') &&
+        parse('mobaus_models').some((item) => item.id === 'smoke-model-imported') &&
+        parse('mobaus_custom_providers').some((item) => item.id === 'smoke-provider-existing') &&
+        parse('mobaus_custom_providers').some((item) => item.id === 'smoke-provider-imported') &&
+        parse('mobaus_agents').some((item) => item.id === 'smoke-agent-imported') &&
+        parse('mobaus_skills').some((item) => item.id === 'smoke-skill-imported') &&
+        parse('mobaus_mcp_servers').some((item) => item.id === 'smoke-mcp-imported')
+      );
+    }, null, { timeout: 10_000 });
+  } catch (error) {
+    const importSnapshot = await page.evaluate(() => {
+      const parse = (key) => {
+        try {
+          return JSON.parse(localStorage.getItem(key) || '[]');
+        } catch (parseError) {
+          return { parseError: String(parseError), raw: localStorage.getItem(key) };
+        }
+      };
+      return {
+        bodyText: document.body.innerText.slice(0, 2000),
+        models: parse('mobaus_models'),
+        customProviders: parse('mobaus_custom_providers'),
+        agents: parse('mobaus_agents'),
+        skills: parse('mobaus_skills'),
+        mcp: parse('mobaus_mcp_servers'),
+      };
+    });
+    fail(`Import did not persist the expected merged data.\n${JSON.stringify(importSnapshot, null, 2)}\n${error.message}`);
+  }
+  await expectVisible(page.getByText('Mobaus Studio'), 'app shell after completed import');
 
   const screenshotPath = process.env.PRODUCTION_SMOKE_SCREENSHOT || DEFAULT_SCREENSHOT_PATH;
   mkdirSync(dirname(screenshotPath), { recursive: true });
@@ -236,8 +488,8 @@ async function runBrowserSmoke(url) {
       'Providers search input',
       '外观设置',
       '数据管理',
-      '导出配置 modal',
-      '导入配置 modal',
+      '导出配置 download with models/custom providers/agents/skills/MCP',
+      '导入配置 file restore with merged persisted data',
     ],
     consoleErrors,
     pageErrors,

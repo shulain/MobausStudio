@@ -696,6 +696,8 @@ export const zh = {
         selectItems: '选择要导出的配置项：',
         modelsConfig: 'Models 配置',
         modelsConfigDesc: '导出 AI 模型和 API 密钥配置',
+        customProvidersConfig: '自定义提供商',
+        customProvidersConfigDesc: '导出自定义提供商定义和协议配置',
         agentsConfig: 'Agents 配置',
         agentsConfigDesc: '导出所有智能代理配置',
         skillsConfig: 'Skills 配置',

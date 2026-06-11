@@ -698,6 +698,8 @@ export const en: Translations = {
         selectItems: 'Select items to export:',
         modelsConfig: 'Models Configuration',
         modelsConfigDesc: 'Export AI model and API key configurations',
+        customProvidersConfig: 'Custom Providers',
+        customProvidersConfigDesc: 'Export custom provider definitions and protocol settings',
         agentsConfig: 'Agents Configuration',
         agentsConfigDesc: 'Export all agent configurations',
         skillsConfig: 'Skills Configuration',
