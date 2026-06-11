@@ -22,6 +22,16 @@ async function expectVisible(locator, label, timeout = 10_000) {
   });
 }
 
+async function expectAbsent(locator, label, timeout = 2_000) {
+  await locator.waitFor({ state: 'attached', timeout }).then(() => {
+    throw new Error(`Expected absent: ${label}`);
+  }).catch((error) => {
+    if (!String(error.message).includes('Timeout')) {
+      throw error;
+    }
+  });
+}
+
 function findChromeExecutable() {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -162,6 +172,9 @@ async function runBrowserSmoke(url) {
   await page.goto(url, { waitUntil: 'networkidle' });
   await expectVisible(page.getByText('Mobaus Studio'), 'app shell');
   await expectVisible(page.getByPlaceholder('搜索对话...'), 'chat search input');
+  await expectAbsent(page.getByText('React 开发问题'), 'mock React chat on clean startup');
+  await expectAbsent(page.getByText('Python 数据分析'), 'mock Python chat on clean startup');
+  await expectAbsent(page.getByText('Agent 创建成功'), 'mock notification on clean startup');
 
   const chatInput = page.getByPlaceholder(/输入消息/);
   await expectVisible(chatInput, 'chat message input', 15_000);
@@ -475,6 +488,7 @@ async function runBrowserSmoke(url) {
     screenshotPath,
     checked: [
       'startup chat page',
+      'clean startup without mock chats or notifications',
       'chat input editable',
       'new chat button',
       'Agent 管理',

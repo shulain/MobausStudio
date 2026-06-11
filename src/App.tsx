@@ -88,9 +88,6 @@ import {
   shouldSkipTokenUpdate,
   formatErrorMessage,
 } from './utils/chatStreamHelpers';
-import {
-  defaultNotifications,
-} from './data/mockData';
 import { useGoogleModels } from './hooks/useGoogleModels';
 import { useKiroModels } from './hooks/useKiroModels';
 import { type APITool, type MCPToolWithServer } from './hooks/useMCPTools';
@@ -189,7 +186,7 @@ function App() {
     roundtableChatsRef,
   } = useAppBootstrap({ addToast });
 
-  const [notifications, setNotifications] = useState<AppNotification[]>(defaultNotifications);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   // v4.1.4: 每个圆桌会议的发言者状态（按对话 ID 存储）
   const [roundtableSpeakerMap, setRoundtableSpeakerMap] = useState<Map<string, string | null>>(new Map());

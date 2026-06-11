@@ -33,7 +33,6 @@ import {
 } from '../services/storage';
 import { analytics, trackEvents } from '../services/analytics';
 import { tokenRefresher } from '../services/tokenRefresher';
-import { defaultChats } from '../data/mockData';
 import { isTauri } from '../utils/platform';
 import { logger, LogTags } from '../utils/logger';
 import { usePersistedState } from './usePersistedState';
@@ -198,7 +197,7 @@ export function useAppBootstrap(options: UseAppBootstrapOptions): UseAppBootstra
   // 防抖保存模式（高频更新数据，流式输出期间频繁变化）
   const { data: chats, setData: setChats, loaded: chatsLoaded } = usePersistedState({
     storage: chatsStorage,
-    initialValue: defaultChats,
+    initialValue: [],
   });
   const { data: roundtableChats, setData: setRoundtableChatsInternal, loaded: roundtableChatsLoaded } = usePersistedState({
     storage: roundtableChatsStorage,
