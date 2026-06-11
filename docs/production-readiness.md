@@ -42,6 +42,7 @@ npm run build:app:local: passed
 npm run verify:macos-app-bundle: passed
 npm run smoke:macos-app-launch: passed
 LaunchServices screenshot: /tmp/mobausstudio-app-launch-smoke.png
+macOS launch smoke resolves the target .app bundle to an absolute path, verifies that newly detected PIDs execute from that bundle's Contents/MacOS path, and warns when another same-name app process is running from a different path.
 ```
 
 Distribution boundary from the same local artifact:
