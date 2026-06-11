@@ -6,6 +6,25 @@
 
 #[cfg(test)]
 mod mcp_tests {
+    use crate::mcp::client::MCPClientManager;
+    use crate::mcp::protocol::{
+        MCPServerConfig as RuntimeMCPServerConfig, ToolContent, TransportType,
+    };
+    use serde_json::json;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+
+    fn python3_available() -> bool {
+        Command::new("python3")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
     /// TC-MCP-001: 测试 MCP 服务器配置验证
     #[test]
     fn test_mcp_server_config_validation() {
@@ -165,5 +184,80 @@ mod mcp_tests {
         }
 
         assert_eq!(request_id, 11);
+    }
+
+    /// TC-MCP-011: 真实 stdio MCP 子进程闭环。
+    ///
+    /// 覆盖 initialize -> tools/list -> tools/call -> disconnect，避免只测试配置对象。
+    #[tokio::test]
+    async fn test_stdio_mcp_real_echo_server_closed_loop() {
+        if !python3_available() {
+            eprintln!("python3 is unavailable; skipping stdio MCP fixture test");
+            return;
+        }
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("mcp_stdio_echo_server.py");
+        assert!(
+            fixture_path.is_file(),
+            "missing MCP stdio fixture: {}",
+            fixture_path.display()
+        );
+
+        let manager = MCPClientManager::new();
+        let server_id = "stdio-echo-fixture";
+        let config = RuntimeMCPServerConfig {
+            transport_type: TransportType::Stdio,
+            command: Some("python3".to_string()),
+            args: Some(vec![fixture_path.to_string_lossy().to_string()]),
+            env: Some(HashMap::new()),
+            endpoint: None,
+            auth_type: None,
+            auth_value: None,
+        };
+
+        let connection = manager
+            .connect(server_id, config)
+            .await
+            .expect("stdio MCP fixture should connect");
+        assert!(connection.success);
+        assert_eq!(
+            connection
+                .server_info
+                .as_ref()
+                .map(|info| info.name.as_str()),
+            Some("mobaus-stdio-fixture")
+        );
+
+        let tools = manager
+            .list_tools(server_id)
+            .await
+            .expect("stdio MCP fixture should list tools");
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0].name, "echo_text");
+
+        let result = manager
+            .call_tool(
+                server_id,
+                "echo_text",
+                json!({ "text": "hello from mobaus" }),
+            )
+            .await
+            .expect("stdio MCP fixture should call echo_text");
+        assert_eq!(result.is_error, Some(false));
+        assert_eq!(result.content.len(), 1);
+
+        match &result.content[0] {
+            ToolContent::Text { text } => assert_eq!(text, "echo:hello from mobaus"),
+            other => panic!("expected text tool content, got {:?}", other),
+        }
+
+        manager
+            .disconnect(server_id)
+            .await
+            .expect("stdio MCP fixture should disconnect");
+        assert!(!manager.is_connected(server_id).await);
     }
 }

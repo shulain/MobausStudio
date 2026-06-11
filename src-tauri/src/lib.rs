@@ -2388,6 +2388,10 @@ pub struct MCPConnectRequest {
     pub env: Option<HashMap<String, String>>,
     /// http 传输: 端点地址
     pub endpoint: Option<String>,
+    /// 认证类型: "none" | "apikey" | "token"
+    pub auth_type: Option<String>,
+    /// 认证值（API Key 或 Bearer Token）
+    pub auth_value: Option<String>,
 }
 
 /// MCP 连接响应
@@ -2443,8 +2447,8 @@ async fn mcp_connect(request: MCPConnectRequest) -> Result<MCPConnectResponse, S
         args: request.args,
         env: request.env,
         endpoint: request.endpoint,
-        auth_type: None, // 认证在前端配置中单独管理
-        auth_value: None,
+        auth_type: request.auth_type,
+        auth_value: request.auth_value,
     };
 
     // 执行连接

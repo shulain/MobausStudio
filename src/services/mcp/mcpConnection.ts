@@ -32,6 +32,8 @@ interface MCPConnectRequest {
   args?: string[];
   env?: Record<string, string>;
   endpoint?: string;
+  auth_type?: string;
+  auth_value?: string;
 }
 
 /**
@@ -129,6 +131,8 @@ export async function handleMCPConnect(
       args: server.args,
       env: server.env,
       endpoint: server.endpoint,
+      auth_type: server.authType,
+      auth_value: server.authValue,
     };
 
     logger.debug(LogTags.MCP, `调用后端 mcp_connect 命令`, { serverId: server.id });

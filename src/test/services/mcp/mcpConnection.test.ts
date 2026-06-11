@@ -114,6 +114,8 @@ describe('mcpConnection 业务逻辑测试', () => {
           args: mockServer.args,
           env: mockServer.env,
           endpoint: mockServer.endpoint,
+          auth_type: mockServer.authType,
+          auth_value: mockServer.authValue,
         },
       });
       expect(mockInvoke).toHaveBeenNthCalledWith(3, 'mcp_list_tools', {
@@ -176,6 +178,8 @@ describe('mcpConnection 业务逻辑测试', () => {
         request: expect.objectContaining({
           transport_type: 'http',
           endpoint: 'https://mcp.example.com',
+          auth_type: 'apikey',
+          auth_value: 'test-api-key',
         }),
       });
 
@@ -332,6 +336,8 @@ describe('mcpConnection 业务逻辑测试', () => {
       expect(mockInvoke).toHaveBeenNthCalledWith(2, 'mcp_connect', {
         request: expect.objectContaining({
           args: [],
+          auth_type: 'none',
+          auth_value: undefined,
         }),
       });
       expect(result.success).toBe(true);
