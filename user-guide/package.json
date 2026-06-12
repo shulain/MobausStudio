@@ -8,6 +8,9 @@
     "preview": "vitepress preview",
     "clean": "rm -rf .vitepress/dist .vitepress/cache"
   },
+  "overrides": {
+    "vite": "6.4.3"
+  },
   "devDependencies": {
     "vitepress": "^1.5.0"
   }

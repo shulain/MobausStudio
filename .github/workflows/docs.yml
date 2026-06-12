@@ -40,7 +40,10 @@ jobs:
           enablement: true
 
       - name: Install dependencies
-        run: cd user-guide && npm install
+        run: cd user-guide && npm ci
+
+      - name: Audit dependencies
+        run: cd user-guide && npm audit --audit-level=moderate
 
       - name: Build VitePress
         run: cd user-guide && npm run build

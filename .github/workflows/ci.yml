@@ -131,6 +131,29 @@ jobs:
           path: artifacts/production-smoke
           if-no-files-found: warn
 
+  docs-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: user-guide/package-lock.json
+
+      - name: 安装用户指南依赖
+        run: cd user-guide && npm ci
+
+      - name: 用户指南依赖漏洞审计
+        run: cd user-guide && npm audit --audit-level=moderate
+
+      - name: 构建用户指南
+        run: cd user-guide && npm run build
+
   macos-app-local-build:
     runs-on: macos-latest
 

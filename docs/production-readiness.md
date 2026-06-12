@@ -6,7 +6,7 @@ This document records the current production-readiness boundary for MobausStudio
 
 ## Current status
 
-Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction.
+Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, user guide build, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction.
 
 The Release workflow now also requires macOS distribution artifacts to pass signing and notarization verification after `tauri-apps/tauri-action` finishes. The gate rejects adhoc-signed apps, missing TeamIdentifier, missing hardened runtime, non-authoritative Gatekeeper checks, and DMGs without a stapled notarization ticket.
 
@@ -158,6 +158,7 @@ CI currently enforces these non-release smoke gates on every `main` push and pul
 - `test`: npm vulnerability audit, TypeScript, ESLint, release workflow guard verifier, release version verifier, frontend tests, and Web build.
 - `web-production-smoke`: production Vite build, preview server startup, real browser navigation through Chat, Agent, Skills, MCP, Models, Providers, Config Switcher, Stats, and Settings, chat input/new-chat interaction, Settings data import/export modal coverage, screenshot/report artifact upload, and browser console/page-error failure capture.
 - `docker-web-smoke`: Docker Web image build and OCI version label verification.
+- `docs-build`: VitePress user guide dependency installation with `npm ci`, dependency vulnerability audit, and static site build.
 - `macos-app-local-build`: unsigned local macOS `.app` build, bundle structure verification, and LaunchServices open smoke when the runner has a GUI-capable session.
 - `rust-check`: RustSec audit, `cargo check`, Rust format check, Clippy with warnings denied, and Rust tests.
 - `test`: includes a Tauri security gate that rejects disabled CSP and unsafe script sources.
