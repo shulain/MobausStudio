@@ -459,11 +459,12 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: 验证 Docker 镜像构建
+        timeout-minutes: 20
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
-          load: true
+          platforms: linux/amd64,linux/arm64
+          outputs: type=cacheonly
           push: false
           tags: ${{ steps.image.outputs.tags }}
           build-args: |
@@ -527,15 +528,15 @@ jobs:
           gh release download "$TAG" --pattern latest.json --dir /tmp/release-assets
           npm run verify:updater-manifest -- /tmp/release-assets/latest.json "${{ needs.prepare-release.outputs.version }}" /tmp/release-assets.txt
 
-      # Docker image is a static Web preview. Keep the publish platform aligned
-      # with build-docker verification so an unverified QEMU arm64 build cannot
-      # block desktop release publication indefinitely.
+      # Docker image is a static Web preview. Keep publish platforms aligned
+      # with build-docker verification, and bound the push so GHCR/Buildx stalls
+      # cannot block desktop release publication indefinitely.
       - name: 推送 Docker 镜像
         timeout-minutes: 20
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.image.outputs.tags }}
           build-args: |

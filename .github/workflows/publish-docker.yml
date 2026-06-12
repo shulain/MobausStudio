@@ -1,0 +1,91 @@
+# 发布或修复 Docker Web 预览镜像
+#
+# 用途：
+# - 已发布桌面 Release 不需要重建，但 GHCR 镜像 tag 需要补发或修复时使用
+# - 正式 Release workflow 仍是完整发布主路径
+
+name: Publish Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号 (如 0.8.8)"
+        required: true
+      tag_latest:
+        description: "稳定版本同时发布 major.minor 和 latest tag"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  publish-docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 验证版本号
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::版本号格式错误: $VERSION"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major_minor=$(echo "$VERSION" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          cache-image: false
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 设置镜像名称
+        id: image
+        shell: bash
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          VERSION="${{ steps.version.outputs.version }}"
+          MAJOR_MINOR="${{ steps.version.outputs.major_minor }}"
+          IMAGE_NAME="ghcr.io/${REPO_LOWER}"
+          TAG_LATEST="${{ github.event.inputs.tag_latest }}"
+
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE_NAME}:${VERSION}"
+            if [[ "$VERSION" != *-* && "$TAG_LATEST" == "true" ]]; then
+              echo "${IMAGE_NAME}:${MAJOR_MINOR}"
+              echo "${IMAGE_NAME}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 推送 Docker 多架构镜像
+        timeout-minutes: 20
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.image.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false

@@ -12,20 +12,23 @@ All version update records.
 
 - 🚀 Stable Release Refresh - Published v0.8.8 as the stable production release line after completing bilingual release-note coverage and release documentation closure
 - 🌐 Bilingual Release Notes - Added English and Chinese changelog coverage so project documentation matches the public GitHub Release page
+- 🐳 Multi-Architecture Docker Image - GHCR Web preview images now publish for both `linux/amd64` and `linux/arm64`
 
 ### Improved
 
 - 📋 Release Documentation Standard - Production readiness documentation now requires bilingual changelog entries before any public Release or prerelease
 - 🧭 Release Page Clarity - Official Release notes now include user-facing feature/change descriptions and platform download guidance instead of fallback text
+- 🧱 Docker Release Safety - Release Docker builds verify the same multi-architecture platform set before publishing, with a bounded Docker push timeout
 
 ### Fixed
 
 - 🔧 Fixed official Release notes missing feature descriptions when the target version is absent from the changelog before publication
 - 🔧 Fixed Chinese changelog coverage for the current stable release stream
+- 🔧 Fixed the v0.8.8 Docker publishing mitigation being temporarily constrained to `linux/amd64` after the GHCR push stall
 
 ### Notes
 
-- Runtime product behavior is unchanged from v0.8.7 except for release version metadata; this release exists to provide a clean, complete, bilingual stable Release record.
+- Runtime product behavior is unchanged from v0.8.7 except for release version metadata and Docker Web preview image architecture coverage; this release exists to provide a clean, complete, bilingual stable Release record.
 
 ---
 

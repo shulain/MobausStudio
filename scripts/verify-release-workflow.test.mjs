@@ -107,9 +107,45 @@ test('rejects Docker push before release asset verification', () => {
   assert.match(result.stderr, /release asset verification before Docker push has the wrong order/);
 });
 
+test('rejects release Docker verification without a bounded timeout', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace(
+      '      - name: 验证 Docker 镜像构建\n        timeout-minutes: 20\n        uses: docker/build-push-action@v7',
+      '      - name: 验证 Docker 镜像构建\n        uses: docker/build-push-action@v7',
+    ),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /release Docker build verification timeout is missing/);
+});
+
+test('rejects release Docker verification without multi-arch platforms', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace(
+      '          platforms: linux/amd64,linux/arm64\n          outputs: type=cacheonly',
+      '          platforms: linux/amd64\n          outputs: type=cacheonly',
+    ),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /release Docker build verification platforms is missing/);
+});
+
+test('rejects release Docker verification without cache-only output', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace('          outputs: type=cacheonly\n          push: false', '          push: false'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /release Docker multi-arch verification output is missing/);
+});
+
 test('rejects publish Docker push without a bounded timeout', () => {
   const result = runVerifier(
-    VALID_WORKFLOW.replace('        timeout-minutes: 20\n        uses: docker/build-push-action@v7', '        uses: docker/build-push-action@v7'),
+    VALID_WORKFLOW.replace(
+      '      - name: 推送 Docker 镜像\n        timeout-minutes: 20\n        uses: docker/build-push-action@v7',
+      '      - name: 推送 Docker 镜像\n        uses: docker/build-push-action@v7',
+    ),
   );
 
   assert.notEqual(result.status, 0);
@@ -118,11 +154,14 @@ test('rejects publish Docker push without a bounded timeout', () => {
 
 test('rejects publish Docker push platforms that diverge from verification', () => {
   const result = runVerifier(
-    VALID_WORKFLOW.replace('          platforms: linux/amd64\n          push: true', '          platforms: linux/amd64,linux/arm64\n          push: true'),
+    VALID_WORKFLOW.replace(
+      '          platforms: linux/amd64,linux/arm64\n          push: true',
+      '          platforms: linux/amd64\n          push: true',
+    ),
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /publish-time Docker push must match the validated linux\/amd64 platform/);
+  assert.match(result.stderr, /publish-time Docker push platforms is missing/);
 });
 
 test('rejects cleanup without workflow_dispatch tag deletion', () => {

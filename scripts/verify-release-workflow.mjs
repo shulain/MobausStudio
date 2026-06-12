@@ -120,6 +120,19 @@ assertOrder(
   'macOS distribution verification after DMG notarization',
 );
 
+const buildDocker = jobBlock('build-docker');
+assertIncludes(buildDocker, 'timeout-minutes: 20', 'release Docker build verification timeout');
+assertIncludes(
+  buildDocker,
+  'platforms: linux/amd64,linux/arm64',
+  'release Docker build verification platforms',
+);
+assertIncludes(
+  buildDocker,
+  'outputs: type=cacheonly',
+  'release Docker multi-arch verification output',
+);
+
 const publishRelease = jobBlock('publish-release');
 assertIncludes(
   publishRelease,
@@ -128,10 +141,7 @@ assertIncludes(
 );
 assertIncludes(publishRelease, '推送 Docker 镜像', 'publish-time Docker push');
 assertIncludes(publishRelease, 'timeout-minutes: 20', 'publish-time Docker push timeout');
-assertIncludes(publishRelease, 'platforms: linux/amd64', 'publish-time Docker push platform');
-if (publishRelease.includes('platforms: linux/amd64,linux/arm64')) {
-  fail('publish-time Docker push must match the validated linux/amd64 platform until arm64 is verified separately');
-}
+assertIncludes(publishRelease, 'platforms: linux/amd64,linux/arm64', 'publish-time Docker push platforms');
 assertIncludes(publishRelease, '验证 Draft Release 资产完整性', 'release asset completeness guard');
 assertIncludes(publishRelease, 'npm run verify:release-assets', 'release asset verifier command');
 assertIncludes(publishRelease, 'npm run verify:updater-manifest', 'updater manifest verifier command');
