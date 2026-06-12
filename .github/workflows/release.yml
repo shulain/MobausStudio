@@ -547,11 +547,15 @@ jobs:
             const version = '${{ needs.prepare-release.outputs.version }}';
             const tag = `v${version}`;
             const { owner, repo } = context.repo;
-            const { data: release } = await github.rest.repos.getReleaseByTag({
+            const releases = await github.paginate(github.rest.repos.listReleases, {
               owner,
               repo,
-              tag,
+              per_page: 100,
             });
+            const release = releases.find((item) => item.tag_name === tag);
+            if (!release) {
+              throw new Error(`Release ${tag} not found`);
+            }
 
             await github.rest.repos.updateRelease({
               owner,
