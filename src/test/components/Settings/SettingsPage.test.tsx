@@ -256,6 +256,39 @@ describe('SettingsPage', () => {
         }
     });
 
+    it('reports file read failures without writing storage', async () => {
+        const OriginalFileReader = window.FileReader;
+        class FailingFileReader {
+            onerror: ((e: any) => void) | null = null;
+            error = new Error('read failed');
+            readAsText(_file: Blob) {
+                setTimeout(() => {
+                    this.onerror?.({ target: this });
+                }, 0);
+            }
+        }
+        window.FileReader = FailingFileReader as any;
+
+        try {
+            renderWithProviders(<SettingsPage />);
+            fireEvent.click(screen.getByText('数据管理'));
+            fireEvent.click(screen.getByText('导入配置'));
+
+            const unreadableFile = new File(['{}'], 'unreadable-config.json', { type: 'application/json' });
+            const unreadableInput = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(unreadableInput, { target: { files: [unreadableFile] } });
+            fireEvent.click(screen.getByText('开始导入'));
+
+            await waitFor(() => {
+                expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('导入失败'));
+            });
+            expect(chatsStorage.save).not.toHaveBeenCalled();
+            expect(mockReload).not.toHaveBeenCalled();
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
+    });
+
     it('creates a full storage-service backup before importing', async () => {
         const OriginalGlobalBlob = globalThis.Blob;
         const OriginalWindowBlob = window.Blob;
