@@ -530,8 +530,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 importingRef.current = false;  // 错误时重置，允许重试
             }
         };
-        reader.onerror = async () => {
-            logger.error(LogTags.SETTINGS, '导入文件读取失败', reader.error);
+        const reportReadError = async (error: unknown) => {
+            logger.error(LogTags.SETTINGS, '导入文件读取失败', error);
             const errorMessage = t.messages.importError || '导入失败：文件格式无效';
             if (isTauriEnvironment()) {
                 await message(errorMessage, { title: 'Mobaus Studio', kind: 'error' });
@@ -540,7 +540,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             }
             importingRef.current = false;
         };
-        reader.readAsText(file);
+
+        reader.onerror = () => {
+            void reportReadError(reader.error);
+        };
+
+        try {
+            reader.readAsText(file);
+        } catch (error) {
+            void reportReadError(error);
+        }
         // v2.6.2: 不需要在这里关闭 modal，ImportModal 内部已经调用 onClose()
     }, [createPreImportBackup, t]);
 

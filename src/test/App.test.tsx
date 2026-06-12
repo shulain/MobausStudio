@@ -182,6 +182,34 @@ describe('App', () => {
         }
     });
 
+    it('should report global import read start failures without writing credentials', async () => {
+        const OriginalFileReader = window.FileReader;
+        class ThrowingFileReader {
+            readAsText(_file: Blob) {
+                throw new Error('read start failed');
+            }
+        }
+        window.FileReader = ThrowingFileReader as any;
+
+        try {
+            renderWithProviders(<App />);
+            await waitForAppReady();
+
+            fireEvent.click(screen.getByTitle('导入配置'));
+
+            const file = new File(['{}'], 'broken-backup.json', { type: 'application/json' });
+            const input = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(input, { target: { files: [file] } });
+            fireEvent.click(screen.getByText('开始导入'));
+
+            expect(await screen.findAllByText('导入失败：文件格式无效')).not.toHaveLength(0);
+            expect(providerCredentialsStorage.save).not.toHaveBeenCalled();
+            expect(customProviderStorage.save).not.toHaveBeenCalled();
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
+    });
+
     it('should render chat page by default', async () => {
         renderWithProviders(<App />);
         // 搜索对话输入框应该存在

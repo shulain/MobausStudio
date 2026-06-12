@@ -4961,8 +4961,9 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
     }
   };
 
-  reader.onerror = () => {
+  const reportReadError = (error: unknown) => {
     importingRef.current = false;
+    logger.error(LogTags.APP, '导入文件读取失败', error);
     addToast({
       type: 'error',
       title: t.messages.importError || '导入失败：文件格式无效',
@@ -4971,7 +4972,15 @@ const handleImport = useCallback((file: File, options: ImportOptions) => {
     });
   };
 
-  reader.readAsText(file);
+  reader.onerror = () => {
+    reportReadError(reader.error);
+  };
+
+  try {
+    reader.readAsText(file);
+  } catch (error) {
+    reportReadError(error);
+  }
 }, [addToast, createPreImportBackup, t]);
 
 const unreadCount = notifications.filter((n) => !n.read).length;
