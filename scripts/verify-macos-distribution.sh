@@ -99,10 +99,16 @@ verify_dmg() {
   local dmg="$1"
   local stapler_output gatekeeper_output
 
-  stapler_output="$(xcrun stapler validate "$dmg" 2>&1)"
+  if ! stapler_output="$(xcrun stapler validate "$dmg" 2>&1)"; then
+    printf '%s\n' "$stapler_output"
+    fail "DMG does not have a valid stapled notarization ticket: $dmg"
+  fi
   printf '%s\n' "$stapler_output"
 
-  gatekeeper_output="$(spctl -a -vvv -t open --context context:primary-signature "$dmg" 2>&1)"
+  if ! gatekeeper_output="$(spctl -a -vvv -t open --context context:primary-signature "$dmg" 2>&1)"; then
+    printf '%s\n' "$gatekeeper_output"
+    fail "Gatekeeper rejected macOS DMG: $dmg"
+  fi
   reject_gatekeeper_override "$gatekeeper_output" "$dmg"
   printf '%s\n' "$gatekeeper_output"
 

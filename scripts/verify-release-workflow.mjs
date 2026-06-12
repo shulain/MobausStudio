@@ -89,6 +89,16 @@ for (const jobName of ['build-desktop', 'build-web', 'build-docker']) {
 const buildDesktop = jobBlock('build-desktop');
 assertIncludes(
   buildDesktop,
+  '公证并装订 macOS DMG',
+  'macOS DMG notarization and stapling step',
+);
+assertIncludes(
+  buildDesktop,
+  'bash scripts/notarize-macos-dmgs.sh "${{ matrix.target }}" "v${{ steps.version.outputs.version }}"',
+  'macOS DMG notarization and stapling command',
+);
+assertIncludes(
+  buildDesktop,
   '验证 macOS 签名与公证产物',
   'macOS distribution signing verifier step',
 );
@@ -100,8 +110,14 @@ assertIncludes(
 assertOrder(
   buildDesktop,
   'uses: tauri-apps/tauri-action@v0',
+  '公证并装订 macOS DMG',
+  'macOS DMG notarization after Tauri build',
+);
+assertOrder(
+  buildDesktop,
+  '公证并装订 macOS DMG',
   '验证 macOS 签名与公证产物',
-  'macOS distribution verification after Tauri build',
+  'macOS distribution verification after DMG notarization',
 );
 
 const publishRelease = jobBlock('publish-release');

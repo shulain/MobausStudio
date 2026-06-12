@@ -351,6 +351,16 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           args: ${{ matrix.args }}
 
+      - name: 公证并装订 macOS DMG
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/notarize-macos-dmgs.sh "${{ matrix.target }}" "v${{ steps.version.outputs.version }}"
+
       - name: 验证 macOS 签名与公证产物
         if: matrix.platform == 'macos-latest'
         shell: bash

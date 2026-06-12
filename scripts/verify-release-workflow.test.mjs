@@ -13,6 +13,16 @@ const MACOS_DISTRIBUTION_VERIFIER_STEP = `      - name: 验证 macOS 签名与�
         shell: bash
         run: npm run verify:macos-distribution -- "\${{ matrix.target }}"
 `;
+const MACOS_DMG_NOTARIZATION_STEP = `      - name: 公证并装订 macOS DMG
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        env:
+          APPLE_ID: \${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: \${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: \${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/notarize-macos-dmgs.sh "\${{ matrix.target }}" "v\${{ steps.version.outputs.version }}"
+`;
 
 function runVerifier(workflowContent) {
   const tempDir = mkdtempSync(join(tmpdir(), 'mobaus-release-workflow-'));
@@ -76,6 +86,13 @@ test('rejects macOS release builds without distribution signing verification', (
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /macOS distribution signing verifier step is missing/);
+});
+
+test('rejects macOS release builds without DMG notarization and stapling', () => {
+  const result = runVerifier(VALID_WORKFLOW.replace(MACOS_DMG_NOTARIZATION_STEP, ''));
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /macOS DMG notarization and stapling step is missing/);
 });
 
 test('rejects Docker push before release asset verification', () => {
