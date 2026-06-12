@@ -1,12 +1,12 @@
 # Production Readiness Evidence
 
-Last updated: 2026-06-11, Asia/Shanghai.
+Last updated: 2026-06-12, Asia/Shanghai.
 
 This document records the current production-readiness boundary for MobausStudio. It is an evidence index, not a replacement for CI or the Release workflow.
 
 ## Current status
 
-Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, user guide build, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction.
+Repository-side release hardening is in place and verified. CI now covers the Web production browser smoke path, Docker Web image smoke, user guide build, npm dependency audit, RustSec/Rust checks, and local macOS `.app` bundle construction and LaunchServices launch smoke.
 
 The Release workflow now also requires macOS distribution artifacts to pass signing and notarization verification after `tauri-apps/tauri-action` finishes. The gate rejects adhoc-signed apps, missing TeamIdentifier, missing hardened runtime, non-authoritative Gatekeeper checks, and DMGs without a stapled notarization ticket.
 
@@ -31,17 +31,42 @@ cleanup-release-draft: success; no Draft Release or v0.8.7-10 tag remained after
 
 Do not mark the project as fully production-ready until a Release workflow run completes after Apple Developer / App Store Connect agreements and notarization credentials are valid.
 
-Local evidence from 2026-06-11:
+Latest main CI evidence from 2026-06-12:
+
+```bash
+gh run view 27396105066 --json status,conclusion,jobs
+```
+
+Expected result:
+
+```text
+status: completed
+conclusion: success
+web-production-smoke: success
+docker-web-smoke: success
+docs-build: success
+rust-check: success
+test: success
+macos-app-local-build: success
+```
+
+The `web-production-smoke` job includes production browser navigation through the primary app sections, chat input/new-chat interaction, Settings data import/export modal coverage, Config Switcher and Stats coverage, Agent/Skills/MCP/Models/Providers modal open-close coverage, screenshot/report artifact upload, and browser console/page-error failure capture.
+
+The `macos-app-local-build` job includes local macOS `.app` construction, app bundle structure verification, and LaunchServices launch smoke for the built artifact.
+
+Local evidence from 2026-06-11 and 2026-06-12:
 
 ```text
 npm run verify:release-workflow: passed
 npm run test:release-workflow: passed, 8 tests
 npm run test:release-version: passed, 4 tests
 npm run audit:web: passed, found 0 vulnerabilities
+npm run smoke:web:production: passed; consoleErrors: []; pageErrors: []
 npm run build:app:local: passed
 npm run verify:macos-app-bundle: passed
 npm run smoke:macos-app-launch: passed
 LaunchServices screenshot: /tmp/mobausstudio-app-launch-smoke.png
+Production Web smoke screenshot: /var/folders/2y/3r_6wqkj6cx3lgxcvx5zrd6h0000gn/T/mobausstudio-production-smoke.png
 macOS launch smoke resolves the target .app bundle to an absolute path, verifies that newly detected PIDs execute from that bundle's Contents/MacOS path, and warns when another same-name app process is running from a different path.
 ```
 
@@ -59,7 +84,7 @@ This local artifact proves local launchability only. It does not prove user-dist
 
 ## Verified evidence
 
-Recent repository CI evidence:
+Previous repository CI evidence:
 
 ```bash
 gh run view 27349210478
@@ -71,6 +96,7 @@ Expected result:
 test: success
 web-production-smoke: success
 docker-web-smoke: success
+docs-build: success
 macos-app-local-build: success
 rust-check: success
 ```
