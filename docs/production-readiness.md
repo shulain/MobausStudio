@@ -173,6 +173,9 @@ The Release workflow currently enforces these guardrails:
 - Failed or cancelled draft releases are cleaned up; failed manual `workflow_dispatch` releases also clean up the automatically created tag.
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
+- Before any public Release or prerelease, `user-guide/en/changelog.md` and `user-guide/zh/changelog.md` must both contain an exact `## [<version>] - YYYY-MM-DD` entry for the target version.
+- English and Chinese changelog entries must describe the same release scope with user-facing change descriptions. Missing either language, or publishing a Release body that falls back to a default placeholder such as `首次发布` or `版本更新`, is release-blocking.
+- Until the Release workflow supports bilingual extraction, the GitHub Release body must be reviewed manually so it includes complete release notes instead of only the workflow fallback text.
 - The Release `build-web` job runs a browser smoke against the versioned Web `dist` before uploading `MobausStudio-web.zip`, and uploads the smoke screenshot/report as an artifact.
 - `publish-release` verifies that the Draft Release contains Web, macOS Apple Silicon, macOS Intel, Windows, Linux, and updater assets before pushing GHCR images and before making the Release public.
 - `publish-release` downloads `latest.json` from the Draft Release and verifies that updater manifest entries exist for macOS Apple Silicon, macOS Intel, Windows, and Linux with non-empty URLs and signatures, match the release version, and point to assets present in the Draft Release.
@@ -221,6 +224,8 @@ Production-ready release criteria:
 - `publish-release`: success
 - `cleanup-release-draft`: skipped
 - The GitHub Release is public or prerelease as intended
+- The GitHub Release body contains complete feature/change descriptions and download instructions, not fallback text such as `首次发布` or `版本更新`
+- `user-guide/en/changelog.md` and `user-guide/zh/changelog.md` both contain the target version entry and are semantically aligned
 - Release assets are present for supported platforms
 - Release assets include Web zip, macOS Apple Silicon DMG, macOS Intel DMG, Windows installer, Linux installer, `latest.json`, and updater signatures
 - `latest.json` includes updater entries with URLs and signatures for macOS Apple Silicon, macOS Intel, Windows, and Linux; its version matches the Release version and every updater URL points to an uploaded Release asset

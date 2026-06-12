@@ -6,6 +6,28 @@ All version update records.
 
 ---
 
+## [0.8.7] - 2026-06-12
+
+### Added
+
+- 🚀 Production Release - First stable production release for Mobaus Studio, with verified desktop, web, and Docker distribution channels
+- 📦 Multi-platform Installers - Published signed release assets for macOS Apple Silicon, macOS Intel, Windows, Linux, and Web
+- 🔄 Updater Manifest - Published `latest.json` with release assets so supported clients can discover the latest stable build
+
+### Improved
+
+- 🍎 macOS Distribution Trust - macOS DMG artifacts are now notarized and stapled for both Apple Silicon and Intel builds before release publication
+- ✅ Release Quality Gates - Release workflow now validates required secrets, version compatibility, web smoke checks, Docker builds, desktop artifacts, and release asset completeness before publishing
+- 🧪 Production Readiness Closure - Added end-to-end release validation so official releases only publish after all platform build and verification jobs pass
+
+### Fixed
+
+- 🔧 Fixed macOS release verification failing because DMG artifacts were signed but not separately notarized and stapled
+- 🔧 Fixed Draft Release publication failing when GitHub's `getReleaseByTag` API could not find draft releases by tag
+- 🔧 Fixed macOS distribution verification logs so stapler and Gatekeeper failures are visible during CI diagnosis
+
+---
+
 ## [0.8.6] - 2026-04-08
 
 ### Added

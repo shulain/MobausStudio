@@ -6,6 +6,28 @@
 
 ---
 
+## [0.8.7] - 2026-06-12
+
+### 新增
+
+- 🚀 正式生产版发布 - Mobaus Studio 首个稳定生产版本，桌面端、Web 和 Docker 分发链路均已完成验证
+- 📦 多平台安装包 - 发布适用于 macOS Apple Silicon、macOS Intel、Windows、Linux 和 Web 的签名发布产物
+- 🔄 更新清单 - 发布 `latest.json`，让支持自动更新的客户端可发现最新稳定版本
+
+### 改进
+
+- 🍎 macOS 分发可信度 - macOS DMG 产物在发布前会分别完成公证和装订，覆盖 Apple Silicon 与 Intel 架构
+- ✅ Release 质量门禁 - 发布流程会校验必需 Secrets、版本兼容性、Web 烟测、Docker 构建、桌面端产物和 Release 资产完整性后再公开发布
+- 🧪 生产可用闭环 - 增加端到端发布验证，所有平台构建和验证任务通过后才发布正式版本
+
+### 修复
+
+- 🔧 修复 macOS Release 验证失败问题：DMG 产物此前只签名但未单独公证和装订
+- 🔧 修复 Draft Release 发布失败问题：GitHub `getReleaseByTag` API 无法按 tag 找到 draft release
+- 🔧 修复 macOS 分发验证日志不透明问题：CI 会输出 stapler 和 Gatekeeper 失败细节，便于诊断
+
+---
+
 ## [0.8.6] - 2026-04-08
 
 ### 新增
