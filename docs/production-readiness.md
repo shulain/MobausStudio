@@ -156,7 +156,7 @@ The Release workflow currently enforces these guardrails:
 CI currently enforces these non-release smoke gates on every `main` push and pull request:
 
 - `test`: npm vulnerability audit, TypeScript, ESLint, release workflow guard verifier, release version verifier, frontend tests, and Web build.
-- `web-production-smoke`: production Vite build, preview server startup, real browser navigation through Chat, Agent, Skills, MCP, Models, Providers, Config Switcher, Stats, and Settings, chat input/new-chat interaction, Settings data import/export modal coverage, screenshot/report artifact upload, and browser console/page-error failure capture.
+- `web-production-smoke`: production Vite build, preview server startup, real browser navigation through Chat, Agent, Skills, MCP, Models, Providers, Config Switcher, Stats, and Settings, chat input/new-chat interaction, Agent/Skills/MCP/Models/Providers modal open-close coverage, Settings data import/export modal coverage, screenshot/report artifact upload, and browser console/page-error failure capture.
 - `docker-web-smoke`: Docker Web image build and OCI version label verification.
 - `docs-build`: VitePress user guide dependency installation with `npm ci`, dependency vulnerability audit, and static site build.
 - `macos-app-local-build`: unsigned local macOS `.app` build, bundle structure verification, and LaunchServices open smoke when the runner has a GUI-capable session.

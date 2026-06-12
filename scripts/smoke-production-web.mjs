@@ -32,6 +32,11 @@ async function expectAbsent(locator, label, timeout = 2_000) {
   });
 }
 
+async function closeModalWithEscape(page, locator, label) {
+  await page.keyboard.press('Escape');
+  await expectAbsent(locator, label);
+}
+
 function findChromeExecutable() {
   if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
     return process.env.CHROME_PATH;
@@ -187,21 +192,42 @@ async function runBrowserSmoke(url) {
   await page.getByText('Agent').first().click();
   await expectVisible(page.getByRole('heading', { name: 'Agent 管理' }), 'Agent page heading');
   await expectVisible(page.getByPlaceholder('搜索 Agent...'), 'Agent search input');
+  await page.getByRole('button', { name: '创建 Agent' }).click();
+  const createAgentHeading = page.getByRole('heading', { name: '创建新 Agent', level: 2 });
+  await expectVisible(createAgentHeading, 'Create Agent modal heading');
+  await closeModalWithEscape(page, createAgentHeading, 'Create Agent modal after Escape');
 
   await page.getByText('Skills').first().click();
   await expectVisible(page.getByRole('heading', { name: '技能管理' }), 'Skills page heading');
   await expectVisible(page.getByPlaceholder('搜索技能...').first(), 'Skills search input');
   await expectVisible(page.getByRole('button', { name: '安装技能' }), 'install skills button');
+  await page.getByRole('button', { name: '安装技能' }).click();
+  const installSkillsHeading = page.getByRole('heading', { name: '安装技能', level: 2 });
+  await expectVisible(installSkillsHeading, 'Install Skills modal heading');
+  await closeModalWithEscape(page, installSkillsHeading, 'Install Skills modal after Escape');
 
   await page.getByText('MCP').first().click();
   await expectVisible(page.getByRole('heading', { name: 'MCP 服务器' }), 'MCP page heading');
   await expectVisible(page.getByRole('button', { name: '添加服务器' }), 'MCP add server button');
+  await page.getByRole('button', { name: '添加服务器' }).click();
+  const addMcpServerHeading = page.getByRole('heading', { name: '添加服务器', level: 2 });
+  await expectVisible(addMcpServerHeading, 'Add MCP server modal heading');
+  await closeModalWithEscape(page, addMcpServerHeading, 'Add MCP server modal after Escape');
 
   await page.getByText('模型').first().click();
   await expectVisible(page.getByPlaceholder('搜索模型...'), 'Models search input');
+  await page.getByRole('button', { name: '添加模型' }).click();
+  const addModelHeading = page.getByRole('heading', { name: '添加模型', level: 2 });
+  await expectVisible(addModelHeading, 'Add Model modal heading');
+  await closeModalWithEscape(page, addModelHeading, 'Add Model modal after Escape');
 
   await page.getByText('提供商').first().click();
   await expectVisible(page.getByPlaceholder('搜索提供商...'), 'Providers search input');
+  await page.getByRole('button', { name: /添加自定义/ }).click();
+  const addCustomProviderHeading = page.getByRole('heading', { name: '添加自定义提供商', level: 2 });
+  await expectVisible(addCustomProviderHeading, 'Add Custom Provider modal heading');
+  await page.getByRole('button', { name: '取消' }).click();
+  await expectAbsent(addCustomProviderHeading, 'Add Custom Provider modal after cancel');
 
   await page.getByText('配置切换').first().click();
   await expectVisible(page.getByRole('heading', { name: '配置切换' }), 'Config switcher page heading');
@@ -501,13 +527,18 @@ async function runBrowserSmoke(url) {
       'new chat button',
       'Agent 管理',
       'Agent search input',
+      '创建 Agent modal open/close',
       '技能管理',
       'Skills search input',
       '安装技能 button',
+      '安装技能 modal open/close',
       'MCP 服务器',
       'MCP add server button',
+      '添加服务器 modal open/close',
       'Models search input',
+      '添加模型 modal open/close',
       'Providers search input',
+      '添加自定义提供商 modal open/close',
       '配置切换 page heading',
       '使用统计 page heading',
       '关闭统计 modal',
