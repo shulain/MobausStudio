@@ -81,6 +81,7 @@ Download from the [Releases](https://github.com/shulain/MobausStudio/releases/la
 ### Docker
 
 > **Important:** The Docker image serves the static Web preview only. It does not include the Tauri/Rust backend, so AI chat requests, OAuth magic login callbacks, MCP execution, filesystem-backed secure storage, and auto-updates require the desktop app.
+> The official GHCR image is currently published for `linux/amd64`.
 
 ```bash
 docker run -d -p 8080:80 --name mobaus-studio ghcr.io/shulain/mobausstudio:latest

@@ -170,6 +170,7 @@ The Release workflow currently enforces these guardrails:
 - Desktop, Web, and Docker release jobs depend on Draft Release creation.
 - macOS desktop Release jobs verify non-adhoc signing, TeamIdentifier, hardened runtime, Gatekeeper assessment, and stapled DMG notarization before the workflow can publish.
 - Docker image push only happens in `publish-release`, after all release gates pass.
+- Release Docker image push is bounded with a step timeout and intentionally constrained to `linux/amd64`, matching the `build-docker` verification platform. Additional Docker architectures must first add matching verification before being enabled in `publish-release`.
 - Failed or cancelled draft releases are cleaned up; failed manual `workflow_dispatch` releases also clean up the automatically created tag.
 - Release workflow structure is verified in CI with `npm run verify:release-workflow`.
 - The release workflow verifier has regression tests in CI with `npm run test:release-workflow`.
@@ -229,7 +230,7 @@ Production-ready release criteria:
 - Release assets are present for supported platforms
 - Release assets include Web zip, macOS Apple Silicon DMG, macOS Intel DMG, Windows installer, Linux installer, `latest.json`, and updater signatures
 - `latest.json` includes updater entries with URLs and signatures for macOS Apple Silicon, macOS Intel, Windows, and Linux; its version matches the Release version and every updater URL points to an uploaded Release asset
-- GHCR image tags are present only after release publish succeeds
+- GHCR image tags are present only after release publish succeeds; the official Web preview image is currently published for `linux/amd64`
 
 ## Local checks
 

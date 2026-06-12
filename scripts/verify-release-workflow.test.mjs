@@ -107,6 +107,24 @@ test('rejects Docker push before release asset verification', () => {
   assert.match(result.stderr, /release asset verification before Docker push has the wrong order/);
 });
 
+test('rejects publish Docker push without a bounded timeout', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace('        timeout-minutes: 20\n        uses: docker/build-push-action@v7', '        uses: docker/build-push-action@v7'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /publish-time Docker push timeout is missing/);
+});
+
+test('rejects publish Docker push platforms that diverge from verification', () => {
+  const result = runVerifier(
+    VALID_WORKFLOW.replace('          platforms: linux/amd64\n          push: true', '          platforms: linux/amd64,linux/arm64\n          push: true'),
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /publish-time Docker push must match the validated linux\/amd64 platform/);
+});
+
 test('rejects cleanup without workflow_dispatch tag deletion', () => {
   const result = runVerifier(
     VALID_WORKFLOW.replace('await github.rest.git.deleteRef', 'await github.rest.git.getRef'),
