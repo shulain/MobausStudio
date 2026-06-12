@@ -203,6 +203,14 @@ async function runBrowserSmoke(url) {
   await page.getByText('提供商').first().click();
   await expectVisible(page.getByPlaceholder('搜索提供商...'), 'Providers search input');
 
+  await page.getByText('配置切换').first().click();
+  await expectVisible(page.getByRole('heading', { name: '配置切换' }), 'Config switcher page heading');
+
+  await page.getByText('统计').first().click();
+  await expectVisible(page.getByRole('heading', { name: '使用统计' }), 'Stats page heading');
+  await page.getByRole('button', { name: '关闭' }).click();
+  await expectAbsent(page.getByRole('heading', { name: '使用统计' }), 'Stats modal after close');
+
   await page.getByText('设置').first().click();
   await expectVisible(page.getByText('外观设置'), 'Settings appearance section');
   await page.getByText('数据管理').first().click();
@@ -500,6 +508,9 @@ async function runBrowserSmoke(url) {
       'MCP add server button',
       'Models search input',
       'Providers search input',
+      '配置切换 page heading',
+      '使用统计 page heading',
+      '关闭统计 modal',
       '外观设置',
       '数据管理',
       '导出配置 download with models/custom providers/agents/skills/MCP',
