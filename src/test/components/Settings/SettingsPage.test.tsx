@@ -223,6 +223,39 @@ describe('SettingsPage', () => {
         expect(mockReload).toHaveBeenCalled();
     });
 
+    it('rejects empty import packages without writing storage', async () => {
+        const OriginalFileReader = window.FileReader;
+        class EmptyPackageFileReader {
+            onload: ((e: any) => void) | null = null;
+            readAsText(_file: Blob) {
+                setTimeout(() => {
+                    this.onload?.({ target: { result: '{}' } });
+                }, 0);
+            }
+        }
+        window.FileReader = EmptyPackageFileReader as any;
+
+        try {
+            renderWithProviders(<SettingsPage />);
+            fireEvent.click(screen.getByText('数据管理'));
+            fireEvent.click(screen.getByText('导入配置'));
+
+            const file = new File(['{}'], 'empty-config.json', { type: 'application/json' });
+            const input = screen.getByLabelText(/选择文件/i);
+            fireEvent.change(input, { target: { files: [file] } });
+            fireEvent.click(screen.getByText('开始导入'));
+
+            await waitFor(() => {
+                expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('导入失败'));
+            });
+            expect(chatsStorage.save).not.toHaveBeenCalled();
+            expect(modelsStorage.save).not.toHaveBeenCalled();
+            expect(mockReload).not.toHaveBeenCalled();
+        } finally {
+            window.FileReader = OriginalFileReader;
+        }
+    });
+
     it('creates a full storage-service backup before importing', async () => {
         const OriginalGlobalBlob = globalThis.Blob;
         const OriginalWindowBlob = window.Blob;

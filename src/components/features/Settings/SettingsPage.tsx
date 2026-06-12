@@ -276,7 +276,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const data = JSON.parse(e.target?.result as string);
+                const raw = e.target?.result;
+                if (typeof raw !== 'string') {
+                    throw new Error('导入文件内容无效');
+                }
+
+                const data = JSON.parse(raw);
+                const hasImportPayload = [
+                    'models',
+                    'chats',
+                    'agents',
+                    'skills',
+                    'mcp',
+                    'mcpServers',
+                    'providerCredentials',
+                    'customProviders',
+                    'roundtableChats',
+                    'settings',
+                ].some((key) => Object.prototype.hasOwnProperty.call(data, key));
+
+                if (!hasImportPayload) {
+                    throw new Error('导入文件中未检测到可识别的配置字段');
+                }
 
                 if (options.backup) {
                     await createPreImportBackup();
