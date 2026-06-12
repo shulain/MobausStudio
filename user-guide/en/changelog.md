@@ -6,6 +6,29 @@ All version update records.
 
 ---
 
+## [0.8.8] - 2026-06-12
+
+### Added
+
+- 🚀 Stable Release Refresh - Published v0.8.8 as the stable production release line after completing bilingual release-note coverage and release documentation closure
+- 🌐 Bilingual Release Notes - Added English and Chinese changelog coverage so project documentation matches the public GitHub Release page
+
+### Improved
+
+- 📋 Release Documentation Standard - Production readiness documentation now requires bilingual changelog entries before any public Release or prerelease
+- 🧭 Release Page Clarity - Official Release notes now include user-facing feature/change descriptions and platform download guidance instead of fallback text
+
+### Fixed
+
+- 🔧 Fixed official Release notes missing feature descriptions when the target version is absent from the changelog before publication
+- 🔧 Fixed Chinese changelog coverage for the current stable release stream
+
+### Notes
+
+- Runtime product behavior is unchanged from v0.8.7 except for release version metadata; this release exists to provide a clean, complete, bilingual stable Release record.
+
+---
+
 ## [0.8.7] - 2026-06-12
 
 ### Added
