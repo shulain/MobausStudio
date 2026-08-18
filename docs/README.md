@@ -14,6 +14,7 @@ MobausStudio is a cross-platform AI client tool built with the Tauri framework.
 
 #### Development
 - [Development Guide](./DEVELOPMENT_GUIDE.md) -- Environment setup, code conventions, workflow (Bilingual)
+- [Architecture Review](./ARCHITECTURE_REVIEW.md) -- Architecture assessment and refactoring roadmap (Chinese, baseline v0.8.8)
 
 #### Module Documentation
 - [Module Index](./modules/README.md) -- Feature module design and implementation docs
@@ -32,6 +33,7 @@ MobausStudio/
 ├── docs/                    # Project documentation
 │   ├── README.md            # Documentation index (this file)
 │   ├── DEVELOPMENT_GUIDE.md # Development guide (bilingual)
+│   ├── ARCHITECTURE_REVIEW.md # Architecture review report
 │   ├── modules/             # Module design docs
 │   ├── components/          # Component docs
 │   └── services/            # Service layer docs
@@ -98,6 +100,7 @@ MobausStudio 是一个基于 Tauri 框架的跨平台 AI 客户端工具。
 
 #### 开发指南
 - [开发指南](./DEVELOPMENT_GUIDE.md) -- 开发环境配置、代码规范、工作流程（中英双语）
+- [架构检查报告](./ARCHITECTURE_REVIEW.md) -- 架构评估与重构路线（基线 v0.8.8）
 
 #### 模块文档
 - [模块文档目录](./modules/README.md) -- 功能模块设计与实现文档
@@ -116,6 +119,7 @@ MobausStudio/
 ├── docs/                    # 项目文档
 │   ├── README.md            # 文档入口（本文件）
 │   ├── DEVELOPMENT_GUIDE.md # 开发指南（中英双语）
+│   ├── ARCHITECTURE_REVIEW.md # 架构检查报告
 │   ├── modules/             # 模块设计文档
 │   ├── components/          # 组件文档
 │   └── services/            # 服务层文档
