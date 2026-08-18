@@ -13,7 +13,16 @@ const host = process.env.TAURI_DEV_HOST;
 // 只能通过环境变量传递：Vitest 会覆盖 poolOptions.*.execArgv，无法从配置直接注入；
 // 而写在此处而非 npm 脚本，是为了在 Windows（cmd 不支持内联环境变量）下同样生效。
 // worker 进程继承本进程环境，因此在配置加载期设置即可。
-if (process.env.VITEST && !process.env.NODE_OPTIONS?.includes("--no-experimental-webstorage")) {
+// 版本保护：Node 在 NODE_OPTIONS 中遇到未知参数会直接拒绝启动
+// （"--no-experimental-webstorage is not allowed in NODE_OPTIONS"），
+// 该参数自 Node 22 才存在。engines 字段默认不阻断安装，因此不能假定运行时版本。
+const nodeMajor = Number(process.versions.node.split(".")[0]);
+
+if (
+  process.env.VITEST &&
+  nodeMajor >= 22 &&
+  !process.env.NODE_OPTIONS?.includes("--no-experimental-webstorage")
+) {
   process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ""} --no-experimental-webstorage`.trim();
 }
 
