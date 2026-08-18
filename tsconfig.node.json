@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
     "composite": true,
+    // composite 即使配合 --noEmit 也会写 tsbuildinfo；
+    // 指向 node_modules 下的临时目录，避免污染仓库根目录
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",

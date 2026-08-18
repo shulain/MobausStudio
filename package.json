@@ -16,7 +16,7 @@
     "smoke:macos-app-launch": "bash scripts/smoke-macos-app-launch.sh",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "test": "tsc --noEmit -p tsconfig.test.json && vitest",

@@ -62,10 +62,38 @@ static GOOGLE_PROJECT_CACHE: Lazy<RwLock<HashMap<String, String>>> =
 /// 这些状态是可重新写入的注册信息与临时授权参数，不存在"panic 后数据不一致
 /// 就必须停止使用"的语义，恢复使用比让功能永久失效更合理。
 fn lock_tolerant<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| {
-        warn!("[lock] 检测到互斥锁中毒，恢复锁内数据继续使用");
-        poisoned.into_inner()
-    })
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            warn!("[lock] 检测到互斥锁中毒，恢复锁内数据继续使用");
+            // 必须清除中毒标记：into_inner() 只取回数据，不改变锁状态，
+            // 否则之后每一次 lock() 都会继续走错误分支
+            mutex.clear_poison();
+            poisoned.into_inner()
+        }
+    }
+}
+
+/// 获取 Kiro 授权临时状态的锁；中毒时丢弃其中数据而非恢复
+///
+/// 与 `lock_tolerant` 的区别在于数据语义：该状态保存的是 PKCE `code_verifier`
+/// 与 `state`，二者必须成对有效。持锁期间 panic 可能留下"半更新"的组合，
+/// 复用会导致后续用错配的参数交换 token（表现为授权失败而非被绕过）。
+/// 丢弃后调用方会得到"未找到授权状态"，重新发起授权即可 —— 这比复用可疑数据更稳妥。
+fn lock_kiro_auth_state() -> std::sync::MutexGuard<'static, KiroSocialAuthState> {
+    match KIRO_SOCIAL_AUTH_STATE.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            warn!("[lock] 授权临时状态锁中毒，丢弃可能不一致的 PKCE/state");
+            // 必须清除中毒标记，否则「置空」会在之后每次加锁时重复发生：
+            // 发起授权写入的 Some(...) 会在交换 token 取用前被再次清空，
+            // 导致 Kiro 授权永久失败直到应用重启 —— 正是本项要避免的失效模式
+            KIRO_SOCIAL_AUTH_STATE.clear_poison();
+            let mut guard = poisoned.into_inner();
+            *guard = None;
+            guard
+        }
+    }
 }
 
 /// 当前通用 OAuth 回调监听代次。
@@ -3331,7 +3359,7 @@ async fn request_kiro_social_auth(
 
     // 保存状态供后续 token 交换使用
     {
-        let mut auth_state = lock_tolerant(&KIRO_SOCIAL_AUTH_STATE);
+        let mut auth_state = lock_kiro_auth_state();
         *auth_state = Some((
             code_verifier.clone(),
             state.clone(),
@@ -3471,7 +3499,7 @@ async fn kiro_exchange_code(
     info!("[kiro_exchange_code] 开始交换 Kiro 授权码");
 
     let state = {
-        let mut auth_state = lock_tolerant(&KIRO_SOCIAL_AUTH_STATE);
+        let mut auth_state = lock_kiro_auth_state();
         auth_state
             .take()
             .ok_or_else(|| "未找到 Kiro Social Auth 状态，请先发起授权".to_string())?

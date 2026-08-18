@@ -38,7 +38,7 @@ jobs:
         run: npm run audit:web
 
       - name: TypeScript 编译检查
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: ESLint 代码质量检查
         run: npm run lint

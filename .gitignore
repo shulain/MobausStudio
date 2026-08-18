@@ -59,3 +59,6 @@ FIXES_TODO.md
 # Git Hooks
 .githooks/
 src-tauri/.playwright-mcp/
+
+# TypeScript 增量编译信息（composite 项目即使 --noEmit 也会生成）
+*.tsbuildinfo
