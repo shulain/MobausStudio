@@ -90,8 +90,13 @@ impl ConfigWatcher {
 
             loop {
                 // 从接收器中获取事件
+                // 容忍锁中毒：持锁线程 panic 后若直接 unwrap，监听循环会随之终止，
+                // 配置文件变更将不再被感知且无任何提示
                 let event = {
-                    let rx = self.receiver.lock().unwrap();
+                    let rx = self.receiver.lock().unwrap_or_else(|poisoned| {
+                        log::warn!("[ConfigWatcher] 检测到接收器锁中毒，恢复后继续监听");
+                        poisoned.into_inner()
+                    });
                     rx.recv_timeout(Duration::from_secs(1))
                 };
 

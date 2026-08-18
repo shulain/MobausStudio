@@ -7,7 +7,6 @@
  * @module test/components/ConfigSwitcher/ProviderSelector
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { ProviderSelector } from '../../../components/features/ConfigSwitcher/ProviderSelector';
@@ -59,6 +58,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
@@ -92,6 +92,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
@@ -112,6 +113,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
@@ -133,6 +135,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
@@ -165,7 +168,7 @@ describe('ProviderSelector', () => {
     expect(disableButton).toBeDefined();
 
     // 禁用按钮应该可点击
-    expect(disableButton.disabled).toBe(false);
+    expect((disableButton as HTMLButtonElement).disabled).toBe(false);
   });
 
   /**
@@ -181,13 +184,14 @@ describe('ProviderSelector', () => {
         isExporting={true}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
     // 所有按钮应该被禁用
     const buttons = screen.getAllByRole('button');
     buttons.forEach(button => {
-      expect(button.disabled).toBe(true);
+      expect((button as HTMLButtonElement).disabled).toBe(true);
     });
   });
 
@@ -204,6 +208,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 
@@ -224,6 +229,7 @@ describe('ProviderSelector', () => {
         isExporting={false}
         enabledProviderId={null}
         onEnable={onEnable}
+        onDisable={vi.fn()}
       />
     );
 

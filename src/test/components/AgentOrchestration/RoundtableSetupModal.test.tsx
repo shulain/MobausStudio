@@ -6,7 +6,6 @@
  * @module test/components/AgentOrchestration/RoundtableSetupModal.test
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { screen, waitFor, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

@@ -27,6 +27,8 @@ const createMockChat = (id: string): Chat => ({
   id,
   title: `Chat ${id}`,
   messages: [],
+  starred: false,
+  model: 'gpt-4o-mini',
   createdAt: new Date(),
   updatedAt: new Date(),
 });

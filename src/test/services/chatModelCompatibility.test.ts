@@ -6,8 +6,9 @@ import {
   getDefaultChatModelId,
   normalizeChatModelId,
 } from '../../services/models/chatModelCompatibility';
+import type { AIModelConfig } from '../../types';
 
-const model = (overrides: Record<string, unknown>) => ({
+const model = (overrides: Partial<AIModelConfig> = {}): AIModelConfig => ({
   id: 'model',
   name: 'Model',
   provider: 'openai',
@@ -16,6 +17,8 @@ const model = (overrides: Record<string, unknown>) => ({
   endpoint: 'https://api.openai.com/v1',
   maxTokens: 128000,
   pricing: { input: 0, output: 0 },
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
   ...overrides,
 });
 

@@ -29,6 +29,10 @@ import type { MCPServer, MCPTool } from '../../../types';
 const createMockServer = (id: string): MCPServer => ({
   id,
   name: `Server ${id}`,
+  description: `Server ${id} description`,
+  enabled: true,
+  authType: 'none',
+  requestCount: 0,
   transportType: 'stdio',
   command: 'node',
   args: ['server.js'],

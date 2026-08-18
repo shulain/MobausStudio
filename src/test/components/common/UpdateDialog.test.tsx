@@ -7,7 +7,6 @@
  * - 下载成功显示重启提示
  * - 下载失败显示错误并允许重试
  */
-import React from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UpdateDialog } from '../../../components/common/UpdateDialog';

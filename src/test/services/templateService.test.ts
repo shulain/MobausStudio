@@ -5,7 +5,7 @@
  * - TC-TPL-001 ~ TC-TPL-014: 模板解析和安装测试
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     parseTemplate,
     getRequiredVariables,
@@ -20,6 +20,7 @@ import type {
     AgentTemplatePackage,
     MCPServer,
     Skill,
+    SkillTemplate,
     Agent,
 } from '../../types';
 import { TemplateParseError } from '../../types';
@@ -119,7 +120,7 @@ function createTemplateWithVariables(): AgentTemplatePackage {
     };
 }
 
-function createTemplateWithRemoteSkill(skillTemplate: { inline?: unknown; url?: string } = {}): AgentTemplatePackage {
+function createTemplateWithRemoteSkill(skillTemplate: Partial<SkillTemplate> = {}): AgentTemplatePackage {
     return {
         id: 'remote-template',
         name: '远程技能模板',
@@ -294,6 +295,8 @@ describe('installTemplate', () => {
                     id: 'remote-skill',
                     name: 'Remote Skill',
                     description: 'Remote Skill Desc',
+                    version: '1.0.0',
+                    tags: ['coding'],
                     skill: {
                         name: '远程技能',
                         description: '来自 registry 的技能',

@@ -42,7 +42,7 @@ describe('LinkRenderer 组件', () => {
 
     // LR-03: 禁用外部链接图标
     it('LR-03: showExternalIcon=false 时不应该显示外部链接图标', () => {
-        const { container } = render(
+        render(
             <LinkRenderer href="https://example.com" showExternalIcon={false}>
                 无图标链接
             </LinkRenderer>

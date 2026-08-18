@@ -54,6 +54,20 @@ static MCP_MANAGER: Lazy<MCPClientManager> = Lazy::new(|| {
 static GOOGLE_PROJECT_CACHE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
+/// 获取互斥锁，容忍锁中毒
+///
+/// `std::sync::Mutex` 在持锁线程 panic 后会进入中毒状态，此后 `lock().unwrap()`
+/// 会持续 panic。OAuth 相关全局状态贯穿整个登录流程，一旦中毒将导致登录功能
+/// 持续不可用直到用户重启应用。这里恢复锁内数据继续使用：
+/// 这些状态是可重新写入的注册信息与临时授权参数，不存在"panic 后数据不一致
+/// 就必须停止使用"的语义，恢复使用比让功能永久失效更合理。
+fn lock_tolerant<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| {
+        warn!("[lock] 检测到互斥锁中毒，恢复锁内数据继续使用");
+        poisoned.into_inner()
+    })
+}
+
 /// 当前通用 OAuth 回调监听代次。
 ///
 /// 每次启动或停止都会推进代次，旧的监听循环检测到代次变化后会退出，
@@ -1896,15 +1910,14 @@ async fn save_api_keys(
 
     let data_dir = get_data_dir(&app_handle)?;
 
-    if !data_dir.exists() {
-        fs::create_dir_all(&data_dir).map_err(|e| format!("创建数据目录失败: {}", e))?;
-    }
-
     let file_path = data_dir.join("api_keys.json");
     let json = serde_json::to_string_pretty(&api_keys)
         .map_err(|e| format!("序列化 API Keys 失败: {}", e))?;
 
-    fs::write(&file_path, &json).map_err(|e| format!("写入文件失败: {}", e))?;
+    // API Key 文件含明文密钥，使用受限权限写入（父目录 0o700 / 文件 0o600）
+    // write_secure 内部会创建缺失的父目录，无需额外的 create_dir_all
+    services::secure_file::write_secure(&file_path, json.as_bytes())
+        .map_err(|e| format!("写入文件失败: {}", e))?;
 
     info!("[save_api_keys] 保存成功");
     Ok(())
@@ -2008,7 +2021,9 @@ async fn save_provider_credentials(
     let json =
         serde_json::to_string_pretty(&credentials).map_err(|e| format!("序列化凭证失败: {}", e))?;
 
-    fs::write(&file_path, json).map_err(|e| format!("写入文件失败: {}", e))?;
+    // 凭证文件含 OAuth Token，使用受限权限写入（父目录 0o700 / 文件 0o600）
+    services::secure_file::write_secure(&file_path, json.as_bytes())
+        .map_err(|e| format!("写入文件失败: {}", e))?;
 
     info!("[save_provider_credentials] 保存成功: {:?}", file_path);
 
@@ -2932,7 +2947,7 @@ async fn request_kiro_device_code() -> Result<OAuthDeviceCodeResponse, String> {
 
     // 保存客户端凭证供后续 token 轮询使用
     {
-        let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+        let mut registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
         *registration = Some((client_id.to_string(), client_secret.to_string()));
     }
 
@@ -3099,7 +3114,7 @@ async fn request_kiro_idc_device_code(
 
     // 保存客户端凭证供后续 token 轮询使用（包含 startUrl 和 region）
     {
-        let mut registration = KIRO_IDC_CLIENT_REGISTRATION.lock().unwrap();
+        let mut registration = lock_tolerant(&KIRO_IDC_CLIENT_REGISTRATION);
         *registration = Some((
             client_id.to_string(),
             client_secret.to_string(),
@@ -3110,7 +3125,7 @@ async fn request_kiro_idc_device_code(
 
     // 同时更新普通的 KIRO_CLIENT_REGISTRATION（用于 poll_kiro_token）
     {
-        let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+        let mut registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
         *registration = Some((client_id.to_string(), client_secret.to_string()));
     }
 
@@ -3194,20 +3209,18 @@ static KIRO_SOCIAL_AUTH_STATE: once_cell::sync::Lazy<std::sync::Mutex<KiroSocial
     once_cell::sync::Lazy::new(|| std::sync::Mutex::new(None));
 
 /// 生成 PKCE code_verifier 和 code_challenge
-fn generate_pkce() -> (String, String) {
+///
+/// 熵源不可用时返回 `Err` 并中止授权流程。
+/// 不做任何降级：可预测的 code_verifier 会使 PKCE 的授权码拦截防护失效，
+/// 与直接放弃 PKCE 无异。与 `services::chatgpt_web::oauth::generate_pkce_pair` 保持一致。
+fn generate_pkce() -> Result<(String, String), String> {
     use base64::Engine;
     use sha2::{Digest, Sha256};
 
     // 生成 32 字节随机数作为 code_verifier
     let mut verifier_bytes = [0u8; 32];
-    getrandom::getrandom(&mut verifier_bytes).unwrap_or_else(|_| {
-        // 降级方案：使用时间戳
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        verifier_bytes[..16].copy_from_slice(&now.to_le_bytes());
-    });
+    getrandom::getrandom(&mut verifier_bytes)
+        .map_err(|e| format!("生成 PKCE code_verifier 失败：系统随机数源不可用 ({})", e))?;
     let code_verifier = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(verifier_bytes);
 
     // 计算 SHA256 哈希作为 code_challenge
@@ -3216,22 +3229,20 @@ fn generate_pkce() -> (String, String) {
     let hash = hasher.finalize();
     let code_challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(hash);
 
-    (code_verifier, code_challenge)
+    Ok((code_verifier, code_challenge))
 }
 
 /// 生成随机 state 参数
-fn generate_state() -> String {
+///
+/// 熵源不可用时返回 `Err` 并中止授权流程。
+/// 不做任何降级：可预测的 state 会使 CSRF 防护失效。
+fn generate_state() -> Result<String, String> {
     use base64::Engine;
 
     let mut state_bytes = [0u8; 16];
-    getrandom::getrandom(&mut state_bytes).unwrap_or_else(|_| {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        state_bytes[..16].copy_from_slice(&now.to_le_bytes());
-    });
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(state_bytes)
+    getrandom::getrandom(&mut state_bytes)
+        .map_err(|e| format!("生成 OAuth state 失败：系统随机数源不可用 ({})", e))?;
+    Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(state_bytes))
 }
 
 /// 请求 Kiro Social Auth (Google/GitHub)
@@ -3247,11 +3258,11 @@ async fn request_kiro_social_auth(
         provider
     );
 
-    // 生成 PKCE
-    let (code_verifier, code_challenge) = generate_pkce();
+    // 生成 PKCE（熵源不可用时中止授权，不降级）
+    let (code_verifier, code_challenge) = generate_pkce()?;
 
-    // 生成 state
-    let state = generate_state();
+    // 生成 state（熵源不可用时中止授权，不降级）
+    let state = generate_state()?;
     // 生成 redirect_uri；如未提供则使用默认回调地址
     let redirect_uri = redirect_uri_override.unwrap_or_else(|| {
         format!(
@@ -3320,7 +3331,7 @@ async fn request_kiro_social_auth(
 
     // 保存状态供后续 token 交换使用
     {
-        let mut auth_state = KIRO_SOCIAL_AUTH_STATE.lock().unwrap();
+        let mut auth_state = lock_tolerant(&KIRO_SOCIAL_AUTH_STATE);
         *auth_state = Some((
             code_verifier.clone(),
             state.clone(),
@@ -3332,7 +3343,7 @@ async fn request_kiro_social_auth(
 
     // 同步普通客户端注册信息，便于后续 token 刷新
     {
-        let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+        let mut registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
         *registration = Some((client_id.to_string(), client_secret.to_string()));
     }
 
@@ -3460,7 +3471,7 @@ async fn kiro_exchange_code(
     info!("[kiro_exchange_code] 开始交换 Kiro 授权码");
 
     let state = {
-        let mut auth_state = KIRO_SOCIAL_AUTH_STATE.lock().unwrap();
+        let mut auth_state = lock_tolerant(&KIRO_SOCIAL_AUTH_STATE);
         auth_state
             .take()
             .ok_or_else(|| "未找到 Kiro Social Auth 状态，请先发起授权".to_string())?
@@ -3547,7 +3558,7 @@ async fn kiro_exchange_code(
 
         // 记录已持久化客户端注册信息
         {
-            let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+            let mut registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
             *registration = Some((client_id.clone(), client_secret.clone()));
         }
 
@@ -3706,7 +3717,7 @@ async fn poll_kiro_token(device_code: &str) -> Result<OAuthPollTokenResponse, St
     // 优先检查 IDC 注册信息（包含 region 和 start_url）
     // v0.9.1: 同时获取 start_url 用于持久化
     let (client_id, client_secret, region, start_url, is_idc) = {
-        let idc_registration = KIRO_IDC_CLIENT_REGISTRATION.lock().unwrap();
+        let idc_registration = lock_tolerant(&KIRO_IDC_CLIENT_REGISTRATION);
         if let Some((id, secret, url, reg)) = idc_registration.as_ref() {
             info!("[poll_kiro_token] 使用 IDC 认证, region: {}", reg);
             (
@@ -3719,7 +3730,7 @@ async fn poll_kiro_token(device_code: &str) -> Result<OAuthPollTokenResponse, St
         } else {
             drop(idc_registration); // 释放锁
                                     // 回退到普通的 Builder ID 注册
-            let registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+            let registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
             match registration.as_ref() {
                 Some((id, secret)) => {
                     info!(
@@ -7152,12 +7163,12 @@ async fn kiro_refresh_token(
                 .unwrap_or(false)
         {
             // IDC 认证（非默认 region）
-            let mut idc_registration = KIRO_IDC_CLIENT_REGISTRATION.lock().unwrap();
+            let mut idc_registration = lock_tolerant(&KIRO_IDC_CLIENT_REGISTRATION);
             *idc_registration = Some((id.clone(), secret.clone(), String::new(), region.clone()));
             info!("[kiro_refresh_token] 已恢复 IDC 客户端注册信息到内存");
         } else {
             // Builder ID 认证
-            let mut registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+            let mut registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
             *registration = Some((id.clone(), secret.clone()));
             info!("[kiro_refresh_token] 已恢复 Builder ID 客户端注册信息到内存");
         }
@@ -7166,7 +7177,7 @@ async fn kiro_refresh_token(
     } else {
         // 回退到内存中的注册信息
         // 优先检查 IDC 注册信息
-        let idc_registration = KIRO_IDC_CLIENT_REGISTRATION.lock().unwrap();
+        let idc_registration = lock_tolerant(&KIRO_IDC_CLIENT_REGISTRATION);
         if let Some((id, secret, _start_url, reg)) = idc_registration.as_ref() {
             info!(
                 "[kiro_refresh_token] 使用内存中的 IDC 认证信息, region: {}",
@@ -7176,7 +7187,7 @@ async fn kiro_refresh_token(
         } else {
             drop(idc_registration); // 释放锁
                                     // 回退到普通的 Builder ID 注册
-            let registration = KIRO_CLIENT_REGISTRATION.lock().unwrap();
+            let registration = lock_tolerant(&KIRO_CLIENT_REGISTRATION);
             match registration.as_ref() {
                 Some((id, secret)) => {
                     info!(

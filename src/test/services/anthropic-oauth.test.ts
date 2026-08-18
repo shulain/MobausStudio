@@ -10,7 +10,6 @@ import {
     exchangeAnthropicCode,
     refreshAnthropicToken,
     cancelAnthropicAuth,
-    type AnthropicAuthMode,
     anthropicOAuth,
 } from '../../services/anthropic-oauth';
 

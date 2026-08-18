@@ -10,7 +10,6 @@
  * @module test/components/Providers/ProviderCard
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { ProviderCard } from '../../../components/features/Providers/ProviderCard';

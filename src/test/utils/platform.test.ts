@@ -8,17 +8,14 @@
  * @module test/utils/platform
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { isTauri, isWeb } from '../../utils/platform';
 
 describe('platform 平台检测', () => {
-    // 保存原始 window 属性
-    const originalWindow = { ...window };
-
     afterEach(() => {
         // 清理注入的属性
-        delete (window as Record<string, unknown>).__TAURI__;
-        delete (window as Record<string, unknown>).__TAURI_INTERNALS__;
+        delete (window as unknown as Record<string, unknown>).__TAURI__;
+        delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
     });
 
     /**
@@ -36,7 +33,7 @@ describe('platform 平台检测', () => {
      * 测试场景: 有 __TAURI__ 属性时应识别为 Tauri 环境
      */
     it('TC-PLATFORM-002: 有 __TAURI__ 时 isTauri 返回 true', () => {
-        (window as Record<string, unknown>).__TAURI__ = {};
+        (window as unknown as Record<string, unknown>).__TAURI__ = {};
         expect(isTauri()).toBe(true);
         expect(isWeb()).toBe(false);
     });
@@ -46,7 +43,7 @@ describe('platform 平台检测', () => {
      * 测试场景: 有 __TAURI_INTERNALS__ 属性时应识别为 Tauri 环境
      */
     it('TC-PLATFORM-003: 有 __TAURI_INTERNALS__ 时 isTauri 返回 true', () => {
-        (window as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+        (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
         expect(isTauri()).toBe(true);
         expect(isWeb()).toBe(false);
     });

@@ -7,7 +7,7 @@ describe('attachmentUtils', () => {
             const file = new File(['dummy'], 'test.png', { type: 'image/png' });
             // Mock FileReader
             const originalFileReader = global.FileReader;
-            // @ts-ignore
+            // @ts-expect-error 测试用桩替换全局 FileReader，结构与内置类型不兼容
             global.FileReader = class {
                 onload: ((e: any) => void) | null = null;
                 onerror: (() => void) | null = null;

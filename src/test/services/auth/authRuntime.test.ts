@@ -61,7 +61,7 @@ const createMockProvider = (id: string, status: 'connected' | 'disconnected'): A
   icon: '🤖',
   description: 'Test provider',
   defaultEndpoint: 'https://api.test.com',
-  authMethods: ['api-key'],
+  authMethods: [{ type: 'api', label: 'API Key' }],
   models: [],
   status,
   protocol: 'openai',
@@ -71,7 +71,7 @@ const createMockProvider = (id: string, status: 'connected' | 'disconnected'): A
 // ==================== 测试用例 ====================
 
 describe('authRuntime 监听注册函数测试', () => {
-  let mockSetProviders: Mock<[updater: (prev: AIProvider[]) => AIProvider[]], void>;
+  let mockSetProviders: Mock<(updater: (prev: AIProvider[]) => AIProvider[]) => void>;
   let mockProviders: AIProvider[];
 
   beforeEach(() => {
@@ -131,7 +131,7 @@ describe('authRuntime 监听注册函数测试', () => {
   it('TC-AUTH-RUNTIME-004: registerTokenExpiredListener - 刷新成功', async () => {
     const { listen } = await import('@tauri-apps/api/event');
     let eventHandler: any;
-    (listen as Mock).mockImplementation((event, handler) => {
+    (listen as Mock).mockImplementation((_event, handler) => {
       eventHandler = handler;
       return Promise.resolve(vi.fn());
     });
@@ -167,7 +167,7 @@ describe('authRuntime 监听注册函数测试', () => {
   it('TC-AUTH-RUNTIME-005: registerTokenExpiredListener - 刷新失败', async () => {
     const { listen } = await import('@tauri-apps/api/event');
     let eventHandler: any;
-    (listen as Mock).mockImplementation((event, handler) => {
+    (listen as Mock).mockImplementation((_event, handler) => {
       eventHandler = handler;
       return Promise.resolve(vi.fn());
     });

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { tokenRefresher, type TokenRefreshResult } from '../../services/tokenRefresher';
+import { tokenRefresher } from '../../services/tokenRefresher';
 import type { ProviderCredential } from '../../types';
 
 // Mock Tauri API

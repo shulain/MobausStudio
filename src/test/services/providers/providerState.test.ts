@@ -33,7 +33,7 @@ const createMockProvider = (id: string): AIProvider => ({
   icon: '🤖',
   description: 'Test provider',
   defaultEndpoint: 'https://api.test.com',
-  authMethods: [{ type: 'api-key', label: 'API Key' }],
+  authMethods: [{ type: 'api', label: 'API Key' }],
   models: [
     { id: 'model-1', name: 'Model 1', maxTokens: 4096, contextWindow: 4096 },
   ],

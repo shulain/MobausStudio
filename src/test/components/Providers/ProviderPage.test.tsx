@@ -10,7 +10,6 @@
  * @module test/components/Providers/ProviderPage
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProviderPage } from '../../../components/features/Providers';

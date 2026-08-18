@@ -12,7 +12,7 @@
  * @module test/services/providers/providerConnection
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   handleApiKeyConnect,
   handleOAuthConnect,
@@ -55,7 +55,7 @@ describe('providerConnection 业务逻辑测试', () => {
     name: 'Test Provider',
     icon: '🧪',
     defaultEndpoint: 'https://api.test.com/v1',
-    authMethods: [{ type: 'api', name: 'API Key' }],
+    authMethods: [{ type: 'api', label: 'API Key' }],
     models: [
       { id: 'model-1', name: 'Model 1', maxTokens: 4096, contextWindow: 8192 },
       { id: 'model-2', name: 'Model 2', maxTokens: 8192, contextWindow: 16384 },
@@ -452,7 +452,7 @@ describe('providerConnection 业务逻辑测试', () => {
         accountId: 'acc',
         projectId: 'proj',
         profileArn: 'arn:aws:iam::123456789012:role/test',
-        authMethod: 'google',
+        authMethod: 'idc',
         kiroClientId: 'client-id',
         kiroClientSecret: 'client-secret',
         kiroSsoRegion: 'us-east-1',

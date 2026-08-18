@@ -8,7 +8,6 @@
  * - TC-RMB-010: 无内容无工具时显示思考中占位
  */
 
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { RoundtableMessageBubble } from '../../../components/features/AgentOrchestration/RoundtableMessageBubble';

@@ -9,7 +9,6 @@
  * - 组件使用内部 handleCheckUpdate，不再调用 onCheckUpdate prop
  * - 版本号动态获取，测试中显示为 'Web'（非 Tauri 环境）
  */
-import React from 'react';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AboutSettings } from '../../../components/features/Settings/AboutSettings';

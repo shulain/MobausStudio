@@ -8,7 +8,6 @@
  * @module test/components/ConfigSwitcher
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { ConfigSwitcherPage } from '../../../components/features/ConfigSwitcher';
@@ -68,9 +67,17 @@ function createMockMCPServer(overrides: Partial<MCPServer> = {}): MCPServer {
   return {
     id: 'filesystem',
     name: 'Filesystem',
+    description: 'Filesystem MCP server',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-filesystem', '/path'],
     enabled: true,
+    autoStart: false,
+    transportType: 'stdio',
+    authType: 'none',
+    status: 'disconnected',
+    requestCount: 0,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   };
 }
@@ -412,7 +419,7 @@ describe('ConfigSwitcher', () => {
     await waitFor(() => {
       const disableButtons = screen.getAllByRole('button', { name: /禁用|Disable/i });
       expect(disableButtons.length).toBeGreaterThan(0);
-      expect(disableButtons[0].disabled).toBe(false); // 禁用按钮应该可点击
+      expect((disableButtons[0] as HTMLButtonElement).disabled).toBe(false); // 禁用按钮应该可点击
     });
   });
 
@@ -472,7 +479,7 @@ describe('ConfigSwitcher', () => {
     let disableCallCount = 0;
 
     // Mock 一个延迟的导出请求
-    (invoke as any).mockImplementation((cmd: string, args?: any) => {
+    (invoke as any).mockImplementation((cmd: string) => {
       if (cmd === 'export_provider_to_tool') {
         exportCallCount++;
         // 第一次调用返回一个可控的 Promise（模拟长时间运行的请求）
@@ -536,7 +543,7 @@ describe('ConfigSwitcher', () => {
 
     // 5. 现在让旧的导出请求完成
     if (resolveExport) {
-      resolveExport(undefined);
+      (resolveExport as (value: unknown) => void)(undefined);
     }
 
     // 6. 等待一小段时间，确保旧请求的回调被处理

@@ -55,6 +55,37 @@ const FORBIDDEN_CAPABILITY_PERMISSIONS = [
   'updater:default',
 ];
 
+/**
+ * 判断文件写入作用域是否过宽
+ *
+ * 过宽的定义：授予整个文件系统或整个用户主目录的写权限。一旦允许，
+ * WebView 可覆盖 ~/.ssh/、~/.zshrc 等敏感文件。
+ *
+ * 收窄到主目录下的具体子树（如 `$HOME/.config/app/**`）不视为过宽 ——
+ * 本规则拦截的是"整个主目录"，不是"主目录下的任何路径"。
+ *
+ * @param {unknown} path 作用域路径
+ * @returns {boolean} 是否过宽
+ */
+function isOverbroadWriteScope(path) {
+  if (typeof path !== 'string') {
+    return false;
+  }
+
+  const normalized = path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '');
+
+  // 整个文件系统：** / * / /** / /*
+  if (/^\/?\*{1,2}$/.test(normalized)) {
+    return true;
+  }
+
+  // 整个用户主目录：$HOME / $HOME/* / $HOME/** / ~ 及其等价写法
+  return /^(\$HOME|~)(\/\*{1,2})?$/i.test(normalized);
+}
+
 function parseCsp(csp) {
   const directives = new Map();
 
@@ -122,13 +153,14 @@ function verifyCapability(capability) {
       errors.push('fs:allow-write-text-file must declare allowed paths');
     }
 
-    if (allowedPaths.includes('**')) {
-      errors.push('fs:allow-write-text-file must not allow **');
-    }
-
     for (const path of allowedPaths) {
       if (typeof path !== 'string' || path.trim().length === 0) {
         errors.push('fs:allow-write-text-file has an invalid path scope');
+        continue;
+      }
+
+      if (isOverbroadWriteScope(path)) {
+        errors.push(`fs:allow-write-text-file must not allow overbroad scope: ${path}`);
       }
     }
   }

@@ -28,7 +28,7 @@ vi.mock('../../utils/logger', () => ({
 
 // 模拟 permissionUtils
 vi.mock('../../utils/permissionUtils', () => ({
-    checkComprehensivePermission: vi.fn(({ context, permissions, sandboxMode, currentCallCount, maxCallCount }) => {
+    checkComprehensivePermission: vi.fn(() => {
         // 简单模拟：无权限配置时全部允许
         return {
             allowed: true,
@@ -55,6 +55,7 @@ describe('usePermissionCheck Hook', () => {
         const permResult = result.current.checkPermission({
             toolName: 'Bash',
             args: { command: 'ls' },
+            serverId: 'test-server',
         });
 
         expect(permResult.allowed).toBe(true);

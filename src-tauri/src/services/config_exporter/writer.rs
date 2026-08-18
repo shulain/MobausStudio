@@ -453,33 +453,17 @@ impl Writer {
             settings_path.display()
         );
 
-        // 确保目录存在并设置权限（复用 cc-switch gemini_config.rs 逻辑）
+        // 确保目录存在并收紧权限
         if let Some(parent) = env_path.parent() {
             fs::create_dir_all(parent).map_err(ConfigExportError::IoError)?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if let Ok(meta) = fs::metadata(parent) {
-                    let mut perms = meta.permissions();
-                    perms.set_mode(0o700);
-                    let _ = fs::set_permissions(parent, perms);
-                }
-            }
+            crate::services::secure_file::harden_dir(parent);
         }
 
-        // 写入 .env
+        // 写入 .env（保持原子写入：先写临时文件再 rename）
         write_text_file(&env_path, env_content)?;
 
-        // 设置 .env 文件权限为 600（Unix）
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Ok(meta) = fs::metadata(&env_path) {
-                let mut perms = meta.permissions();
-                perms.set_mode(0o600);
-                let _ = fs::set_permissions(&env_path, perms);
-            }
-        }
+        // .env 含 API Key，收紧为仅所有者可读写
+        crate::services::secure_file::harden_file(&env_path);
 
         // 写入 settings.json（合并现有配置）
         // v5.10.0: mcpServers 由导出器管理，删除所有 MCP 后不应残留

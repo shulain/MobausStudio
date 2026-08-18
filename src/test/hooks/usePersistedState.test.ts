@@ -19,7 +19,7 @@
  * @version 1.0.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { usePersistedState, type StorageAdapter } from '../../hooks/usePersistedState';
 

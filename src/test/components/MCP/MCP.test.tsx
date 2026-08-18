@@ -10,7 +10,6 @@
  * 对应文档: docs/modules/mcp.md
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { MCPPage } from '../../../components/features/MCP';

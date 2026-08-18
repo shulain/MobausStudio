@@ -7,7 +7,6 @@
  * @module test/components/ConfigSwitcher/AppSwitcher
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { AppSwitcher } from '../../../components/features/ConfigSwitcher/AppSwitcher';

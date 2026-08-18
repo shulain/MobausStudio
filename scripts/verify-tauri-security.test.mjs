@@ -36,7 +36,6 @@ const validCapability = {
     {
       identifier: 'fs:allow-write-text-file',
       allow: [
-        { path: '$HOME/**' },
         { path: '$DESKTOP/**' },
         { path: '$DOWNLOAD/**' },
         { path: '$DOCUMENT/**' },
@@ -100,17 +99,48 @@ describe('verifyTauriSecurityConfig', () => {
     assert.match(result.errors.join('\n'), /forbidden broad capability permission: updater:default/);
   });
 
-  it('rejects arbitrary filesystem path scopes', () => {
+  const withWriteScope = (...paths) => {
     const capability = structuredClone(validCapability);
     const writeTextPermission = capability.permissions.find(
       (permission) => permission.identifier === 'fs:allow-write-text-file',
     );
-    writeTextPermission.allow.push({ path: '**' });
+    writeTextPermission.allow.push(...paths.map((path) => ({ path })));
+    return capability;
+  };
 
-    const result = verifyTauriSecurityConfig(validConfig, capability);
+  it('rejects arbitrary filesystem path scopes', () => {
+    const result = verifyTauriSecurityConfig(validConfig, withWriteScope('**'));
 
     assert.equal(result.ok, false);
-    assert.match(result.errors.join('\n'), /fs:allow-write-text-file must not allow \*\*/);
+    assert.match(result.errors.join('\n'), /must not allow overbroad scope: \*\*/);
+  });
+
+  // 收窄 fs 作用域后的回归防护：$HOME/** 曾是本文件的"合法样例"，
+  // 门禁必须能拦住它被改回，否则 S4 的修复可以被无声撤销
+  for (const scope of ['$HOME/**', '$HOME/*', '$HOME', '$home/**', '~/**', '~', '/**', '/*', '*']) {
+    it(`rejects the overbroad write scope ${scope}`, () => {
+      const result = verifyTauriSecurityConfig(validConfig, withWriteScope(scope));
+
+      assert.equal(result.ok, false);
+      assert.match(result.errors.join('\n'), /must not allow overbroad scope/);
+    });
+  }
+
+  // 过宽的判定是"整个主目录"，不是"主目录下的任何路径"
+  for (const scope of ['$HOME/.claude/**', '$HOME/.codex/**', '$APPDATA/**']) {
+    it(`accepts the narrowed write scope ${scope}`, () => {
+      const result = verifyTauriSecurityConfig(validConfig, withWriteScope(scope));
+
+      assert.equal(result.ok, true);
+      assert.deepEqual(result.errors, []);
+    });
+  }
+
+  it('rejects a write scope that is only whitespace', () => {
+    const result = verifyTauriSecurityConfig(validConfig, withWriteScope('   '));
+
+    assert.equal(result.ok, false);
+    assert.match(result.errors.join('\n'), /has an invalid path scope/);
   });
 
   it('requires the exact runtime permissions used by the desktop shell', () => {

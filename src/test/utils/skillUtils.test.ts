@@ -2344,7 +2344,7 @@ describe('fetchSkillFromSkillsSh 递归搜索 (v3.0.20)', () => {
             };
         }) as typeof fetch;
 
-        vi.mocked(invoke).mockImplementation(async (cmd: string, args?: Record<string, unknown>) => {
+        vi.mocked(invoke).mockImplementation((async (cmd: string, args?: Record<string, unknown>) => {
             if (cmd === 'fetch_url_content') {
                 const url = String(args?.url || '');
                 if (url.endsWith('/main/SKILL.md')) {
@@ -2361,7 +2361,7 @@ describe('fetchSkillFromSkillsSh 递归搜索 (v3.0.20)', () => {
             }
 
             return null;
-        });
+        }) as unknown as typeof invoke);
 
         const result = await fetchSkillFromSkillsSh({
             id: 'xiaohongshu-skills',

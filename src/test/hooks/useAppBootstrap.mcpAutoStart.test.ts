@@ -41,7 +41,7 @@ describe('useAppBootstrap MCP 自动启动状态合并', () => {
         connectedAt,
         serverName: 'Playwright',
         serverVersion: '1.0.0',
-        tools: [{ name: 'browser_click', description: 'Click', inputSchema: {} }],
+        tools: [{ name: 'browser_click', description: 'Click', inputSchema: { type: 'object' as const, properties: {} } }],
       },
     ];
 
@@ -58,7 +58,7 @@ describe('useAppBootstrap MCP 自动启动状态合并', () => {
         name: 'Playwright',
         version: '1.0.0',
       },
-      tools: [{ name: 'browser_click', description: 'Click', inputSchema: {} }],
+      tools: [{ name: 'browser_click', description: 'Click', inputSchema: { type: 'object' as const, properties: {} } }],
     });
   });
 });

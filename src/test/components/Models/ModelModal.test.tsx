@@ -5,7 +5,6 @@
  * 包含中文注释和详细步骤日志。
  */
 
-import React from 'react';
 import { screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ModelModal from '../../../components/features/Models/ModelModal';

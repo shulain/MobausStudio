@@ -19,7 +19,6 @@ export default [
       'src-tauri/target/**',
       '*.config.js',
       '*.config.ts',
-      'src/test/**',  // 忽略测试文件，减少噪声
     ],
   },
 
@@ -50,14 +49,15 @@ export default [
     },
 
     rules: {
-      // 禁止使用 console.log（警告级别）
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // 禁止使用 console.log
+      // error 级 + lint 脚本的 --max-warnings=0：违规必须显式登记，不能靠"警告"无限累积
+      'no-console': ['error', { allow: ['warn', 'error'] }],
 
-      // 禁止使用 any 类型（警告级别）
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // 禁止使用 any 类型
+      '@typescript-eslint/no-explicit-any': 'error',
 
-      // 禁止未使用的变量（警告级别）
-      '@typescript-eslint/no-unused-vars': ['warn', {
+      // 禁止未使用的变量
+      '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
       }],
@@ -73,7 +73,21 @@ export default [
 
       // React Hooks 规则
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
+    },
+  },
+
+  // 测试文件：定向放宽个别规则，而非整体豁免
+  //
+  // 测试代码同样需要参与 lint —— 未使用变量、错误的 Hook 用法、被抑制的类型
+  // 检查在测试里同样是缺陷。但以下两类在测试中属正常手段，单独关闭：
+  // - console：断言失败时的诊断输出
+  // - any：构造不完整的桩数据、访问私有实现
+  {
+    files: ['src/test/**/*.{ts,tsx}'],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

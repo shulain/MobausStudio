@@ -10,7 +10,6 @@
  * 对应文档: docs/modules/skills.md
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { SkillsPage } from '../../../components/features/Skills';

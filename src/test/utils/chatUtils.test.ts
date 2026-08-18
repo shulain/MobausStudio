@@ -173,7 +173,7 @@ describe('chatUtils', () => {
                 ...Array.from({ length: 58 }, (_, i) => ({
                     id: `msg_${i}`,
                     chatId: 'c1',
-                    role: i % 2 === 0 ? 'user' : 'assistant',
+                    role: (i % 2 === 0 ? 'user' : 'assistant') as Message['role'],
                     content: `Message ${i}`,
                     createdAt: new Date(),
                 })),
@@ -181,7 +181,7 @@ describe('chatUtils', () => {
                 {
                     id: 'msg_58',
                     chatId: 'c1',
-                    role: 'assistant',
+                    role: 'assistant' as Message['role'],
                     content: '',
                     createdAt: new Date(),
                     toolCalls: [{
@@ -200,7 +200,7 @@ describe('chatUtils', () => {
                 {
                     id: 'msg_59',
                     chatId: 'c1',
-                    role: 'user',
+                    role: 'user' as Message['role'],
                     content: 'Thanks',
                     createdAt: new Date(),
                 },

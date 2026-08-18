@@ -16,7 +16,6 @@
     {
       "identifier": "fs:allow-write-text-file",
       "allow": [
-        { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOWNLOAD/**" },
         { "path": "$DOCUMENT/**" }

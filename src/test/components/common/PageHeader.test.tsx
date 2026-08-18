@@ -8,8 +8,7 @@
  * @module test/components/common/PageHeader
  */
 
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithI18n as render } from '../../testUtils';
 import { PageHeader } from '../../../components/common/PageHeader';

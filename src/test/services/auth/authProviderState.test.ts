@@ -35,17 +35,21 @@ const createMockProvider = (id: string): AIProvider => ({
   icon: '🤖',
   description: 'Test provider',
   defaultEndpoint: 'https://api.test.com',
-  authMethods: ['api-key'],
+  authMethods: [{ type: 'api', label: 'API Key' }],
   models: [],
   status: 'disconnected',
   protocol: 'openai',
   category: 'other',
 });
 
+const TEST_TIME = new Date('2026-01-01T00:00:00Z');
+
 const createApiKeyCredential = (providerId: string): ProviderCredential => ({
   providerId,
   type: 'api',
   apiKey: 'test-api-key',
+  createdAt: TEST_TIME,
+  updatedAt: TEST_TIME,
 });
 
 const createOAuthCredential = (
@@ -55,6 +59,8 @@ const createOAuthCredential = (
 ): ProviderCredential => ({
   providerId,
   type: 'oauth',
+  createdAt: TEST_TIME,
+  updatedAt: TEST_TIME,
   accessToken: 'test-access-token',
   refreshToken: hasRefreshToken ? 'test-refresh-token' : undefined,
   expiresAt,
@@ -205,6 +211,8 @@ describe('authProviderState 纯函数测试', () => {
     const credential: ProviderCredential = {
       providerId: 'test',
       type: 'oauth',
+      createdAt: TEST_TIME,
+      updatedAt: TEST_TIME,
       accessToken: 'test-token',
       refreshToken: 'test-refresh',
       // 没有 expiresAt

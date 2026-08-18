@@ -5,7 +5,6 @@
  * 包含中文注释。
  */
 
-import React from 'react';
 import { screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ModelCard from '../../../components/features/Models/ModelCard';

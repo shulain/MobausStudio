@@ -10,7 +10,6 @@
  * @module test/components/common/markdown/ThinkingBlock.test
  */
 
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { renderWithI18n as render } from '../../../testUtils';

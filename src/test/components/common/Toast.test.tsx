@@ -5,7 +5,6 @@
  * 包含中文注释和详细的步骤日志
  */
 
-import React from 'react';
 import { screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Toast, type ToastItem } from '../../../components/common';

@@ -28,7 +28,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: 安装依赖
@@ -68,8 +68,8 @@ jobs:
           npm run verify:tauri-security
           npm run test:tauri-security
 
-      - name: 运行单元测试
-        run: npm test
+      - name: 运行单元测试（含覆盖率）
+        run: npm run test:coverage
 
       - name: 构建检查
         run: npm run build
@@ -111,7 +111,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: 安装依赖
@@ -141,7 +141,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: user-guide/package-lock.json
 
@@ -164,7 +164,7 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: 安装 Rust

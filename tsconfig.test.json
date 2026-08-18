@@ -1,0 +1,10 @@
+{
+  // 测试代码的类型检查配置
+  //
+  // 根 tsconfig.json 的 exclude 排除了 src/test 与 *.test.*，
+  // 而 extends 会继承 exclude 并反过来过滤 include —— 因此这里必须
+  // 显式将 exclude 清空，否则测试文件仍不会被检查。
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": []
+}

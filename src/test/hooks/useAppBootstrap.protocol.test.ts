@@ -78,7 +78,7 @@ describe('useAppBootstrap 协议映射测试', () => {
             icon: cp.icon,
             defaultEndpoint: cp.endpoint,
             authMethods: cp.authMethods,
-            models: cp.models,
+            models: [], // 与 useAppBootstrap.ts:368 保持一致：自定义提供商不含模型列表
             status: 'disconnected' as const,
             protocol: cp.protocol, // 关键：使用 cp.protocol 而非硬编码
             isCustom: true,
